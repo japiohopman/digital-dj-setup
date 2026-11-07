@@ -1,0 +1,569 @@
+.turntable {
+  --turntable-ink: #171a1c;
+  --turntable-metal: #aeb4b5;
+  --turntable-amber: #dba64d;
+  width: 100%;
+}
+
+.turntable__frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1.243 / 1;
+  padding: 1.8%;
+  overflow: hidden;
+  border: 1px solid #c2c8c8;
+  border-radius: clamp(8px, 1.5vw, 16px);
+  background:
+    linear-gradient(135deg, #f3f4f0 0%, #7d8588 5%, #c9ceca 9%, #62696c 13%, #aab0ad 19%, #697174 100%);
+  box-shadow:
+    0 28px 52px rgb(0 0 0 / 38%),
+    0 8px 15px rgb(0 0 0 / 35%),
+    inset 0 1px 1px rgb(255 255 255 / 90%),
+    inset 0 -2px 5px rgb(0 0 0 / 55%);
+}
+
+.turntable__surface {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid #080a0b;
+  border-radius: 5px;
+  background:
+    radial-gradient(ellipse at 37% 43%, rgb(79 85 87 / 38%), transparent 58%),
+    linear-gradient(145deg, #33393c 0%, #171b1e 49%, #24292c 100%);
+  box-shadow:
+    inset 0 2px 8px rgb(0 0 0 / 85%),
+    inset 0 0 0 1px rgb(255 255 255 / 7%);
+}
+
+.turntable__surface::before {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0,
+    rgb(255 255 255 / 2.2%) 1px,
+    transparent 2px,
+    transparent 4px
+  );
+  content: '';
+  pointer-events: none;
+}
+
+.turntable__identification {
+  position: absolute;
+  z-index: 4;
+  top: 2.8%;
+  right: 3.2%;
+  left: 3.6%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #c2c8c7;
+  text-shadow: 0 1px 2px #000;
+}
+
+.turntable__branding {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(7px, 1.4vw, 14px);
+  min-width: 0;
+}
+
+.turntable__brand {
+  color: #e1e5e1;
+  font-size: clamp(9px, 1.65vw, 17px);
+  font-weight: 800;
+  letter-spacing: 0.19em;
+}
+
+.turntable__model,
+.turntable__deck-label {
+  color: #9ca5a5;
+  font-size: clamp(5px, 0.8vw, 8px);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  white-space: nowrap;
+}
+
+.turntable__deck-label {
+  color: #d8ddda;
+}
+
+.turntable__platter {
+  position: absolute;
+  top: 8%;
+  left: 3.2%;
+  height: 82%;
+  aspect-ratio: 1;
+  border: 2px solid #090b0c;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22282b, #8b9292 45%, #23282a 72%, #0d1011);
+  box-shadow:
+    0 8px 14px rgb(0 0 0 / 75%),
+    inset 0 0 0 2px rgb(255 255 255 / 24%),
+    inset 0 0 0 5px rgb(0 0 0 / 65%);
+}
+
+.turntable__platter-rim {
+  position: absolute;
+  inset: 2.5%;
+  border: 1px solid rgb(236 239 233 / 37%);
+  border-radius: 50%;
+  background: conic-gradient(
+    from 15deg,
+    #626a6d,
+    #d2d6d1 9deg,
+    #666e71 24deg,
+    #252b2e 53deg,
+    #b9bfbb 76deg,
+    #3b4245 119deg,
+    #d1d5d0 151deg,
+    #454d50 193deg,
+    #b4bbb8 238deg,
+    #333a3d 275deg,
+    #c4cac5 318deg,
+    #626a6d
+  );
+  box-shadow: inset 0 0 0 2px rgb(0 0 0 / 55%), 0 0 0 1px #080a0b;
+}
+
+.turntable__mat {
+  position: absolute;
+  inset: 6.2%;
+  border: 1px solid #090b0c;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #111517 0 63%, #1b2022 64% 65%, #080a0b 66% 100%);
+  box-shadow: inset 0 1px 8px #000;
+}
+
+.turntable__record {
+  position: absolute;
+  inset: 8.8%;
+  overflow: hidden;
+  border: 1px solid #050606;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 24%, rgb(255 255 255 / 10%), transparent 22%),
+    repeating-radial-gradient(
+      circle at 50% 50%,
+      #171a1b 0,
+      #080a0b 1px,
+      #262a2b 2px,
+      #080a0b 3px,
+      #141718 4px
+    );
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 8%),
+    inset 0 0 24px rgb(0 0 0 / 80%),
+    0 1px 2px #000;
+  transform: rotate(0deg);
+}
+
+.turntable__record.is-spinning {
+  animation: vinyl-spin var(--record-spin-duration, 1.8s) linear infinite;
+}
+
+.turntable__grooves {
+  position: absolute;
+  inset: 2%;
+  border: 1px solid rgb(255 255 255 / 7%);
+  border-radius: 50%;
+  background: repeating-radial-gradient(
+    circle at 50% 50%,
+    transparent 0 3px,
+    rgb(255 255 255 / 5%) 3.5px,
+    transparent 4px 6px
+  );
+  opacity: 0.9;
+}
+
+.turntable__label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  width: 26%;
+  aspect-ratio: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 3px double #b9a277;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 27%, #e0d6b9, #b99d69 47%, #706042 100%);
+  color: #29251f;
+  text-align: center;
+  text-shadow: 0 1px rgb(255 255 255 / 28%);
+  transform: translate(-50%, -50%);
+}
+
+.turntable__label-title {
+  font-size: clamp(6px, 1.1vw, 11px);
+  font-weight: 900;
+  letter-spacing: 0.16em;
+}
+
+.turntable__label-subtitle {
+  margin-top: 2px;
+  font-size: clamp(4px, 0.58vw, 6px);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.turntable__spindle {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  width: 2.2%;
+  aspect-ratio: 1;
+  border: 1px solid #e2e4df;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f8f8f1, #92999a 48%, #22282a 100%);
+  box-shadow: 0 0 2px #000;
+  transform: translate(-50%, -50%);
+}
+
+.turntable__strobe-ring {
+  position: absolute;
+  inset: 3.8%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgb(235 239 232 / 55%) 0deg 1.1deg,
+    transparent 1.1deg 7.5deg
+  );
+  mask: radial-gradient(circle, transparent 0 94%, #000 94.5% 98%, transparent 98.5%);
+  opacity: 0.55;
+}
+
+.turntable__tonearm {
+  position: absolute;
+  z-index: 3;
+  top: 8.5%;
+  right: 2.6%;
+  width: 31%;
+  height: 75%;
+  overflow: visible;
+  filter: drop-shadow(2px 4px 2px rgb(0 0 0 / 65%));
+}
+
+.turntable__pitch-control {
+  position: absolute;
+  top: 40%;
+  right: 3.8%;
+  display: flex;
+  width: 5.3%;
+  height: 31%;
+  flex-direction: column;
+  align-items: center;
+  color: #b5bcba;
+}
+
+.turntable__pitch-title,
+.turntable__pitch-zero {
+  font-size: clamp(4px, 0.58vw, 6px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.turntable__pitch-track {
+  position: relative;
+  width: 4px;
+  height: 76%;
+  margin: 7% 0;
+  border: 1px solid #060809;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #070909, #858d8e 50%, #101415);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 9%);
+}
+
+.turntable__pitch-center {
+  position: absolute;
+  top: 48%;
+  width: 11px;
+  height: 1px;
+  background: var(--turntable-amber);
+  box-shadow: 0 0 4px rgb(219 166 77 / 60%);
+}
+
+.turntable__pitch-indicator {
+  position: absolute;
+  top: 34%;
+  width: 13px;
+  height: 4px;
+  border: 1px solid #d5d9d3;
+  border-radius: 2px;
+  background: linear-gradient(#dfe3dc, #626a6d);
+  box-shadow: 0 1px 2px #000;
+}
+
+.turntable__pitch-zero {
+  margin-top: 1%;
+}
+
+.turntable__target-light {
+  position: absolute;
+  right: 12%;
+  bottom: 11.5%;
+  width: 5.2%;
+  aspect-ratio: 1;
+  border: 2px solid #080a0b;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #687174, #1a1e20);
+  box-shadow: 0 2px 4px #000, inset 0 1px 2px rgb(255 255 255 / 20%);
+}
+
+.turntable__target-light span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 35%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #32383a;
+  transform: translate(-50%, -50%);
+}
+
+.turntable.has-target-light .turntable__target-light span {
+  background: #f7d18b;
+  box-shadow: 0 0 12px 5px rgb(255 202 112 / 85%);
+}
+
+.turntable__controls {
+  position: absolute;
+  z-index: 5;
+  right: 23%;
+  bottom: 5.4%;
+  left: 4.2%;
+  display: flex;
+  height: 11.5%;
+  align-items: center;
+  gap: clamp(7px, 1.8vw, 18px);
+}
+
+.turntable__power-control,
+.turntable__lamp-control {
+  display: flex;
+  height: 100%;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.turntable__power-button,
+.turntable__lamp-button {
+  position: relative;
+  display: grid;
+  width: clamp(22px, 4.3vw, 42px);
+  aspect-ratio: 1;
+  place-items: center;
+  padding: 0;
+  border: 2px solid #090b0c;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #5f6769, #1a1f21 65%, #080a0b);
+  box-shadow: 0 2px 3px #000, inset 0 1px 2px rgb(255 255 255 / 22%);
+  cursor: pointer;
+}
+
+.turntable__power-ring {
+  width: 52%;
+  aspect-ratio: 1;
+  border: 2px solid #aeb5b4;
+  border-top-color: transparent;
+  border-radius: 50%;
+}
+
+.turntable__power-ring::after {
+  position: absolute;
+  top: 21%;
+  left: 48%;
+  width: 2px;
+  height: 35%;
+  background: #c5ccca;
+  content: '';
+  transform: translateX(-50%);
+}
+
+.turntable__power-button.is-on .turntable__power-ring {
+  border-color: var(--turntable-amber);
+  border-top-color: transparent;
+  filter: drop-shadow(0 0 2px rgb(219 166 77 / 70%));
+}
+
+.turntable__control-caption {
+  color: #abb2b0;
+  font-size: clamp(4px, 0.55vw, 6px);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.turntable__start-stop {
+  display: flex;
+  min-width: clamp(72px, 12.5vw, 120px);
+  height: clamp(22px, 4vw, 38px);
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 8px;
+  border: 2px solid #080a0b;
+  border-radius: 4px;
+  background: linear-gradient(145deg, #454d50, #15191b 75%);
+  box-shadow: 0 2px 3px #000, inset 0 1px rgb(255 255 255 / 12%);
+  color: #c7ceca;
+  cursor: pointer;
+  font-size: clamp(5px, 0.82vw, 9px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.turntable__start-stop:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.turntable__start-stop-light {
+  width: 6px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #4c2520;
+  box-shadow: inset 0 1px 2px #000;
+}
+
+.turntable__start-stop.is-active .turntable__start-stop-light {
+  background: #d66b45;
+  box-shadow: 0 0 6px 2px rgb(214 107 69 / 65%);
+}
+
+.turntable__speed-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.turntable__speed-button {
+  display: grid;
+  width: clamp(22px, 3.7vw, 36px);
+  aspect-ratio: 1;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #080a0b;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #5c6466, #171c1e 75%);
+  box-shadow: 0 2px 2px #000, inset 0 1px rgb(255 255 255 / 12%);
+  color: #b7bfbc;
+  cursor: pointer;
+  font-size: clamp(6px, 0.85vw, 9px);
+  font-weight: 800;
+}
+
+.turntable__speed-button.is-selected {
+  border-color: #c99443;
+  background: linear-gradient(145deg, #d3a654, #795b2e);
+  box-shadow: 0 0 7px rgb(219 166 77 / 34%), inset 0 1px rgb(255 255 255 / 25%);
+  color: #17130d;
+}
+
+.turntable__speed-button:disabled,
+.turntable__lamp-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.turntable__lamp-button span {
+  width: 23%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #6e7777;
+}
+
+.turntable__lamp-button.is-on span {
+  background: #fff1c8;
+  box-shadow: 0 0 10px 4px rgb(255 220 155 / 80%);
+}
+
+.turntable button:focus-visible {
+  outline: 2px solid #f2c574;
+  outline-offset: 4px;
+}
+
+@keyframes vinyl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 520px) {
+  .turntable__frame {
+    padding: 2.1%;
+    border-radius: 9px;
+  }
+
+  .turntable__surface {
+    border-radius: 3px;
+  }
+
+  .turntable__identification {
+    top: 2.5%;
+    right: 3%;
+    left: 3.2%;
+  }
+
+  .turntable__brand {
+    font-size: clamp(8px, 2.25vw, 12px);
+  }
+
+  .turntable__model,
+  .turntable__deck-label {
+    font-size: clamp(4px, 1.1vw, 6px);
+  }
+
+  .turntable__pitch-title,
+  .turntable__pitch-zero {
+    font-size: 4px;
+  }
+
+  .turntable__controls {
+    right: 22%;
+    bottom: 4.4%;
+    left: 3.5%;
+    height: 12%;
+    gap: clamp(5px, 1.5vw, 9px);
+  }
+
+  .turntable__start-stop {
+    min-width: clamp(59px, 19vw, 82px);
+    height: clamp(20px, 6vw, 29px);
+    gap: 4px;
+    padding-inline: 5px;
+    font-size: clamp(5px, 1.35vw, 7px);
+  }
+
+  .turntable__power-button,
+  .turntable__lamp-button {
+    width: clamp(20px, 6vw, 27px);
+  }
+
+  .turntable__speed-button {
+    width: clamp(18px, 5.5vw, 25px);
+    font-size: clamp(6px, 1.65vw, 8px);
+  }
+
+  .turntable__target-light {
+    right: 10%;
+    bottom: 10.7%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turntable__record.is-spinning {
+    animation: none;
+  }
+}
