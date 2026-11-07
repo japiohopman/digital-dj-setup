@@ -20,6 +20,7 @@ export class AudioEngine {
   private audioBuffer: AudioBuffer | null = null;
   private audioBufferReversed: AudioBuffer | null = null;
   private currentSource: AudioBufferSourceNode | null = null;
+  private gainNode: GainNode | null = null;
   private isReversed = false;
   private isScratching = false;
 
@@ -41,6 +42,12 @@ export class AudioEngine {
   private coastStartedAt = 0;
   private coastDurationSec = 0;
   private coastInitialRate = 1.0;
+
+  private isSpinningUp = false;
+  private spinUpStartedAt = 0;
+  private spinUpDurationSec = 0;
+  private spinUpInitialRate = 0.2;
+  private spinUpTimer: ReturnType<typeof setTimeout> | null = null;
 
   private tickerTimer: ReturnType<typeof setInterval> | null = null;
   private readonly listeners = new Set<AudioEngineListener>();
@@ -67,8 +74,19 @@ export class AudioEngine {
   private getOrCreateContext(): AudioContext {
     if (!this.audioContext) {
       this.audioContext = this.contextFactory();
+      this.gainNode = this.audioContext.createGain();
+      this.gainNode.connect(this.audioContext.destination);
     }
     return this.audioContext;
+  }
+
+  private getOrCreateGainNode(): GainNode {
+    const ctx = this.getOrCreateContext();
+    if (!this.gainNode) {
+      this.gainNode = ctx.createGain();
+      this.gainNode.connect(ctx.destination);
+    }
+    return this.gainNode;
   }
 
   /**
@@ -120,10 +138,19 @@ export class AudioEngine {
           this.coastDurationSec,
           Math.max(0, this.audioContext.currentTime - this.coastStartedAt),
         );
-        // Average rate during linear ramp: coastInitialRate * (1 - 0.5 * (coastElapsed / coastDurationSec))
         const progress = this.coastDurationSec > 0 ? coastElapsed / this.coastDurationSec : 1;
         const avgRate = this.coastInitialRate * (1 - 0.5 * progress);
         const elapsed = coastElapsed * avgRate;
+        currentTime = Math.min(this.duration, Math.max(0, this.logicalPosition + elapsed));
+      } else if (this.isSpinningUp) {
+        // Linear acceleration from spinUpInitialRate to currentPlaybackRate over spinUpDurationSec
+        const spinElapsed = Math.min(
+          this.spinUpDurationSec,
+          Math.max(0, this.audioContext.currentTime - this.spinUpStartedAt),
+        );
+        const progress = this.spinUpDurationSec > 0 ? spinElapsed / this.spinUpDurationSec : 1;
+        const avgRate = this.spinUpInitialRate + 0.5 * (this.currentPlaybackRate - this.spinUpInitialRate) * progress;
+        const elapsed = spinElapsed * avgRate;
         currentTime = Math.min(this.duration, Math.max(0, this.logicalPosition + elapsed));
       } else {
         const elapsed = (this.audioContext.currentTime - this.playStartedAt) * this.currentPlaybackRate;
@@ -361,15 +388,16 @@ export class AudioEngine {
     this.notify();
   }
 
-  private startSourceAt(position: number, reversed: boolean): void {
+  private startSourceAt(position: number, reversed: boolean, rampGain = true): void {
     if (!this.audioBuffer || !this.audioBufferReversed || this.isDisposed) return;
     const ctx = this.getOrCreateContext();
+    const gain = this.getOrCreateGainNode();
 
     this.stopCurrentSourceNode();
 
     const source = ctx.createBufferSource();
     source.buffer = reversed ? this.audioBufferReversed : this.audioBuffer;
-    source.connect(ctx.destination);
+    source.connect(gain);
 
     source.onended = () => {
       if (this.currentSource === source && !this.isScratching) {
@@ -388,6 +416,24 @@ export class AudioEngine {
     const now = ctx.currentTime;
     source.playbackRate.cancelScheduledValues(now);
     source.playbackRate.setValueAtTime(this.currentPlaybackRate, now);
+
+    // De-click ramp on start
+    if (rampGain) {
+      try {
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(1, now + 0.015);
+      } catch {
+        // mock
+      }
+    } else {
+      try {
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setValueAtTime(1, now);
+      } catch {
+        // mock
+      }
+    }
 
     source.start(0, startOffset);
     this.currentSource = source;
@@ -578,6 +624,87 @@ export class AudioEngine {
     }
   }
 
+  /**
+   * Initiates authentic Technics high-torque motor spin-up from fully stopped.
+   * Playback begins from the preserved track position with playback rate ramping
+   * up smoothly from 0.2 to target nominal rate over durationMs (default 450ms).
+   *
+   * @param durationMs - Spin-up acceleration duration in milliseconds (default 450ms).
+   */
+  public async spinUp(durationMs = 450): Promise<void> {
+    if (!this.audioBuffer || this.isDisposed) {
+      return;
+    }
+
+    this.stopCoastTimer();
+    this.stopSpinUpTimer();
+
+    const currentPlayId = ++this.playCounter;
+
+    try {
+      await this.ensureContextRunning();
+    } catch (err) {
+      this.error = err instanceof Error ? err.message : String(err);
+      this.notify();
+      return;
+    }
+
+    if (this.isDisposed || currentPlayId !== this.playCounter) {
+      return;
+    }
+
+    if (this.logicalPosition >= this.duration) {
+      this.logicalPosition = 0;
+    }
+
+    this.isReversed = false;
+    this.isScratching = false;
+
+    // Start source at current logical position with gain fade-in
+    this.startSourceAt(this.logicalPosition, false, true);
+
+    const ctx = this.getOrCreateContext();
+    const now = ctx.currentTime;
+    const durationSec = Math.max(0.1, durationMs / 1000);
+
+    this.isSpinningUp = true;
+    this.spinUpStartedAt = now;
+    this.spinUpDurationSec = durationSec;
+    this.spinUpInitialRate = 0.2;
+
+    if (this.currentSource) {
+      try {
+        this.currentSource.playbackRate.cancelScheduledValues(now);
+        this.currentSource.playbackRate.setValueAtTime(this.spinUpInitialRate, now);
+        this.currentSource.playbackRate.linearRampToValueAtTime(this.currentPlaybackRate, now + durationSec);
+      } catch {
+        // mock
+      }
+    }
+
+    this.playbackState = 'playing';
+    this.error = null;
+    this.startTicker();
+    this.notify();
+
+    this.spinUpTimer = setTimeout(() => {
+      if (this.isSpinningUp) {
+        this.updateLogicalPositionBeforeStopping();
+        this.playStartedAt = this.audioContext?.currentTime ?? 0;
+        this.isSpinningUp = false;
+        this.spinUpTimer = null;
+      }
+    }, durationMs);
+  }
+
+  private stopSpinUpTimer(): void {
+    if (this.spinUpTimer !== null) {
+      clearTimeout(this.spinUpTimer);
+      this.spinUpTimer = null;
+    }
+    this.isSpinningUp = false;
+  }
+
   private stopCoastTimer(): void {
     if (this.coastTimer !== null) {
       clearTimeout(this.coastTimer);
@@ -591,14 +718,38 @@ export class AudioEngine {
    */
   public pause(): void {
     this.stopCoastTimer();
+    this.stopSpinUpTimer();
     this.playCounter++;
     if (this.playbackState !== 'playing' || !this.audioBuffer) {
       return;
     }
 
     this.updateLogicalPositionBeforeStopping();
-    this.stopCurrentSourceNode();
     this.stopTicker();
+
+    const srcToStop = this.currentSource;
+    this.currentSource = null;
+
+    if (this.gainNode && this.audioContext && srcToStop) {
+      const now = this.audioContext.currentTime;
+      try {
+        this.gainNode.gain.cancelScheduledValues(now);
+        this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
+        this.gainNode.gain.linearRampToValueAtTime(0, now + 0.015);
+      } catch {
+        // mock
+      }
+
+      try {
+        srcToStop.onended = null;
+        srcToStop.stop();
+        srcToStop.disconnect();
+      } catch {
+        // ignore
+      }
+    } else {
+      this.stopCurrentSourceNode();
+    }
 
     this.playbackState = 'paused';
     this.notify();
@@ -609,8 +760,33 @@ export class AudioEngine {
    */
   public stop(): void {
     this.stopCoastTimer();
+    this.stopSpinUpTimer();
     this.playCounter++;
-    this.stopCurrentSourceNode();
+
+    const srcToStop = this.currentSource;
+    this.currentSource = null;
+
+    if (this.gainNode && this.audioContext && srcToStop) {
+      const now = this.audioContext.currentTime;
+      try {
+        this.gainNode.gain.cancelScheduledValues(now);
+        this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
+        this.gainNode.gain.linearRampToValueAtTime(0, now + 0.015);
+      } catch {
+        // mock
+      }
+
+      try {
+        srcToStop.onended = null;
+        srcToStop.stop();
+        srcToStop.disconnect();
+      } catch {
+        // ignore
+      }
+    } else {
+      this.stopCurrentSourceNode();
+    }
+
     this.stopTicker();
     this.logicalPosition = 0;
     if (this.audioBuffer) {

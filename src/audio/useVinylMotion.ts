@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from 'react';
 import type { DeckTransport } from './types';
 
-export type TurntableMotorState = 'driven' | 'coasting' | 'stopped';
+export type TurntableMotorState = 'driven' | 'coasting' | 'spinning-up' | 'stopped';
 
 export interface UseVinylMotionOptions {
   isPowered: boolean;
@@ -101,14 +101,21 @@ export function useVinylMotion({
     }
   }, [transport?.currentTime, effectiveRps, transport]);
 
-  // Auto-rotate and physics loop with coast-down support
+  // Auto-rotate and physics loop with coast-down and spin-up support
   const coastProgressRef = useRef<{ start: number; duration: number } | null>(null);
+  const spinUpProgressRef = useRef<{ start: number; duration: number } | null>(null);
 
   useEffect(() => {
     if (motorState === 'coasting') {
       coastProgressRef.current = { start: performance.now(), duration: 1200 };
     } else {
       coastProgressRef.current = null;
+    }
+
+    if (motorState === 'spinning-up') {
+      spinUpProgressRef.current = { start: performance.now(), duration: 450 };
+    } else {
+      spinUpProgressRef.current = null;
     }
   }, [motorState]);
 
@@ -129,21 +136,33 @@ export function useVinylMotion({
         coastFactor = 1 - progress; // Linear decay 1 -> 0
       }
 
+      const isSpinningUp = motorState === 'spinning-up' && spinUpProgressRef.current !== null;
+      let spinUpFactor = 1.0;
+      if (isSpinningUp) {
+        const elapsed = now - spinUpProgressRef.current!.start;
+        const progress = Math.min(1, Math.max(0, elapsed / spinUpProgressRef.current!.duration));
+        // Linear acceleration 0.2 -> 1.0
+        spinUpFactor = 0.2 + 0.8 * progress;
+      }
+
       const isMotorSpinning = isPowered && isMotorOn;
       const isAudioPlaying = transport?.isPlaying;
 
       if (!isScratchingRef.current) {
-        // If track is loaded, rotate when track is actively playing or coasting
-        // If no track loaded, rotate if motor is on or coasting
+        // If track is loaded, rotate when track is actively playing, coasting or spinning up
+        // If no track loaded, rotate if motor is on, coasting or spinning up
         const shouldRotate = isCoasting
           ? coastFactor > 0.001
-          : transport?.isLoaded
-            ? isAudioPlaying
-            : isMotorSpinning;
+          : isSpinningUp
+            ? true
+            : transport?.isLoaded
+              ? isAudioPlaying
+              : isMotorSpinning;
 
         // Respect prefers-reduced-motion: skip continuous visual platter rotation while keeping audio playing
         if (shouldRotate && !prefersReducedMotionRef.current) {
-          const deltaAngle = radsPerMs * dt * (isCoasting ? coastFactor : 1.0);
+          const speedMod = isCoasting ? coastFactor : isSpinningUp ? spinUpFactor : 1.0;
+          const deltaAngle = radsPerMs * dt * speedMod;
           let newAngle = angleRef.current + deltaAngle;
           if (maxAngle !== Infinity && newAngle > maxAngle) {
             newAngle = maxAngle;

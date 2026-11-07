@@ -53,7 +53,7 @@ export function Turntable({
 }: TurntableProps) {
   const motorActive = initiallyMotorOn !== undefined ? initiallyMotorOn : initiallySpinning;
   const [isPowered, setIsPowered] = useState(initiallyPowered);
-  const [isMotorOn, setIsMotorOn] = useState(initiallyPowered && motorActive);
+  const [isMotorOn, setIsMotorOn] = useState(motorActive);
   const [motorState, setMotorState] = useState<TurntableMotorState>(
     initiallyPowered && motorActive ? 'driven' : 'stopped',
   );
@@ -68,6 +68,7 @@ export function Turntable({
   const trackRef = useRef<HTMLDivElement | null>(null);
   const recordRef = useRef<HTMLDivElement | null>(null);
   const coastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const spinUpTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep live refs of power and motor state to avoid stale closures in async file loaders
   const isPoweredRef = useRef(isPowered);
@@ -75,11 +76,14 @@ export function Turntable({
   const isMotorOnRef = useRef(isMotorOn);
   isMotorOnRef.current = isMotorOn;
 
-  // Cleanup coast timer on unmount
+  // Cleanup coast and spin-up timers on unmount
   useEffect(() => {
     return () => {
       if (coastTimeoutRef.current !== null) {
         clearTimeout(coastTimeoutRef.current);
+      }
+      if (spinUpTimeoutRef.current !== null) {
+        clearTimeout(spinUpTimeoutRef.current);
       }
     };
   }, []);
@@ -178,6 +182,11 @@ export function Turntable({
     if (!nextPower) {
       // Power turned OFF
       setIsLightOn(false);
+      if (spinUpTimeoutRef.current !== null) {
+        clearTimeout(spinUpTimeoutRef.current);
+        spinUpTimeoutRef.current = null;
+      }
+
       const wasSpinning = isMotorOn || (transport?.isPlaying ?? false);
 
       if (wasSpinning) {
@@ -215,7 +224,23 @@ export function Turntable({
           transport.cancelCoastDown();
         }
       } else {
-        setMotorState(isMotorOn ? 'driven' : 'stopped');
+        // Power restored from fully stopped
+        // If motor was left in ON position, spin up smoothly over 450ms from preserved position
+        if (isMotorOn) {
+          setMotorState('spinning-up');
+          if (transport && transport.isLoaded) {
+            void transport.spinUp(450);
+          }
+          if (spinUpTimeoutRef.current !== null) {
+            clearTimeout(spinUpTimeoutRef.current);
+          }
+          spinUpTimeoutRef.current = setTimeout(() => {
+            setMotorState('driven');
+            spinUpTimeoutRef.current = null;
+          }, 450);
+        } else {
+          setMotorState('stopped');
+        }
       }
     }
   };
@@ -224,13 +249,26 @@ export function Turntable({
     if (!isPowered) return;
     const nextMotor = !isMotorOn;
     setIsMotorOn(nextMotor);
-    setMotorState(nextMotor ? 'driven' : 'stopped');
 
-    if (transport && transport.isLoaded) {
-      if (nextMotor) {
-        void transport.play();
-      } else {
-        // START/STOP button provides immediate Play/Pause (no coast-down)
+    if (spinUpTimeoutRef.current !== null) {
+      clearTimeout(spinUpTimeoutRef.current);
+      spinUpTimeoutRef.current = null;
+    }
+
+    if (nextMotor) {
+      // Technics high-torque motor spin-up to 33/45 RPM
+      setMotorState('spinning-up');
+      if (transport && transport.isLoaded) {
+        void transport.spinUp(450);
+      }
+      spinUpTimeoutRef.current = setTimeout(() => {
+        setMotorState('driven');
+        spinUpTimeoutRef.current = null;
+      }, 450);
+    } else {
+      // START/STOP button provides immediate Play/Pause (no coast-down)
+      setMotorState('stopped');
+      if (transport && transport.isLoaded) {
         transport.pause();
       }
     }
@@ -303,10 +341,11 @@ export function Turntable({
     setPitch(0);
   };
 
-  // If a track is loaded, the platter only spins when actually playing or coasting
-  // If no track loaded, platter spins if motor is on or coasting
+  // If a track is loaded, the platter only spins when actually playing, coasting or spinning up
+  // If no track loaded, platter spins if motor is on, coasting or spinning up
   const isSpinning =
     motorState === 'coasting' ||
+    motorState === 'spinning-up' ||
     (isPowered && isMotorOn && (!transport?.isLoaded || transport.isPlaying));
 
   const classes = [
@@ -317,6 +356,7 @@ export function Turntable({
     hasSlipmat ? 'has-slipmat' : '',
     isScratching ? 'is-scratching' : '',
     motorState === 'coasting' ? 'coasting' : '',
+    motorState === 'spinning-up' ? 'spinning-up' : '',
   ]
     .filter(Boolean)
     .join(' ');

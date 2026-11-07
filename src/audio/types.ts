@@ -61,4 +61,5 @@ export interface DeckTransport {
   setPlaybackRate: (rate: number) => void;
   coastDown: (durationMs?: number) => void;
   cancelCoastDown: () => void;
+  spinUp: (durationMs?: number) => Promise<void>;
 }

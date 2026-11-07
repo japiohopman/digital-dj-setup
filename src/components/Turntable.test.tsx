@@ -141,6 +141,7 @@ describe('Turntable static markup', () => {
       setPlaybackRate: vi.fn(),
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -186,6 +187,7 @@ describe('Turntable static markup', () => {
       setPlaybackRate: vi.fn(),
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -223,6 +225,7 @@ describe('Turntable static markup', () => {
       setPlaybackRate: vi.fn(),
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -255,6 +258,7 @@ describe('Turntable static markup', () => {
       setPlaybackRate: vi.fn(),
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -298,6 +302,7 @@ describe('Turntable interactive controls', () => {
       setPlaybackRate: vi.fn(),
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
     };
 
     await act(async () => {
@@ -352,6 +357,7 @@ describe('Turntable interactive controls', () => {
       setPlaybackRate: vi.fn(),
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
     };
 
     await act(async () => {
@@ -406,6 +412,7 @@ describe('Turntable interactive controls', () => {
       setPlaybackRate: vi.fn(),
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
     };
 
     await act(async () => {
@@ -457,6 +464,7 @@ describe('Turntable interactive controls', () => {
       setPlaybackRate: vi.fn(),
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
     };
 
     await act(async () => {
@@ -508,6 +516,7 @@ describe('Turntable interactive controls', () => {
       setPlaybackRate: vi.fn(),
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
     };
 
     await act(async () => {
@@ -524,6 +533,63 @@ describe('Turntable interactive controls', () => {
 
     expect(mockTransport.pause).toHaveBeenCalled();
     expect(mockTransport.coastDown).not.toHaveBeenCalled();
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('triggers spinUp when Power is turned ON from fully stopped state with motor active', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: 'spinup-deck.wav',
+      metadata: null,
+      duration: 180,
+      currentTime: 25,
+      playbackState: 'paused',
+      isPlaying: false,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // Initially powered OFF, but motor active
+    await act(async () => {
+      root.render(
+        <Turntable
+          deckLabel="DECK A"
+          transport={mockTransport}
+          initiallyPowered={false}
+          initiallyMotorOn={true}
+        />,
+      );
+    });
+
+    const powerDial = container.querySelector('button[aria-label="DECK A Power"]') as HTMLButtonElement;
+    expect(powerDial).toBeDefined();
+
+    // Turn power ON from stopped
+    await act(async () => {
+      powerDial.click();
+    });
+
+    // Should call spinUp(450) preserving track position
+    expect(mockTransport.spinUp).toHaveBeenCalledWith(450);
 
     await act(async () => {
       root.unmount();

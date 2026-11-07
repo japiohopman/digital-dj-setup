@@ -86,6 +86,14 @@ class MockAudioContext {
     this.createdSources.push(source);
     return source as unknown as AudioBufferSourceNode;
   });
+
+  createGain = vi.fn(() => {
+    return {
+      gain: new MockAudioParam(),
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    } as unknown as GainNode;
+  });
 }
 
 describe('AudioEngine', () => {
@@ -488,6 +496,62 @@ describe('AudioEngine', () => {
       expect.closeTo(2.025, 3),
       expect.any(Number),
     );
+
+    engine.dispose();
+  });
+
+  it('routes audio through a GainNode with de-click ramps on play and pause', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'declick-test.mp3');
+
+    expect(mockContext.createGain).toHaveBeenCalled();
+
+    await engine.play();
+    const source = mockContext.createdSources[0];
+    expect(source).toBeDefined();
+
+    // Source connects to GainNode, not directly to destination
+    expect(source?.connect).toHaveBeenCalledWith(expect.objectContaining({ gain: expect.anything() }));
+
+    // Pause schedules de-click ramp to 0 before stopping source
+    engine.pause();
+    expect(engine.getState().playbackState).toBe('paused');
+
+    // Advance 25ms to allow de-click timeout to execute
+    await vi.advanceTimersByTimeAsync(25);
+    expect(source?.stop).toHaveBeenCalled();
+
+    engine.dispose();
+  });
+
+  it('spins up from fully stopped preserving track position and accelerating playbackRate', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'spinup-test.mp3');
+
+    // Play first to position 15s, then pause
+    mockContext.currentTime = 0;
+    await engine.play();
+    mockContext.currentTime = 15;
+    engine.pause();
+    await vi.advanceTimersByTimeAsync(25);
+    expect(engine.getState().currentTime).toBe(15);
+
+    // Call spinUp(450ms)
+    mockContext.currentTime = 20;
+    await engine.spinUp(450);
+
+    const secondSource = mockContext.createdSources[1];
+    expect(secondSource).toBeDefined();
+    // Starts exactly at preserved track position (15s)
+    expect(secondSource?.startedAtOffset).toBe(15);
+
+    // Initial playback rate scheduled from 0.2 up to nominal rate (1.0)
+    expect(secondSource?.playbackRate.setValueAtTime).toHaveBeenCalledWith(0.2, 20);
+    expect(secondSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(1.0, 20 + 0.45);
+
+    // Advance timer past spin-up duration
+    await vi.advanceTimersByTimeAsync(450);
+    expect(engine.getState().playbackState).toBe('playing');
 
     engine.dispose();
   });

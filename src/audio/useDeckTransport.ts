@@ -103,6 +103,11 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     engineRef.current.cancelCoastDown();
   }, []);
 
+  const spinUp = useCallback(async (durationMs?: number) => {
+    if (!engineRef.current) return;
+    await engineRef.current.spinUp(durationMs);
+  }, []);
+
   return {
     trackName: state.trackName,
     metadata: state.metadata,
@@ -123,5 +128,6 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     setPlaybackRate,
     coastDown,
     cancelCoastDown,
+    spinUp,
   };
 }
