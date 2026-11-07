@@ -633,14 +633,20 @@ export class AudioEngine {
   }
 
   private finishCoastDown(): void {
-    if (this.isCoasting) {
-      this.updateLogicalPositionBeforeStopping();
-      this.stopCurrentSourceNode();
-      this.stopTicker();
-      this.isCoasting = false;
-      this.playbackState = 'paused';
-      this.notify();
+    if (!this.isCoasting) return;
+
+    // Preserve the exact position reached during the coast before reusing pause().
+    // Rebase the playback clock so pause() cannot add another interval at nominal speed.
+    this.updateLogicalPositionBeforeStopping();
+    if (this.audioContext) {
+      this.playStartedAt = this.audioContext.currentTime;
     }
+
+    // Power-off must finish through the same GainNode fade-out and delayed
+    // source disconnection as the dedicated Pause button. Stopping the source
+    // directly here was the power-only click/pop.
+    this.isCoasting = false;
+    this.pause();
   }
 
   /**
