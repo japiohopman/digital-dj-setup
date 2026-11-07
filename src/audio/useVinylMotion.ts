@@ -19,6 +19,23 @@ const TWO_PI = Math.PI * 2;
 const normalizeDelta = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
 /**
+ * Keeps the most recent real scratch direction while the pointer is momentarily still.
+ * A stationary animation frame has no direction and must not reset reverse playback.
+ */
+export function resolveScratchDirection(deltaAngle: number, previousDirection: boolean): boolean {
+  const movementEpsilon = 1e-7;
+  return Math.abs(deltaAngle) > movementEpsilon ? deltaAngle < 0 : previousDirection;
+}
+
+/**
+ * Scratch direction is handled separately, so velocity smoothing must use magnitude.
+ * Keeping this positive prevents forward and reverse samples from cancelling each other.
+ */
+export function calculateScratchSpeedMagnitude(deltaAngle: number, expectedAngleDelta: number): number {
+  return expectedAngleDelta > 0 ? Math.abs(deltaAngle / expectedAngleDelta) : 0;
+}
+
+/**
  * Custom hook providing realistic vinyl physics, touch/pointer scratching,
  * auto-rotation at Technics 33/45 RPM speeds with pitch modulation, and real-time audio sync.
  *
@@ -48,6 +65,7 @@ export function useVinylMotion({
   const timestampPreviousRef = useRef(performance.now());
   const discRef = useRef<HTMLDivElement | null>(null);
   const draggingSpeedsRef = useRef<number[]>([]);
+  const lastScratchDirectionRef = useRef(false);
 
   // Calculate rotations per second based on 33.333 or 45 RPM and pitch
   // 33.333 RPM = 33.333 / 60 = ~0.5555 rps; 45 RPM = 45 / 60 = 0.75 rps
@@ -174,7 +192,7 @@ export function useVinylMotion({
         // When scratching: compute instantaneous rotation velocity and direction
         const deltaAngle = angleRef.current - anglePreviousRef.current;
         const expectedAngleDelta = radsPerMs * dt;
-        const instantSpeed = expectedAngleDelta > 0 ? deltaAngle / expectedAngleDelta : 0;
+        const instantSpeed = calculateScratchSpeedMagnitude(deltaAngle, expectedAngleDelta);
 
         draggingSpeedsRef.current.push(instantSpeed);
         if (draggingSpeedsRef.current.length > 8) {
@@ -185,7 +203,8 @@ export function useVinylMotion({
           draggingSpeedsRef.current.reduce((a, b) => a + b, 0) /
           draggingSpeedsRef.current.length;
 
-        const isReversed = deltaAngle < 0;
+        const isReversed = resolveScratchDirection(deltaAngle, lastScratchDirectionRef.current);
+        lastScratchDirectionRef.current = isReversed;
         const currentSeconds = effectiveRps > 0 ? angleRef.current / (TWO_PI * effectiveRps) : 0;
 
         if (transport && transport.isLoaded) {
@@ -233,6 +252,7 @@ export function useVinylMotion({
     isScratchingRef.current = true;
     setIsScratching(true);
     draggingSpeedsRef.current = [];
+    lastScratchDirectionRef.current = false;
 
     // Capture pointer
     try {
