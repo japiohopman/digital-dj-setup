@@ -53,9 +53,9 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     await engineRef.current.play(offset);
   }, []);
 
-  const pause = useCallback(() => {
+  const pause = useCallback((durationMs?: number) => {
     if (!engineRef.current) return;
-    engineRef.current.pause();
+    engineRef.current.pause(durationMs);
   }, []);
 
   const stop = useCallback(() => {
