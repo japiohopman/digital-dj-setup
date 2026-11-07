@@ -18,7 +18,21 @@ describe('Turntable', () => {
     expect(markup).toContain('aria-label="DECK 01 Target light"');
     expect(markup).toContain('aria-label="DECK 01 Pitch Control"');
     expect(markup).toContain('aria-label="DECK 01 pitch slider"');
+    expect(markup).toContain('aria-label="DECK 01 Reset pitch to 0%"');
+    expect(markup).toContain('class="pitch-track"');
+    expect(markup).toContain('class="pitch-knob"');
     expect(markup).toContain('/turntable/landscape/tt_case_and_lighting.png');
+  });
+
+  it('renders realistic pitch assembly with scale markers and 0.0% quartz lock', () => {
+    const markup = renderToStaticMarkup(<Turntable deckLabel="DECK A" />);
+
+    expect(markup).toContain('PITCH ADJ.');
+    expect(markup).toContain('+8');
+    expect(markup).toContain('-8');
+    expect(markup).toContain('RESET');
+    expect(markup).toContain('0.0%');
+    expect(markup).toContain('pitch-reset-btn locked');
   });
 
   it('supports a reusable deck label, model and initial speed', () => {

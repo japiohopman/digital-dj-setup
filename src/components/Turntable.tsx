@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useState, useRef, type CSSProperties, type PointerEvent, type KeyboardEvent } from 'react';
 
 export type TurntableSpeed = 33 | 45;
 
@@ -33,6 +33,89 @@ export function Turntable({
   const [hasRecord] = useState(initiallyHasRecord);
   const [hasSlipmat] = useState(initiallyHasSlipmat);
   const [pitch, setPitch] = useState<number>(0);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+
+  const updatePitchFromPointer = (clientY: number, clientX: number) => {
+    if (!trackRef.current) return;
+    const rect = trackRef.current.getBoundingClientRect();
+    if (rect.height === 0 && rect.width === 0) return;
+
+    // Detect if element is rotated or vertical in screen space
+    // In battle mode, turntable is rotated -90deg.
+    // The pitch track element in screen space is horizontal!
+    // rect.width will be larger than rect.height.
+    let fraction = 0.5;
+    if (rect.width > rect.height) {
+      // Horizontal on screen: left is positive or right is positive?
+      // In battle mode (-90deg), top in local coordinates becomes left in screen coordinates.
+      // Top (+8%) -> Screen Left, Bottom (-8%) -> Screen Right.
+      // So as clientX goes from left to right: fraction goes 0 (top/+8%) to 1 (bottom/-8%)
+      const clampedX = Math.max(rect.left, Math.min(rect.right, clientX));
+      fraction = (clampedX - rect.left) / rect.width;
+    } else {
+      // Standard vertical on screen
+      const clampedY = Math.max(rect.top, Math.min(rect.bottom, clientY));
+      fraction = (clampedY - rect.top) / rect.height;
+    }
+
+    // fraction: 0 -> +8%, 0.5 -> 0%, 1 -> -8%
+    // Technics pitch: Top is +8, center is 0, bottom is -8
+    const rawPitch = 8 - fraction * 16;
+    // Snap to 0 within deadzone (-0.2 to +0.2)
+    const snappedPitch = Math.abs(rawPitch) < 0.25 ? 0 : Math.round(rawPitch * 10) / 10;
+    const clampedPitch = Math.max(-8, Math.min(8, snappedPitch));
+    setPitch(clampedPitch);
+  };
+
+  const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    updatePitchFromPointer(e.clientY, e.clientX);
+  };
+
+  const handlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    updatePitchFromPointer(e.clientY, e.clientX);
+  };
+
+  const handlePointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    if (isDragging) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        // pointer capture might already be released
+      }
+      setIsDragging(false);
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    let delta = 0;
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+      delta = 0.5;
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+      delta = -0.5;
+    } else if (e.key === 'Home') {
+      setPitch(8);
+      return;
+    } else if (e.key === 'End') {
+      setPitch(-8);
+      return;
+    } else if (e.key === 'PageUp') {
+      delta = 1.0;
+    } else if (e.key === 'PageDown') {
+      delta = -1.0;
+    } else {
+      return;
+    }
+    e.preventDefault();
+    setPitch((prev) => {
+      const next = Math.max(-8, Math.min(8, Math.round((prev + delta) * 10) / 10));
+      return Math.abs(next) < 0.2 ? 0 : next;
+    });
+  };
 
   const handlePowerToggle = () => {
     const nextPower = !isPowered;
@@ -81,6 +164,9 @@ export function Turntable({
   const spinStyle: CSSProperties = {
     animationDuration: `${effectiveDuration.toFixed(4)}s`,
   };
+
+  // Convert pitch (-8 to +8) to percentage along the fader slot (0% = +8, 50% = 0, 100% = -8)
+  const knobPercent = ((8 - pitch) / 16) * 100;
 
   return (
     <div
@@ -182,14 +268,58 @@ export function Turntable({
           <span>{modelName}</span>
         </div>
 
-        {/* Pitch Control Assembly (battle mode: top edge / native mode: right edge) */}
-        <div className="pitch-control" role="group" aria-label={`${deckLabel} Pitch Control`}>
-          <div className="pitch-scale">
-            <span className="scale-mark pos">+8</span>
-            <span className="scale-mark zero">0</span>
-            <span className="scale-mark neg">-8</span>
+        {/* Authentic Technics Pitch Control Assembly */}
+        <div className="pitch-assembly" role="group" aria-label={`${deckLabel} Pitch Control`}>
+          {/* 2X / Range indicator */}
+          <div className="pitch-indicator-box" aria-hidden="true">
+            <div className="indicator-led" />
+            <span className="indicator-label">±8</span>
           </div>
-          <div className="pitch-track">
+
+          {/* Main Fader Section */}
+          <div className="pitch-fader-housing">
+            <div className="pitch-adj-label" aria-hidden="true">PITCH ADJ.</div>
+
+            <div
+              className="pitch-track"
+              ref={trackRef}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+              role="presentation"
+            >
+              <div className="pitch-track-slot" />
+              <div
+                className={`pitch-knob${isDragging ? ' dragging' : ''}`}
+                style={{ top: `${knobPercent}%` }}
+                role="slider"
+                tabIndex={0}
+                aria-label={`${deckLabel} pitch slider`}
+                aria-valuemin={-8}
+                aria-valuemax={8}
+                aria-valuenow={pitch}
+                aria-valuetext={`${pitch > 0 ? '+' : ''}${pitch.toFixed(1)}%`}
+                onKeyDown={handleKeyDown}
+              >
+                <div className="pitch-knob-ridge" />
+              </div>
+            </div>
+
+            {/* Scale Markings alongside the fader */}
+            <div className="pitch-scale" aria-hidden="true">
+              <div className="scale-row pos"><span className="scale-num">+8</span><span className="scale-tick" /></div>
+              <div className="scale-row"><span className="scale-tick minor" /></div>
+              <div className="scale-row"><span className="scale-num">+4</span><span className="scale-tick" /></div>
+              <div className="scale-row"><span className="scale-tick minor" /></div>
+              <div className="scale-row zero"><span className="scale-num">0</span><span className="scale-tick zero" /></div>
+              <div className="scale-row"><span className="scale-tick minor" /></div>
+              <div className="scale-row"><span className="scale-num">-4</span><span className="scale-tick" /></div>
+              <div className="scale-row"><span className="scale-tick minor" /></div>
+              <div className="scale-row neg"><span className="scale-num">-8</span><span className="scale-tick" /></div>
+            </div>
+
+            {/* Hidden native input for form compatibility and assistive tech */}
             <input
               type="range"
               min="-8"
@@ -197,23 +327,27 @@ export function Turntable({
               step="0.1"
               value={pitch}
               onChange={handlePitchChange}
-              className="pitch-slider"
-              aria-label={`${deckLabel} pitch slider`}
-              aria-valuemin={-8}
-              aria-valuemax={8}
-              aria-valuenow={pitch}
-              aria-valuetext={`${pitch > 0 ? '+' : ''}${pitch.toFixed(1)}%`}
+              className="pitch-slider-sr"
+              aria-hidden="true"
+              tabIndex={-1}
             />
           </div>
-          <button
-            type="button"
-            className={`pitch-zero-led${pitch === 0 ? ' active' : ''}`}
-            onClick={handleResetPitch}
-            title="Reset pitch to 0% (Quartz Lock)"
-            aria-label={`${deckLabel} Reset pitch to 0%`}
-          />
-          <div className="pitch-readout" aria-hidden="true">
-            {pitch > 0 ? `+${pitch.toFixed(1)}%` : `${pitch.toFixed(1)}%`}
+
+          {/* Reset / Quartz 0% Lock Button and LED */}
+          <div className="pitch-reset-group">
+            <button
+              type="button"
+              className={`pitch-reset-btn${pitch === 0 ? ' locked' : ''}`}
+              onClick={handleResetPitch}
+              title="Reset pitch to 0% (Quartz Lock)"
+              aria-label={`${deckLabel} Reset pitch to 0%`}
+            >
+              <div className="reset-led" />
+              <span className="reset-label">RESET</span>
+            </button>
+            <div className="pitch-readout" aria-hidden="true">
+              {pitch > 0 ? `+${pitch.toFixed(1)}%` : `${pitch.toFixed(1)}%`}
+            </div>
           </div>
         </div>
       </div>
