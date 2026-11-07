@@ -252,6 +252,37 @@ describe('AudioEngine', () => {
     const state = engine.getState();
     expect(state.playbackState).toBe('stopped');
     expect(state.currentTime).toBe(120);
+    // Natural completion has already ended the source; never stop it a second time.
+    expect(activeSource?.stop).not.toHaveBeenCalled();
+    expect(activeSource?.disconnect).toHaveBeenCalled();
+  });
+
+  it('does not let the 100ms UI ticker pre-empt the native audio end event', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'ticker-end-race.mp3');
+
+    mockContext.currentTime = 0;
+    await engine.play();
+
+    const source = mockContext.createdSources[0];
+    expect(source).toBeDefined();
+
+    // The extrapolated logical time has reached the end, but the browser has
+    // not delivered AudioBufferSourceNode.onended yet.
+    mockContext.currentTime = 120;
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(engine.getState().playbackState).toBe('playing');
+    expect(source?.stop).not.toHaveBeenCalled();
+    expect(source?.disconnect).not.toHaveBeenCalled();
+
+    // Only the native end event is allowed to complete natural playback.
+    source?.onended?.();
+    expect(engine.getState().playbackState).toBe('stopped');
+    expect(source?.stop).not.toHaveBeenCalled();
+    expect(source?.disconnect).toHaveBeenCalled();
+
+    engine.dispose();
   });
 
   it('supports two completely isolated deck instances with independent audio state', async () => {
@@ -559,7 +590,7 @@ describe('AudioEngine', () => {
 
   it('smoothly fades terminal PCM edge across all channels to 0 on decode', async () => {
     const engine = createEngine();
-    const length = 1000;
+    const length = 44100;
     const ch0 = new Float32Array(length).fill(1.0);
     const ch1 = new Float32Array(length).fill(0.8);
 
@@ -573,13 +604,15 @@ describe('AudioEngine', () => {
 
     await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'test-edge.mp3');
 
-    // Terminal sample at index length - 1 must be exactly 0
+    // The final 20ms use a raised-cosine envelope on every channel.
+    const fadeSamples = Math.round(44100 * 0.02);
+    expect(ch0[length - fadeSamples]).toBeCloseTo(1.0, 5);
+    expect(ch1[length - fadeSamples]).toBeCloseTo(0.8, 5);
+    expect(ch0[length - fadeSamples + Math.floor(fadeSamples / 2)]).toBeGreaterThan(0);
+    expect(ch0[length - fadeSamples + Math.floor(fadeSamples / 2)]).toBeLessThan(1.0);
+    expect(ch1[length - fadeSamples + Math.floor(fadeSamples / 2)]).toBeLessThan(0.8);
     expect(ch0[length - 1]).toBe(0);
     expect(ch1[length - 1]).toBe(0);
-
-    // Preceding samples should ramp up
-    expect(ch0[length - 2]).toBeGreaterThan(0);
-    expect(ch0[length - 2]).toBeLessThan(1.0);
 
     engine.dispose();
   });
