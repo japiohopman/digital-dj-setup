@@ -11,7 +11,7 @@ describe('App dual-deck workspace', () => {
     expect(markup).toContain('id="deck-b-panel"');
     expect(markup).toContain('DECK A Technics-inspired turntable');
     expect(markup).toContain('DECK B Technics-inspired turntable');
-    expect(markup.match(/class="turntable is-powered is-spinning"/g)).toHaveLength(2);
+    expect(markup.match(/class="turntable power-on motor-on has-record"/g)).toHaveLength(2);
   });
 
   it('provides an accessible portrait deck selector', () => {
