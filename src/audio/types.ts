@@ -52,7 +52,7 @@ export interface DeckTransport {
   error: string | null;
   loadTrack: (file: File) => Promise<void>;
   play: (offset?: number) => Promise<void>;
-  pause: () => void;
+  pause: (durationMs?: number) => void;
   stop: () => void;
   togglePlayPause: () => Promise<void>;
   scratch: (speed: number, isReversed: boolean, position: number) => void;
