@@ -38,6 +38,7 @@ class MockAudioContext {
   currentTime = 0;
   destination = {};
   createdSources: MockAudioBufferSourceNode[] = [];
+  createdGainParams: MockAudioParam[] = [];
 
   resume = vi.fn(async () => {
     this.state = 'running';
@@ -88,8 +89,10 @@ class MockAudioContext {
   });
 
   createGain = vi.fn(() => {
+    const gain = new MockAudioParam();
+    this.createdGainParams.push(gain);
     return {
-      gain: new MockAudioParam(),
+      gain,
       connect: vi.fn(),
       disconnect: vi.fn(),
     } as unknown as GainNode;
@@ -472,12 +475,53 @@ describe('AudioEngine', () => {
     expect(source?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
     expect(engine.getState().playbackState).toBe('playing');
 
-    // Advance timers by 1200ms to complete coast-down
+    // Advance timers by 1200ms to complete coast-down.
     await vi.advanceTimersByTimeAsync(1200);
 
-    // Audio should now be paused and source stopped
+    // Coast-down must finish through the same GainNode fade as the Pause button.
     expect(engine.getState().playbackState).toBe('paused');
-    expect(source?.isStopped).toBe(true);
+    expect(source?.stop).not.toHaveBeenCalled();
+    expect(source?.disconnect).not.toHaveBeenCalled();
+    expect(mockContext.createdGainParams[0]?.linearRampToValueAtTime).toHaveBeenCalledWith(
+      0,
+      expect.any(Number),
+    );
+
+    // The source stays connected throughout the fade, then is stopped/disconnected.
+    await vi.advanceTimersByTimeAsync(10);
+    expect(source?.stop).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(15);
+    expect(source?.stop).toHaveBeenCalledTimes(1);
+    expect(source?.disconnect).toHaveBeenCalledTimes(1);
+
+    engine.dispose();
+  });
+
+
+  it('uses the same fade-before-stop path for power-off coast-down as the Pause button', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'power-off-declick.mp3');
+
+    mockContext.currentTime = 0;
+    await engine.play();
+    const source = mockContext.createdSources[0];
+    const gain = mockContext.createdGainParams[0];
+    expect(source).toBeDefined();
+    expect(gain).toBeDefined();
+
+    engine.coastDown(1200);
+    mockContext.currentTime = 1.2;
+    await vi.advanceTimersByTimeAsync(1200);
+
+    expect(engine.getState().playbackState).toBe('paused');
+    expect(source?.stop).not.toHaveBeenCalled();
+    expect(gain?.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
+
+    await vi.advanceTimersByTimeAsync(19);
+    expect(source?.stop).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(source?.stop).toHaveBeenCalledTimes(1);
+    expect(source?.disconnect).toHaveBeenCalledTimes(1);
 
     engine.dispose();
   });
