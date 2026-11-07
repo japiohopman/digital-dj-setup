@@ -25,7 +25,7 @@ Use the pinned development version with a Node version manager:
 
 ```bash
 nvm use
-npm install
+npm ci
 npm run dev
 ```
 
@@ -38,7 +38,7 @@ npm run test
 npm run build
 ```
 
-Vitest is configured. Until the first feature adds test files, the test command intentionally passes with no tests so the initial scaffold can be validated.
+CI uses `npm ci` and the committed `package-lock.json` so installs use the same dependency tree. Vitest is configured. Until the first feature adds test files, the test command intentionally passes with no tests so the initial scaffold can be validated.
 
 ## Design references
 
@@ -63,6 +63,6 @@ These are inspiration and behaviour references, not permission to copy code or a
 3. Keep the implementation limited to that issue.
 4. Open one pull request that references the issue with `Closes #N`.
 5. Run all quality checks and include screenshots for visual changes.
-6. Review and merge only after the user approves.
+6. Merge when the issue's acceptance criteria are met, CI is green and review has no unresolved blockers; the user has delegated this merge decision to the assistant.
 
 See [AGENTS.md](AGENTS.md) for coding-agent instructions and [CHATGPT.md](CHATGPT.md) for project collaboration guidance.
