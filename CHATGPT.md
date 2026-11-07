@@ -38,7 +38,7 @@ The mixer reference has not been selected yet. Keep mixer design and implementat
 4. Issue #10 — refine the visual fidelity of the Technics SL-1200MK2 hardware before audio is added.
 5. Issue #4 — isolated Web Audio playback engine per deck (after Issue #10).
 6. Issue #5 — touch-first scratching and reverse transport.
-6. Mixer — create a new issue only after the user chooses a mixer reference.
+7. Mixer — create a new issue only after the user chooses a mixer reference.
 
 ## Definition of done
 
