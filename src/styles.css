@@ -26,6 +26,9 @@ body {
   min-height: 100vh;
   min-height: 100svh;
   margin: 0;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgb(49 54 58 / 54%), transparent 56%),
+    #101113;
 }
 
 button,
@@ -36,42 +39,93 @@ textarea {
 }
 
 .app-shell {
-  display: grid;
+  display: flex;
   min-height: 100vh;
   min-height: 100svh;
-  place-items: center;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 3vh, 30px);
   padding:
-    max(24px, env(safe-area-inset-top))
-    max(24px, env(safe-area-inset-right))
-    max(24px, env(safe-area-inset-bottom))
-    max(24px, env(safe-area-inset-left));
+    max(22px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
 }
 
-.intro {
-  width: min(100%, 34rem);
-  text-align: center;
+.app-header,
+.app-footer {
+  display: flex;
+  width: min(100%, 920px);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-header {
+  gap: 16px;
 }
 
 .eyebrow {
-  margin: 0 0 1.25rem;
-  color: #a7b1bd;
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.22em;
+  margin: 0 0 6px;
+  color: #c59a58;
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.24em;
 }
 
-.intro h1 {
+.app-header h1 {
   margin: 0;
-  font-size: clamp(2rem, 8vw, 3.75rem);
-  font-weight: 650;
-  letter-spacing: -0.055em;
-  line-height: 1.04;
+  color: #f0f1ee;
+  font-size: clamp(1.4rem, 4vw, 2.25rem);
+  font-weight: 620;
+  letter-spacing: -0.05em;
+  line-height: 1;
 }
 
-.intro-copy {
-  max-width: 28rem;
-  margin: 1.25rem auto 0;
-  color: #a4a8ae;
-  font-size: 1rem;
-  line-height: 1.7;
+.app-header__mode {
+  padding: 7px 9px;
+  border: 1px solid rgb(205 211 208 / 15%);
+  border-radius: 3px;
+  color: #979f9f;
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
+.deck-workspace {
+  width: min(100%, 920px);
+}
+
+.app-footer {
+  justify-content: flex-start;
+  gap: 8px;
+  color: #747d80;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.app-footer__status {
+  width: 6px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #c59a58;
+  box-shadow: 0 0 7px rgb(197 154 88 / 50%);
+}
+
+@media (max-width: 520px) {
+  .app-shell {
+    gap: clamp(18px, 4vh, 28px);
+  }
+
+  .app-header__mode {
+    padding: 6px;
+    font-size: 0.48rem;
+  }
+
+  .app-footer {
+    flex-wrap: wrap;
+    font-size: 0.49rem;
+  }
 }
