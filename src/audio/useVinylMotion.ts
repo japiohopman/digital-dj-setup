@@ -81,6 +81,8 @@ export function useVinylMotion({
   const discRef = useRef<HTMLDivElement | null>(null);
   const draggingSpeedsRef = useRef<number[]>([]);
   const lastScratchDirectionRef = useRef(false);
+  const lastPointerMoveAtRef = useRef(performance.now());
+  const lastPointerVelocityRef = useRef(0);
   const freeSpinVelocityRef = useRef(0);
 
   // Calculate rotations per second based on 33.333 or 45 RPM and pitch
@@ -322,6 +324,8 @@ export function useVinylMotion({
     setIsScratching(true);
     draggingSpeedsRef.current = [];
     lastScratchDirectionRef.current = false;
+    lastPointerMoveAtRef.current = performance.now();
+    lastPointerVelocityRef.current = 0;
     freeSpinVelocityRef.current = 0;
     setIsFreeSpinning(false);
 
@@ -352,6 +356,12 @@ export function useVinylMotion({
       );
 
       const delta = normalizeDelta(angleFrom, angleCurrent);
+      const now = performance.now();
+      const elapsedMs = Math.max(1, now - lastPointerMoveAtRef.current);
+      lastPointerMoveAtRef.current = now;
+      // Platter angle increases with forward track movement; reverse hand movement is negative.
+      const velocity = -delta / (radsPerMs * elapsedMs);
+      lastPointerVelocityRef.current = Math.max(-4, Math.min(4, velocity));
       const nextAngle = Math.max(0, angleRef.current - delta);
 
       angleRef.current = nextAngle;
@@ -388,16 +398,11 @@ export function useVinylMotion({
         } else {
           // With the motor off, preserve the last measured hand velocity and let the
           // platter glide to rest rather than snapping to a stop on pointer release.
-          const movingSamples = draggingSpeedsRef.current.filter(
-            (sample) => sample > FREE_SPIN_STOP_THRESHOLD,
+          const elapsedSinceLastMove = Math.max(0, performance.now() - lastPointerMoveAtRef.current);
+          const signedReleaseSpeed = decayFreeSpinVelocity(
+            lastPointerVelocityRef.current,
+            elapsedSinceLastMove,
           );
-          const releaseSpeed = movingSamples.length > 0
-            ? movingSamples.slice(-4).reduce((sum, value) => sum + value, 0) /
-              Math.min(4, movingSamples.length)
-            : 0;
-          const signedReleaseSpeed = lastScratchDirectionRef.current
-            ? -releaseSpeed
-            : releaseSpeed;
 
           if (Math.abs(signedReleaseSpeed) > FREE_SPIN_STOP_THRESHOLD) {
             freeSpinVelocityRef.current = signedReleaseSpeed;
@@ -409,14 +414,11 @@ export function useVinylMotion({
           }
         }
       } else {
-        const movingSamples = draggingSpeedsRef.current.filter(
-          (sample) => sample > FREE_SPIN_STOP_THRESHOLD,
+        const elapsedSinceLastMove = Math.max(0, performance.now() - lastPointerMoveAtRef.current);
+        const signedReleaseSpeed = decayFreeSpinVelocity(
+          lastPointerVelocityRef.current,
+          elapsedSinceLastMove,
         );
-        const releaseSpeed = movingSamples.length > 0
-          ? movingSamples.slice(-4).reduce((sum, value) => sum + value, 0) /
-            Math.min(4, movingSamples.length)
-          : 0;
-        const signedReleaseSpeed = lastScratchDirectionRef.current ? -releaseSpeed : releaseSpeed;
         freeSpinVelocityRef.current = shouldResumeMotor ? 0 : signedReleaseSpeed;
         setIsFreeSpinning(Math.abs(freeSpinVelocityRef.current) > FREE_SPIN_STOP_THRESHOLD);
       }
@@ -425,7 +427,7 @@ export function useVinylMotion({
     window.addEventListener('pointermove', onPointerMove, { passive: false });
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
-  }, [isPowered, isMotorOn, transport, centerElementRef]);
+  }, [isPowered, isMotorOn, transport, centerElementRef, radsPerMs]);
 
   return {
     angle,
