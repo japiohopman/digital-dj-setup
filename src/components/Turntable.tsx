@@ -37,9 +37,9 @@ export function Turntable({
     }
   };
 
-  const spinStyle = {
+  const spinStyle: CSSProperties & { '--record-spin-duration': string } = {
     '--record-spin-duration': speed === 33 ? '1.8s' : '1.333s',
-  } as CSSProperties;
+  };
 
   return (
     <section
