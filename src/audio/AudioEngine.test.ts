@@ -188,6 +188,7 @@ describe('AudioEngine', () => {
     expect(firstSource).toBeDefined();
 
     engine.pause();
+    await vi.advanceTimersByTimeAsync(25);
     expect(firstSource?.stop).toHaveBeenCalled();
 
     await engine.play();
@@ -552,6 +553,60 @@ describe('AudioEngine', () => {
     // Advance timer past spin-up duration
     await vi.advanceTimersByTimeAsync(450);
     expect(engine.getState().playbackState).toBe('playing');
+
+    engine.dispose();
+  });
+
+  it('smoothly fades terminal PCM edge across all channels to 0 on decode', async () => {
+    const engine = createEngine();
+    const length = 1000;
+    const ch0 = new Float32Array(length).fill(1.0);
+    const ch1 = new Float32Array(length).fill(0.8);
+
+    mockContext.decodeAudioData = vi.fn().mockResolvedValueOnce({
+      duration: 1,
+      length,
+      numberOfChannels: 2,
+      sampleRate: 44100,
+      getChannelData: vi.fn((ch: number) => (ch === 0 ? ch0 : ch1)),
+    } as unknown as AudioBuffer);
+
+    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'test-edge.mp3');
+
+    // Terminal sample at index length - 1 must be exactly 0
+    expect(ch0[length - 1]).toBe(0);
+    expect(ch1[length - 1]).toBe(0);
+
+    // Preceding samples should ramp up
+    expect(ch0[length - 2]).toBeGreaterThan(0);
+    expect(ch0[length - 2]).toBeLessThan(1.0);
+
+    engine.dispose();
+  });
+
+  it('keeps source alive during pause de-click fade and only stops it after completion', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'fade-timing.mp3');
+
+    await engine.play();
+    const source = mockContext.createdSources[0];
+    expect(source).toBeDefined();
+
+    // Trigger pause
+    engine.pause();
+
+    // Immediately after pause call, source is NOT yet stopped or disconnected
+    expect(source?.stop).not.toHaveBeenCalled();
+    expect(source?.disconnect).not.toHaveBeenCalled();
+
+    // Advance 10ms (midway through de-click fade)
+    await vi.advanceTimersByTimeAsync(10);
+    expect(source?.stop).not.toHaveBeenCalled();
+
+    // Advance remaining time past the 20ms fade completion window
+    await vi.advanceTimersByTimeAsync(15);
+    expect(source?.stop).toHaveBeenCalled();
+    expect(source?.disconnect).toHaveBeenCalled();
 
     engine.dispose();
   });

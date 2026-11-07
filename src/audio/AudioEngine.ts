@@ -35,6 +35,7 @@ export class AudioEngine {
   private currentPlaybackRate = 1.0;
   private loadCounter = 0;
   private playCounter = 0;
+  private sourceGeneration = 0;
   private isDisposed = false;
 
   private isCoasting = false;
@@ -295,6 +296,7 @@ export class AudioEngine {
 
       if (this.isDisposed || requestId !== this.loadCounter) return;
 
+      this.applyTerminalEdgeFade(decoded);
       this.audioBuffer = decoded;
       this.audioBufferReversed = this.createReversedAudioBuffer(decoded, ctx);
       this.duration = decoded.duration;
@@ -311,6 +313,37 @@ export class AudioEngine {
       this.error = `Failed to decode audio: ${err instanceof Error ? err.message : 'Invalid audio file'}`;
       this.notify();
       throw err;
+    }
+  }
+
+  /**
+   * Generates a reversed AudioBuffer for reverse audio playback and scratching.
+   *
+   * @param buffer - Original forward AudioBuffer.
+   * @param ctx - AudioContext for buffer allocation.
+   * @returns Newly allocated reversed AudioBuffer.
+   */
+  /**
+   * Applies an inaudible short terminal fade (~5-10ms) to the ends of all audio channels
+   * to guarantee that the final PCM sample reaches 0 smoothly, eliminating clicks on natural track end.
+   */
+  private applyTerminalEdgeFade(buffer: AudioBuffer): void {
+    // 5ms fade window in samples
+    const fadeSamples = Math.min(Math.floor(buffer.sampleRate * 0.005), Math.floor(buffer.length / 2));
+    if (fadeSamples <= 0) return;
+
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const data = buffer.getChannelData(c);
+      const totalLen = data.length;
+      // Fade out at end of buffer
+      for (let i = 0; i < fadeSamples; i++) {
+        const idx = totalLen - 1 - i;
+        const rampFactor = i / fadeSamples; // 0 at the very last sample, ramp up to 1
+        const sample = data[idx];
+        if (sample !== undefined) {
+          data[idx] = sample * rampFactor;
+        }
+      }
     }
   }
 
@@ -395,12 +428,13 @@ export class AudioEngine {
 
     this.stopCurrentSourceNode();
 
+    const generation = ++this.sourceGeneration;
     const source = ctx.createBufferSource();
     source.buffer = reversed ? this.audioBufferReversed : this.audioBuffer;
     source.connect(gain);
 
     source.onended = () => {
-      if (this.currentSource === source && !this.isScratching) {
+      if (this.currentSource === source && this.sourceGeneration === generation && !this.isScratching) {
         this.handlePlaybackEnded();
       }
     };
@@ -740,13 +774,22 @@ export class AudioEngine {
         // mock
       }
 
+      // Detach onended immediately to prevent spurious playback ended events
       try {
         srcToStop.onended = null;
-        srcToStop.stop();
-        srcToStop.disconnect();
       } catch {
         // ignore
       }
+
+      // Keep source playing and connected until the gain fade completes (15ms + buffer)
+      setTimeout(() => {
+        try {
+          srcToStop.stop();
+          srcToStop.disconnect();
+        } catch {
+          // ignore
+        }
+      }, 20);
     } else {
       this.stopCurrentSourceNode();
     }
@@ -778,11 +821,19 @@ export class AudioEngine {
 
       try {
         srcToStop.onended = null;
-        srcToStop.stop();
-        srcToStop.disconnect();
       } catch {
         // ignore
       }
+
+      // Keep source playing and connected until the gain fade completes (15ms + buffer)
+      setTimeout(() => {
+        try {
+          srcToStop.stop();
+          srcToStop.disconnect();
+        } catch {
+          // ignore
+        }
+      }, 20);
     } else {
       this.stopCurrentSourceNode();
     }

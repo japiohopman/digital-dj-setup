@@ -192,7 +192,7 @@ export function Turntable({
       if (wasSpinning) {
         // Initiate realistic motor coast-down: audio and platter decelerate together over 1200ms
         setMotorState('coasting');
-        setIsMotorOn(false);
+        // Do NOT clear isMotorOn: retain motor START/STOP intent across power toggles
 
         if (transport && transport.isPlaying) {
           transport.coastDown(1200);
@@ -206,7 +206,6 @@ export function Turntable({
           coastTimeoutRef.current = null;
         }, 1200);
       } else {
-        setIsMotorOn(false);
         setMotorState('stopped');
         if (transport) {
           transport.pause();
@@ -218,14 +217,13 @@ export function Turntable({
         // Power restored while still coasting: restore motor torque seamlessly!
         clearTimeout(coastTimeoutRef.current);
         coastTimeoutRef.current = null;
-        setIsMotorOn(true);
         setMotorState('driven');
         if (transport && transport.isPlaying) {
           transport.cancelCoastDown();
         }
       } else {
         // Power restored from fully stopped
-        // If motor was left in ON position, spin up smoothly over 450ms from preserved position
+        // If motor START/STOP was left in ON position, spin up smoothly over 450ms from preserved position
         if (isMotorOn) {
           setMotorState('spinning-up');
           if (transport && transport.isLoaded) {

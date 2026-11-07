@@ -596,4 +596,213 @@ describe('Turntable interactive controls', () => {
     });
     container.remove();
   });
+
+  it('retains motor intent across full coast-down and triggers spinUp on subsequent Power ON', async () => {
+    vi.useFakeTimers();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: 'power-cycle.wav',
+      metadata: null,
+      duration: 200,
+      currentTime: 40,
+      playbackState: 'playing',
+      isPlaying: true,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // Deck initially powered ON and motor ON
+    await act(async () => {
+      root.render(
+        <Turntable
+          deckLabel="DECK A"
+          transport={mockTransport}
+          initiallyPowered={true}
+          initiallyMotorOn={true}
+        />,
+      );
+    });
+
+    const powerDial = container.querySelector('button[aria-label="DECK A Power"]') as HTMLButtonElement;
+    expect(powerDial).toBeDefined();
+
+    // 1. Turn power OFF -> starts coastDown
+    await act(async () => {
+      powerDial.click();
+    });
+    expect(mockTransport.coastDown).toHaveBeenCalledWith(1200);
+
+    // 2. Advance time past the 1200ms coast duration to reach fully stopped state
+    await act(async () => {
+      vi.advanceTimersByTime(1300);
+    });
+
+    const turntableElem = container.querySelector('.turntable');
+    expect(turntableElem?.classList.contains('coasting')).toBe(false);
+
+    // 3. Turn power ON from fully stopped -> must call spinUp(450) because motor intent was retained!
+    await act(async () => {
+      powerDial.click();
+    });
+
+    expect(mockTransport.spinUp).toHaveBeenCalledWith(450);
+    expect(turntableElem?.classList.contains('spinning-up')).toBe(true);
+
+    // 4. Advance 450ms -> should complete spinUp and enter driven state
+    await act(async () => {
+      vi.advanceTimersByTime(450);
+    });
+    expect(turntableElem?.classList.contains('spinning-up')).toBe(false);
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+    vi.useRealTimers();
+  });
+
+  it('does NOT trigger spinUp on Power ON if motor was explicitly disengaged before power-off', async () => {
+    vi.useFakeTimers();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: 'power-cycle-stopped.wav',
+      metadata: null,
+      duration: 200,
+      currentTime: 40,
+      playbackState: 'paused',
+      isPlaying: false,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // Deck initially powered ON but motor disengaged
+    await act(async () => {
+      root.render(
+        <Turntable
+          deckLabel="DECK A"
+          transport={mockTransport}
+          initiallyPowered={true}
+          initiallyMotorOn={false}
+        />,
+      );
+    });
+
+    const powerDial = container.querySelector('button[aria-label="DECK A Power"]') as HTMLButtonElement;
+
+    // Power OFF
+    await act(async () => {
+      powerDial.click();
+    });
+
+    // Advance past coast duration
+    await act(async () => {
+      vi.advanceTimersByTime(1300);
+    });
+
+    // Power ON
+    await act(async () => {
+      powerDial.click();
+    });
+
+    // Should NOT call spinUp since motor was disengaged
+    expect(mockTransport.spinUp).not.toHaveBeenCalled();
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+    vi.useRealTimers();
+  });
+
+  it('accelerates platter only without audio calls when Power ON from stopped with no track loaded', async () => {
+    vi.useFakeTimers();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: null,
+      metadata: null,
+      duration: 0,
+      currentTime: 0,
+      playbackState: 'idle',
+      isPlaying: false,
+      isLoaded: false,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+    };
+
+    await act(async () => {
+      root.render(
+        <Turntable
+          deckLabel="DECK A"
+          transport={mockTransport}
+          initiallyPowered={false}
+          initiallyMotorOn={true}
+        />,
+      );
+    });
+
+    const powerDial = container.querySelector('button[aria-label="DECK A Power"]') as HTMLButtonElement;
+    await act(async () => {
+      powerDial.click();
+    });
+
+    // No track loaded -> spinUp audio not called, but platter enters spinning-up
+    expect(mockTransport.spinUp).not.toHaveBeenCalled();
+    const turntableElem = container.querySelector('.turntable');
+    expect(turntableElem?.classList.contains('spinning-up')).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(450);
+    });
+    expect(turntableElem?.classList.contains('spinning-up')).toBe(false);
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+    vi.useRealTimers();
+  });
 });
