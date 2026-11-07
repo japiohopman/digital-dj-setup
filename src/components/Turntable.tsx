@@ -152,18 +152,20 @@ export function Turntable({
           {/* Rubber mat and vinyl record */}
           <circle cx="174" cy="176" r="129" fill="#171c1d" stroke="#050707" strokeWidth="2" />
           <circle cx="174" cy="176" r="125.5" fill="none" stroke="#485053" strokeWidth="0.8" />
-          <circle cx="174" cy="176" r="121" fill={`url(#${vinylGradientId})`} stroke="#050607" strokeWidth="1.3" />
-          <circle cx="174" cy="176" r="116" fill="none" stroke="#394143" strokeWidth="0.7" opacity="0.72" />
-          <circle cx="174" cy="176" r="108" fill="none" stroke="#555d5f" strokeWidth="0.55" opacity="0.52" />
-          <circle cx="174" cy="176" r="99" fill="none" stroke="#303739" strokeWidth="0.65" />
-          <circle cx="174" cy="176" r="89" fill="none" stroke="#454d4f" strokeWidth="0.55" opacity="0.58" />
-          <circle cx="174" cy="176" r="79" fill="none" stroke="#303638" strokeWidth="0.7" />
-          <circle cx="174" cy="176" r="69" fill="none" stroke="#51595a" strokeWidth="0.45" opacity="0.56" />
-          <circle cx="174" cy="176" r="61" fill="none" stroke="#333a3b" strokeWidth="0.65" />
-          <circle cx="174" cy="176" r="34" fill={`url(#${labelGradientId})`} stroke="#5a4e39" strokeWidth="1.8" />
-          <circle cx="174" cy="176" r="29" fill="none" stroke="#f5ecd4" strokeWidth="0.8" opacity="0.85" />
-          <text x="174" y="171" textAnchor="middle" fill="#30291f" fontSize="9" fontWeight="900" letterSpacing="1.6">TECHNICS</text>
-          <text x="174" y="183" textAnchor="middle" fill="#53442c" fontSize="5.7" fontWeight="800" letterSpacing="1.2">33⅓ / 45 RPM</text>
+          <g className={`turntable__record${isSpinning ? ' is-spinning' : ''}`} style={spinStyle}>
+            <circle cx="174" cy="176" r="121" fill={`url(#${vinylGradientId})`} stroke="#050607" strokeWidth="1.3" />
+            <circle cx="174" cy="176" r="116" fill="none" stroke="#394143" strokeWidth="0.7" opacity="0.72" />
+            <circle cx="174" cy="176" r="108" fill="none" stroke="#555d5f" strokeWidth="0.55" opacity="0.52" />
+            <circle cx="174" cy="176" r="99" fill="none" stroke="#303739" strokeWidth="0.65" />
+            <circle cx="174" cy="176" r="89" fill="none" stroke="#454d4f" strokeWidth="0.55" opacity="0.58" />
+            <circle cx="174" cy="176" r="79" fill="none" stroke="#303638" strokeWidth="0.7" />
+            <circle cx="174" cy="176" r="69" fill="none" stroke="#51595a" strokeWidth="0.45" opacity="0.56" />
+            <circle cx="174" cy="176" r="61" fill="none" stroke="#333a3b" strokeWidth="0.65" />
+            <circle cx="174" cy="176" r="34" fill={`url(#${labelGradientId})`} stroke="#5a4e39" strokeWidth="1.8" />
+            <circle cx="174" cy="176" r="29" fill="none" stroke="#f5ecd4" strokeWidth="0.8" opacity="0.85" />
+            <text x="174" y="171" textAnchor="middle" fill="#30291f" fontSize="9" fontWeight="900" letterSpacing="1.6">TECHNICS</text>
+            <text x="174" y="183" textAnchor="middle" fill="#53442c" fontSize="5.7" fontWeight="800" letterSpacing="1.2">{speed === 33 ? '33⅓ RPM' : '45 RPM'}</text>
+          </g>
           <circle cx="174" cy="176" r="4.2" fill="#dfe3dd" stroke="#343b3d" strokeWidth="1" />
           <circle cx="174" cy="176" r="1.25" fill="#343b3d" />
 
@@ -299,9 +301,6 @@ export function Turntable({
           <span />
         </button>
 
-        <div className="turntable__record-state" aria-live="polite">
-          {speed === 33 ? '33⅓ RPM' : '45 RPM'}
-        </div>
       </div>
     </section>
   );
