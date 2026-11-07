@@ -87,7 +87,7 @@ export function Turntable({
           className="turntable__artwork"
           viewBox="0 0 453 353"
           role="img"
-          aria-label="Top view of a Technics SL-1200 MK2 with platter, Tonearm and cartridge, S-shaped arm, pitch fader and physical controls"
+          aria-label="Top view of a Technics SL-1200 MK2 with platter, Tonearm and cartridge, S-shaped arm, counterweight, headshell, pitch fader and physical controls"
         >
           <defs>
             <linearGradient id={metalGradientId} x1="0" y1="0" x2="1" y2="1">
