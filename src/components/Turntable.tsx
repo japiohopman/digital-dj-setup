@@ -106,7 +106,7 @@ export function Turntable({
             />
             <circle cx="174" cy="48" r="8" fill="#262b2d" stroke="#bac0c0" strokeWidth="2" />
             <path
-              d="M174 68 C170 111 151 173 111 252"
+              d="M174 68 C170 105 117 175 62 232"
               fill="none"
               stroke="#202528"
               strokeWidth="17"
@@ -114,14 +114,14 @@ export function Turntable({
               opacity="0.55"
             />
             <path
-              d="M174 66 C169 111 149 175 109 248"
+              d="M174 66 C169 105 115 175 60 231"
               fill="none"
               stroke={`url(#${tonearmMetalGradientId})`}
               strokeWidth="11"
               strokeLinecap="round"
             />
             <path
-              d="M171 76 C164 122 144 182 108 247"
+              d="M171 76 C165 114 112 180 59 230"
               fill="none"
               stroke="#fff"
               strokeWidth="1.8"
@@ -129,14 +129,14 @@ export function Turntable({
               opacity="0.72"
             />
             <path
-              d="M111 244 L83 268 L96 286 L130 260 Z"
+              d="M62 225 L35 242 L43 261 L76 245 Z"
               fill={`url(#${tonearmHeadGradientId})`}
               stroke="#444b4f"
               strokeWidth="3"
             />
-            <path d="M91 270 L115 259 L127 272 L103 291 Z" fill="#272d30" stroke="#777f82" strokeWidth="2" />
-            <path d="M108 287 L119 294 L111 308" fill="none" stroke="#aeb4b5" strokeWidth="3" strokeLinecap="round" />
-            <path d="M111 307 L108 316" stroke="#d8dcda" strokeWidth="2" strokeLinecap="round" />
+            <path d="M42 244 L63 236 L74 249 L52 259 Z" fill="#272d30" stroke="#777f82" strokeWidth="2" />
+            <path d="M45 257 L53 263 L49 270" fill="none" stroke="#aeb4b5" strokeWidth="3" strokeLinecap="round" />
+            <path d="M49 269 L46 276" stroke="#d8dcda" strokeWidth="2" strokeLinecap="round" />
           </svg>
 
           <div className="turntable__pitch-control" aria-hidden="true">
