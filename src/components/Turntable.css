@@ -61,7 +61,7 @@
 .turntable__power-button {
   top: 5.8%;
   left: 5.6%;
-  width: clamp(24px, 3.2vw, 36px);
+  width: clamp(25px, 4.2vw, 44px);
   aspect-ratio: 1;
   border: 2px solid #4c5558;
   border-radius: 50%;
@@ -96,7 +96,7 @@
 .turntable__start-stop {
   bottom: 5.6%;
   left: 5.9%;
-  width: clamp(30px, 4.2vw, 46px);
+  width: clamp(30px, 4.8vw, 50px);
   aspect-ratio: 1;
   border: 2px solid #414a4c;
   border-radius: 50%;
@@ -151,7 +151,7 @@
 
 .turntable__speed-button {
   position: relative;
-  width: clamp(23px, 3vw, 34px);
+  width: clamp(23px, 3.7vw, 36px);
   aspect-ratio: 1;
   border: 2px solid #424b4d;
   border-radius: 50%;
@@ -173,7 +173,7 @@
 
 .turntable__target-light-button {
   right: 8%;
-  bottom: 8%;
+  bottom: 11%;
   width: clamp(22px, 3vw, 34px);
   aspect-ratio: 1;
   border: 2px solid #41494c;
