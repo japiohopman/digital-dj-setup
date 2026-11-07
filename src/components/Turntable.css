@@ -384,14 +384,23 @@
   background-size: contain;
 }
 
+.turntable .platter,
+.turntable .spindle,
+.turntable .record-grooves,
+.turntable .record,
+.turntable .slipmat {
+  transition-property: transform;
+  transform-origin: 50% 50%;
+  animation: spin 1.8s linear infinite;
+  animation-play-state: paused;
+}
+
 .turntable.power-on.motor-on .platter,
 .turntable.power-on.motor-on .spindle,
 .turntable.power-on.motor-on .record-grooves,
 .turntable.power-on.motor-on .record,
 .turntable.power-on.motor-on .slipmat {
-  transition-property: transform;
-  transform-origin: 50% 50%;
-  animation: spin 1.8s linear infinite;
+  animation-play-state: running;
 }
 
 .turntable .record-holder,
@@ -552,6 +561,20 @@
   height: 1.85%;
   background: transparent url(/turntable/landscape/tt_33.png) no-repeat 0 0;
   background-size: contain;
+}
+
+/* Expanded touch/click target without changing visual artwork size/position */
+.turntable .speed-33::before,
+.turntable .speed-45::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 28px;
+  min-height: 28px;
+  width: 140%;
+  height: 350%;
 }
 
 .turntable.power-on .speed-33.on {

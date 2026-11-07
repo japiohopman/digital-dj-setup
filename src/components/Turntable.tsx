@@ -1,19 +1,40 @@
 import { useState, useRef, type CSSProperties, type PointerEvent, type KeyboardEvent } from 'react';
 
+/**
+ * Supported playback RPM speeds for the turntable deck.
+ */
 export type TurntableSpeed = 33 | 45;
 
+/**
+ * Configuration and initial state properties for the Turntable component.
+ */
 export interface TurntableProps {
+  /** Optional HTML element ID. */
   id?: string;
+  /** Display label for the deck (e.g. "DECK 01", "DECK A"). */
   deckLabel?: string;
+  /** Turntable model branding label (defaults to "SL-1200 MK2"). */
   modelName?: string;
+  /** Initial rotation speed setting in RPM (33 or 45). */
   initialSpeed?: TurntableSpeed;
+  /** Whether the turntable main power switch is enabled initially. */
   initiallyPowered?: boolean;
+  /** Explicit initial motor state. If omitted, falls back to initiallySpinning. */
   initiallyMotorOn?: boolean;
+  /** Initial spinning state fallback if initiallyMotorOn is omitted. */
   initiallySpinning?: boolean;
+  /** Whether a vinyl record is placed on the platter. */
   initiallyHasRecord?: boolean;
+  /** Whether a slipmat is placed on the platter. */
   initiallyHasSlipmat?: boolean;
 }
 
+/**
+ * Authentic Technics SL-1200 style interactive turntable component.
+ *
+ * Provides realistic visual styling, spinning animations, speed selection,
+ * power dial, target light toggle, and an interactive draggable pitch slider.
+ */
 export function Turntable({
   id,
   deckLabel = 'DECK 01',
@@ -173,7 +194,7 @@ export function Turntable({
 
       {/* image that sets the base dimensions: 1256x1010 */}
       <img
-        src="/turntable/landscape/tt_case_and_lighting.png"
+        src={`${import.meta.env.BASE_URL}turntable/landscape/tt_case_and_lighting.png`}
         alt=""
         className="stub"
         width={1256}
