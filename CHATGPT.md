@@ -34,7 +34,7 @@ The mixer reference has not been selected yet. Keep mixer design and implementat
 
 1. Issue #1 — project scaffold and agentic workflow.
 2. Issue #2 — first reusable Technics-inspired turntable, visual only.
-3. Issue #3 — dual-deck DMC layout; in landscape both decks rotate 45° counterclockwise in the same direction.
+3. Issue #3 — dual-deck DMC layout; in landscape both decks rotate 90° counterclockwise (a quarter turn) in the same direction.
 4. Issue #4 — isolated Web Audio playback engine per deck.
 5. Issue #5 — touch-first scratching and reverse transport.
 6. Mixer — create a new issue only after the user chooses a mixer reference.
