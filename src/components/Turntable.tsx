@@ -299,29 +299,63 @@ export function Turntable({
         <div
           className={`record-holder${isDragOverRecord ? ' drag-over' : ''}`}
           ref={discRef}
+          tabIndex={0}
           onPointerDown={onVinylPointerDown}
           onDragOver={handleRecordDragOver}
           onDragLeave={handleRecordDragLeave}
           onDrop={handleRecordDrop}
-          role="img"
+          onKeyDown={(e) => {
+            if (!transport || !transport.isLoaded) return;
+            if (e.key === 'ArrowRight') {
+              e.preventDefault();
+              transport.seek(transport.currentTime + 2);
+            } else if (e.key === 'ArrowLeft') {
+              e.preventDefault();
+              transport.seek(Math.max(0, transport.currentTime - 2));
+            } else if (e.key === ' ') {
+              e.preventDefault();
+              void transport.togglePlayPause();
+            }
+          }}
+          role="slider"
           aria-label={`${deckLabel} interactive vinyl record - drag to scratch or drop audio track`}
+          aria-valuemin={0}
+          aria-valuemax={transport?.duration || 100}
+          aria-valuenow={Math.round(transport?.currentTime || 0)}
+          aria-valuetext={`${formatTime(transport?.currentTime || 0)} of ${formatTime(transport?.duration || 0)}`}
         >
           <div className="record" style={rotateTransformStyle}>
-            <div className="label">
-              <span className="label-text-brand">
-                {transport?.trackName ? 'PLAYING TRACK' : 'TECHNICS'}
-              </span>
-              <span className="label-text-side" title={transport?.trackName || deckLabel}>
-                {transport?.trackName || deckLabel}
-              </span>
-              <span className="label-text-speed">
-                {transport?.isLoaded
-                  ? `${formatTime(transport.currentTime)} / ${formatTime(transport.duration)}`
-                  : speed === 33
-                    ? '33 RPM'
-                    : '45 RPM'}
-              </span>
-            </div>
+            {transport?.metadata?.artworkUrl ? (
+              <div
+                className="record-artwork"
+                style={{ backgroundImage: `url(${transport.metadata.artworkUrl})` }}
+                role="img"
+                aria-label={`Album art for ${transport.metadata.title}`}
+              >
+                <div className="artwork-center-hole" />
+              </div>
+            ) : (
+              <div className="label">
+                <span className="label-text-brand">
+                  {transport?.trackName ? 'PLAYING TRACK' : 'TECHNICS'}
+                </span>
+                <span
+                  className="label-text-side"
+                  title={transport?.metadata?.title || transport?.trackName || deckLabel}
+                >
+                  {transport?.metadata?.artist
+                    ? `${transport.metadata.artist} - ${transport.metadata.title}`
+                    : transport?.metadata?.title || transport?.trackName || deckLabel}
+                </span>
+                <span className="label-text-speed">
+                  {transport?.isLoaded
+                    ? `${formatTime(transport.currentTime)} / ${formatTime(transport.duration)}`
+                    : speed === 33
+                      ? '33 RPM'
+                      : '45 RPM'}
+                </span>
+              </div>
+            )}
           </div>
           {isDragOverRecord && (
             <div className="record-drop-overlay" aria-hidden="true">

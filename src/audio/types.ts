@@ -1,7 +1,11 @@
+import type { AudioMetadata } from './metadata';
+
 /**
  * State representing current playback progress and lifecycle.
  */
 export type AudioPlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'stopped';
+
+export type { AudioMetadata };
 
 /**
  * Public snapshot of the audio engine state.
@@ -9,6 +13,8 @@ export type AudioPlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'st
 export interface AudioEngineState {
   /** Name of the loaded audio track, or null if no track loaded. */
   trackName: string | null;
+  /** Parsed track metadata including title, artist, album, and artwork Blob URL. */
+  metadata: AudioMetadata | null;
   /** Total duration in seconds, or 0 if not loaded. */
   duration: number;
   /** Current playback timestamp in seconds. */
@@ -37,6 +43,7 @@ export interface AudioEngineOptions {
  */
 export interface DeckTransport {
   trackName: string | null;
+  metadata: AudioMetadata | null;
   duration: number;
   currentTime: number;
   playbackState: AudioPlaybackState;

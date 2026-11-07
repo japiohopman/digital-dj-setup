@@ -1,3 +1,4 @@
+import { parseAudioMetadata, type AudioMetadata } from './metadata';
 import type {
   AudioEngineListener,
   AudioEngineOptions,
@@ -23,11 +24,17 @@ export class AudioEngine {
   private isScratching = false;
 
   private trackName: string | null = null;
+  private metadata: AudioMetadata | null = null;
   private duration = 0;
   private logicalPosition = 0;
   private playStartedAt = 0;
   private playbackState: AudioPlaybackState = 'idle';
   private error: string | null = null;
+
+  private currentPlaybackRate = 1.0;
+  private loadCounter = 0;
+  private playCounter = 0;
+  private isDisposed = false;
 
   private tickerTimer: ReturnType<typeof setInterval> | null = null;
   private readonly listeners = new Set<AudioEngineListener>();
@@ -91,13 +98,14 @@ export class AudioEngine {
    */
   public getState(): AudioEngineState {
     let currentTime = this.logicalPosition;
-    if (this.playbackState === 'playing' && this.audioContext) {
-      const elapsed = this.audioContext.currentTime - this.playStartedAt;
+    if (this.playbackState === 'playing' && this.audioContext && !this.isScratching) {
+      const elapsed = (this.audioContext.currentTime - this.playStartedAt) * this.currentPlaybackRate;
       currentTime = Math.min(this.duration, Math.max(0, this.logicalPosition + elapsed));
     }
 
     return {
       trackName: this.trackName,
+      metadata: this.metadata,
       duration: this.duration,
       currentTime,
       playbackState: this.playbackState,
@@ -137,16 +145,50 @@ export class AudioEngine {
    * Loads and decodes an audio file into the deck.
    */
   public async loadTrack(file: File | ArrayBuffer, name?: string): Promise<void> {
+    const requestId = ++this.loadCounter;
     this.stop();
     this.playbackState = 'loading';
     this.error = null;
-    this.trackName = name ?? (file instanceof File ? file.name : 'Unknown Track');
+
+    // Clean up previous artwork URL if exists
+    if (this.metadata?.artworkUrl) {
+      try {
+        URL.revokeObjectURL(this.metadata.artworkUrl);
+      } catch {
+        // ignore in mock environments
+      }
+    }
+
+    let parsedMeta: AudioMetadata | null = null;
+    if (file instanceof File) {
+      try {
+        parsedMeta = await parseAudioMetadata(file);
+      } catch {
+        // retain default fallback
+      }
+    }
+
+    if (this.isDisposed || requestId !== this.loadCounter) {
+      if (parsedMeta?.artworkUrl) {
+        try {
+          URL.revokeObjectURL(parsedMeta.artworkUrl);
+        } catch {
+          // ignore
+        }
+      }
+      return;
+    }
+
+    this.trackName = parsedMeta?.title ?? name ?? (file instanceof File ? file.name : 'Unknown Track');
+    this.metadata = parsedMeta;
     this.logicalPosition = 0;
     this.duration = 0;
     this.notify();
 
     try {
       const arrayBuffer = file instanceof File ? await file.arrayBuffer() : file;
+      if (this.isDisposed || requestId !== this.loadCounter) return;
+
       const ctx = this.getOrCreateContext();
 
       // Web Audio decodeAudioData handles both Promise-based and callback-based APIs
@@ -193,6 +235,8 @@ export class AudioEngine {
         }
       });
 
+      if (this.isDisposed || requestId !== this.loadCounter) return;
+
       this.audioBuffer = decoded;
       this.audioBufferReversed = this.createReversedAudioBuffer(decoded, ctx);
       this.duration = decoded.duration;
@@ -201,6 +245,7 @@ export class AudioEngine {
       this.error = null;
       this.notify();
     } catch (err) {
+      if (this.isDisposed || requestId !== this.loadCounter) return;
       this.audioBuffer = null;
       this.duration = 0;
       this.logicalPosition = 0;
@@ -237,7 +282,7 @@ export class AudioEngine {
    * Starts or resumes audio playback from the given or current logical track position.
    */
   public async play(offsetPosition?: number): Promise<void> {
-    if (!this.audioBuffer) {
+    if (!this.audioBuffer || this.isDisposed) {
       return;
     }
 
@@ -245,11 +290,18 @@ export class AudioEngine {
       return;
     }
 
+    const currentPlayId = ++this.playCounter;
+
     try {
       await this.ensureContextRunning();
     } catch (err) {
       this.error = err instanceof Error ? err.message : String(err);
       this.notify();
+      return;
+    }
+
+    // If stop, pause, or disposal occurred during async resume, abort play
+    if (this.isDisposed || currentPlayId !== this.playCounter) {
       return;
     }
 
@@ -270,7 +322,7 @@ export class AudioEngine {
   }
 
   private startSourceAt(position: number, reversed: boolean): void {
-    if (!this.audioBuffer || !this.audioBufferReversed) return;
+    if (!this.audioBuffer || !this.audioBufferReversed || this.isDisposed) return;
     const ctx = this.getOrCreateContext();
 
     this.stopCurrentSourceNode();
@@ -292,8 +344,27 @@ export class AudioEngine {
     this.logicalPosition = clampedPos;
     this.isReversed = reversed;
 
+    // Apply current playback rate
+    const now = ctx.currentTime;
+    source.playbackRate.cancelScheduledValues(now);
+    source.playbackRate.setValueAtTime(this.currentPlaybackRate, now);
+
     source.start(0, startOffset);
     this.currentSource = source;
+  }
+
+  /**
+   * Sets the playback rate factor based on turntable speed (33/45 RPM) and pitch fader.
+   */
+  public setPlaybackRate(rate: number): void {
+    const clamped = Math.max(0.1, Math.min(4.0, rate));
+    this.currentPlaybackRate = clamped;
+
+    if (this.currentSource && !this.isScratching && this.audioContext) {
+      const now = this.audioContext.currentTime;
+      this.currentSource.playbackRate.cancelScheduledValues(now);
+      this.currentSource.playbackRate.linearRampToValueAtTime(clamped, now + 0.05);
+    }
   }
 
   /**
@@ -332,6 +403,7 @@ export class AudioEngine {
   public endScratch(resumePlayback: boolean): void {
     this.isScratching = false;
     if (resumePlayback && this.audioBuffer) {
+      this.isReversed = false;
       void this.play(this.logicalPosition);
     } else {
       this.pause();
@@ -339,21 +411,21 @@ export class AudioEngine {
   }
 
   /**
-   * Seeks to a specific logical track position.
+   * Seeks to a specific logical track position and restarts audio at that position.
    */
   public seek(position: number): void {
     this.logicalPosition = Math.max(0, Math.min(this.duration, position));
     if (this.playbackState === 'playing') {
-      void this.play(this.logicalPosition);
-    } else {
-      this.notify();
+      this.startSourceAt(this.logicalPosition, false);
     }
+    this.notify();
   }
 
   /**
    * Pauses playback and records the logical position.
    */
   public pause(): void {
+    this.playCounter++;
     if (this.playbackState !== 'playing' || !this.audioBuffer) {
       return;
     }
@@ -370,6 +442,7 @@ export class AudioEngine {
    * Stops playback and resets logical position to 0.
    */
   public stop(): void {
+    this.playCounter++;
     this.stopCurrentSourceNode();
     this.stopTicker();
     this.logicalPosition = 0;
@@ -413,9 +486,23 @@ export class AudioEngine {
    * Disposes the engine and closes the AudioContext.
    */
   public dispose(): void {
+    this.isDisposed = true;
+    this.loadCounter++;
+    this.playCounter++;
     this.stop();
     this.listeners.clear();
     this.audioBuffer = null;
+    this.audioBufferReversed = null;
+
+    if (this.metadata?.artworkUrl) {
+      try {
+        URL.revokeObjectURL(this.metadata.artworkUrl);
+      } catch {
+        // ignore
+      }
+      this.metadata = null;
+    }
+
     if (this.audioContext && this.audioContext.state !== 'closed') {
       try {
         void this.audioContext.close();

@@ -18,8 +18,10 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
   const [state, setState] = useState<AudioEngineState>(() => engineRef.current!.getState());
 
   useEffect(() => {
+    if (!engineRef.current) {
+      engineRef.current = new AudioEngine(options);
+    }
     const engine = engineRef.current;
-    if (!engine) return;
 
     const unsubscribe = engine.subscribe((nextState) => {
       setState(nextState);
@@ -27,6 +29,8 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
 
     return () => {
       unsubscribe();
+      // In development React StrictMode remounts components.
+      // Dispose on final unmount.
       engine.dispose();
       engineRef.current = null;
     };
@@ -41,9 +45,9 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     }
   }, []);
 
-  const play = useCallback(async () => {
+  const play = useCallback(async (offset?: number) => {
     if (!engineRef.current) return;
-    await engineRef.current.play();
+    await engineRef.current.play(offset);
   }, []);
 
   const pause = useCallback(() => {
@@ -83,6 +87,7 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
 
   return {
     trackName: state.trackName,
+    metadata: state.metadata,
     duration: state.duration,
     currentTime: state.currentTime,
     playbackState: state.playbackState,

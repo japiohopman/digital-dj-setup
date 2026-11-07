@@ -493,14 +493,19 @@
   overflow: hidden;
 }
 
-.turntable .label {
+.turntable .label,
+.turntable .record-artwork {
   position: absolute;
-  top: 37.25%;
-  left: 35.3%;
-  width: 29.4%;
-  height: 26.5%;
-  background: radial-gradient(circle at 45% 40%, #e6dfc7, #baa273 60%, #856a3e);
+  top: 32%;
+  left: 32%;
+  width: 36%;
+  height: 36%;
   border-radius: 100%;
+  overflow: hidden;
+}
+
+.turntable .label {
+  background: radial-gradient(circle at 45% 40%, #e6dfc7, #baa273 60%, #856a3e);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -509,6 +514,25 @@
   font-family: helvetica, arial, sans-serif;
   text-align: center;
   box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.4);
+}
+
+.turntable .record-artwork {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.8), inset 0 0 4px rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.turntable .artwork-center-hole {
+  width: 14%;
+  height: 14%;
+  border-radius: 50%;
+  background: #111;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0 0 3px #000;
 }
 
 .turntable .label-text-brand {
@@ -589,6 +613,11 @@
 .turntable.is-scratching .record-holder,
 .turntable .record-holder:active {
   cursor: grabbing;
+}
+
+.turntable .record-holder:focus-visible {
+  outline: 2px solid #dba64d;
+  outline-offset: -4px;
 }
 
 .turntable.has-record .record-holder,

@@ -4,6 +4,9 @@ import { AudioEngine } from './AudioEngine';
 class MockAudioParam {
   value = 1;
   cancelScheduledValues = vi.fn();
+  setValueAtTime = vi.fn((val: number) => {
+    this.value = val;
+  });
   linearRampToValueAtTime = vi.fn((val: number) => {
     this.value = val;
   });
@@ -285,6 +288,78 @@ describe('AudioEngine', () => {
     // endScratch resumes normal forward playback if requested
     engine.endScratch(true);
     expect(engine.getState().playbackState).toBe('playing');
+
+    engine.dispose();
+  });
+
+  it('cancels older in-flight track loading when a newer track is loaded', async () => {
+    const engine = createEngine();
+    let resolveFirst: ((val: AudioBuffer) => void) | null = null;
+
+    mockContext.decodeAudioData = vi.fn().mockImplementationOnce(() => {
+      return new Promise((resolve) => {
+        resolveFirst = resolve;
+      });
+    });
+
+    const firstLoadPromise = engine.loadTrack(new Uint8Array([1]).buffer, 'first-track.mp3');
+
+    // Second track loaded immediately
+    mockContext.decodeAudioData = vi.fn().mockResolvedValueOnce({
+      duration: 60,
+      length: 60 * 44100,
+      numberOfChannels: 2,
+      sampleRate: 44100,
+      getChannelData: vi.fn(() => new Float32Array(100)),
+    } as unknown as AudioBuffer);
+
+    await engine.loadTrack(new Uint8Array([2]).buffer, 'second-track.mp3');
+
+    expect(engine.getState().trackName).toBe('second-track.mp3');
+    expect(engine.getState().duration).toBe(60);
+
+    // Now let the first load resolve late
+    if (resolveFirst) {
+      (resolveFirst as (val: AudioBuffer) => void)({
+        duration: 90,
+        length: 90 * 44100,
+        numberOfChannels: 2,
+        sampleRate: 44100,
+        getChannelData: vi.fn(() => new Float32Array(100)),
+      } as unknown as AudioBuffer);
+    }
+    await firstLoadPromise;
+
+    // Second track remains active and was not overwritten by stale first load
+    expect(engine.getState().trackName).toBe('second-track.mp3');
+    expect(engine.getState().duration).toBe(60);
+
+    engine.dispose();
+  });
+
+  it('aborts playback if stop is called while AudioContext resume is in progress', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'track.mp3');
+
+    let resolveResume: (() => void) | null = null;
+    mockContext.state = 'suspended';
+    mockContext.resume = vi.fn().mockImplementationOnce(() => {
+      return new Promise<void>((resolve) => {
+        resolveResume = resolve;
+      });
+    });
+
+    const playPromise = engine.play();
+    // Stop is called while resume is still pending
+    engine.stop();
+
+    if (resolveResume) {
+      (resolveResume as () => void)();
+    }
+    await playPromise;
+
+    // State must remain stopped, not playing
+    expect(engine.getState().playbackState).toBe('stopped');
 
     engine.dispose();
   });

@@ -118,6 +118,12 @@ describe('Turntable static markup', () => {
   it('renders track transport controls and metadata when transport is provided', () => {
     const mockTransport: DeckTransport = {
       trackName: 'ahhh-fresh.wav',
+      metadata: {
+        title: 'ahhh-fresh.wav',
+        artist: 'DJ Qbert',
+        album: 'Super Seal Breaks',
+        artworkUrl: null,
+      },
       duration: 180,
       currentTime: 45,
       playbackState: 'playing',
@@ -146,14 +152,54 @@ describe('Turntable static markup', () => {
     expect(markup).toContain('STOP');
     // Center record label displays track name and duration
     expect(markup).toContain('PLAYING TRACK');
-    expect(markup).toContain('class="label-text-side" title="ahhh-fresh.wav"');
+    expect(markup).toContain('DJ Qbert - ahhh-fresh.wav');
     // Platter is spinning because audio is playing
     expect(markup).toContain('motor-on');
+  });
+
+  it('renders embedded cover artwork on the rotating record when available', () => {
+    const mockTransport: DeckTransport = {
+      trackName: 'champion-sound.flac',
+      metadata: {
+        title: 'Champion Sound',
+        artist: 'Jaylib',
+        album: 'Champion Sound',
+        artworkUrl: 'blob:http://localhost:5173/mock-art-uuid',
+      },
+      duration: 150,
+      currentTime: 30,
+      playbackState: 'playing',
+      isPlaying: true,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+    };
+
+    const markup = renderToStaticMarkup(
+      <Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />,
+    );
+
+    expect(markup).toContain('class="record-artwork"');
+    expect(markup).toContain('blob:http://localhost:5173/mock-art-uuid');
+    expect(markup).toContain('class="artwork-center-hole"');
   });
 
   it('does not spin platter when track is paused even if motor button is active', () => {
     const mockTransport: DeckTransport = {
       trackName: 'breakbeat.mp3',
+      metadata: {
+        title: 'breakbeat.mp3',
+        artist: null,
+        album: null,
+        artworkUrl: null,
+      },
       duration: 120,
       currentTime: 10,
       playbackState: 'paused',
@@ -182,6 +228,7 @@ describe('Turntable static markup', () => {
   it('displays decoding error in the audio panel', () => {
     const mockTransport: DeckTransport = {
       trackName: null,
+      metadata: null,
       duration: 0,
       currentTime: 0,
       playbackState: 'idle',
