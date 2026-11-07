@@ -52,6 +52,8 @@ export function App() {
             </div>
           </div>
 
+          <div className="dual-deck__center-panel" aria-hidden="true" />
+
           <div
             className={`dual-deck__slot dual-deck__slot--b${activeDeck === 'b' ? ' is-active' : ''}`}
             id="deck-b-panel"
