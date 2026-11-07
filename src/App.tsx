@@ -7,7 +7,7 @@ export function App() {
       <header className="app-header">
         <div>
           <p className="eyebrow">DIGITAL DJ SETUP</p>
-          <h1>Two decks. One groove.</h1>
+          <h1>The first deck is ready.</h1>
         </div>
         <span className="app-header__mode">VISUAL PROTOTYPE</span>
       </header>
