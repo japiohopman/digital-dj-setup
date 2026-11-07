@@ -45,19 +45,10 @@ export function Turntable({
     // In battle mode, turntable is rotated -90deg.
     // The pitch track element in screen space is horizontal!
     // rect.width will be larger than rect.height.
-    let fraction = 0.5;
-    if (rect.width > rect.height) {
-      // Horizontal on screen: left is positive or right is positive?
-      // In battle mode (-90deg), top in local coordinates becomes left in screen coordinates.
-      // Top (+8%) -> Screen Left, Bottom (-8%) -> Screen Right.
-      // So as clientX goes from left to right: fraction goes 0 (top/+8%) to 1 (bottom/-8%)
-      const clampedX = Math.max(rect.left, Math.min(rect.right, clientX));
-      fraction = (clampedX - rect.left) / rect.width;
-    } else {
-      // Standard vertical on screen
-      const clampedY = Math.max(rect.top, Math.min(rect.bottom, clientY));
-      fraction = (clampedY - rect.top) / rect.height;
-    }
+    const fraction =
+      rect.width > rect.height
+        ? (Math.max(rect.left, Math.min(rect.right, clientX)) - rect.left) / rect.width
+        : (Math.max(rect.top, Math.min(rect.bottom, clientY)) - rect.top) / rect.height;
 
     // fraction: 0 -> +8%, 0.5 -> 0%, 1 -> -8%
     // Technics pitch: Top is +8, center is 0, bottom is -8
