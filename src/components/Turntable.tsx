@@ -87,7 +87,7 @@ export function Turntable({
           className="turntable__artwork"
           viewBox="0 0 453 353"
           role="img"
-          aria-label="Top view of a Technics SL-1200 MK2 with platter, S-shaped tonearm, pitch fader and physical controls"
+          aria-label="Top view of a Technics SL-1200 MK2 with platter, Tonearm and cartridge, S-shaped arm, pitch fader and physical controls"
         >
           <defs>
             <linearGradient id={metalGradientId} x1="0" y1="0" x2="1" y2="1">
@@ -138,7 +138,7 @@ export function Turntable({
           <rect x="10" y="9" width="433" height="333" rx="7" fill={`url(#${metalTextureId})`} opacity="0.55" />
 
           {/* Machined platter well */}
-          <circle cx="174" cy="176" r="164" fill="#202629" stroke="#596265" strokeWidth="2" />
+          <circle className="turntable__platter" cx="174" cy="176" r="164" fill="#202629" stroke="#596265" strokeWidth="2" />
           <circle cx="174" cy="176" r="160" fill={`url(#${platterGradientId})`} stroke="#f5f6f0" strokeWidth="1.4" />
           <circle cx="174" cy="176" r="155" fill="#242a2c" stroke="#5f686b" strokeWidth="1.4" />
           <circle cx="174" cy="176" r="151.5" fill={`url(#${platterGradientId})`} stroke="#252b2d" strokeWidth="1.3" />
