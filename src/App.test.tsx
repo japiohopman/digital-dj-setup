@@ -9,8 +9,8 @@ describe('App dual-deck workspace', () => {
 
     expect(markup).toContain('id="deck-a-panel"');
     expect(markup).toContain('id="deck-b-panel"');
-    expect(markup).toContain('DECK A Technics-inspired turntable');
-    expect(markup).toContain('DECK B Technics-inspired turntable');
+    expect(markup).toContain('DECK A Technics SL-1200 MK2 turntable');
+    expect(markup).toContain('DECK B Technics SL-1200 MK2 turntable');
     expect(markup.match(/class="turntable is-powered is-spinning"/g)).toHaveLength(2);
   });
 
