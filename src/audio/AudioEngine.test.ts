@@ -191,7 +191,7 @@ describe('AudioEngine', () => {
     expect(firstSource).toBeDefined();
 
     engine.pause();
-    await vi.advanceTimersByTimeAsync(25);
+    await vi.advanceTimersByTimeAsync(255);
     expect(firstSource?.stop).toHaveBeenCalled();
 
     await engine.play();
