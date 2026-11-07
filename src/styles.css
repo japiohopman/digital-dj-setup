@@ -45,7 +45,7 @@ textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: clamp(18px, 3vh, 30px);
+  gap: clamp(16px, 2.5vh, 26px);
   padding:
     max(22px, env(safe-area-inset-top))
     max(16px, env(safe-area-inset-right))
@@ -56,7 +56,7 @@ textarea {
 .app-header,
 .app-footer {
   display: flex;
-  width: min(100%, 920px);
+  width: min(100%, 1280px);
   align-items: center;
   justify-content: space-between;
 }
@@ -93,8 +93,81 @@ textarea {
   white-space: nowrap;
 }
 
+.deck-selector {
+  display: flex;
+  width: min(100%, 560px);
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid rgb(205 211 208 / 13%);
+  border-radius: 6px;
+  background: rgb(20 23 25 / 92%);
+}
+
+.deck-selector__button {
+  display: flex;
+  min-width: 0;
+  min-height: 44px;
+  flex: 1 1 50%;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: #929b9c;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.deck-selector__button[aria-pressed="true"] {
+  border-color: rgb(219 166 77 / 35%);
+  background: linear-gradient(145deg, #35312a, #24211d);
+  color: #f0d39f;
+  box-shadow: inset 0 1px rgb(255 255 255 / 5%);
+}
+
+.deck-selector__number {
+  color: #c59a58;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+}
+
+.deck-selector__button:focus-visible {
+  outline: 2px solid #f2c574;
+  outline-offset: 3px;
+}
+
 .deck-workspace {
+  display: flex;
+  width: min(100%, 1280px);
+  align-items: center;
+  justify-content: center;
+}
+
+.dual-deck-layout {
+  display: grid;
   width: min(100%, 920px);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dual-deck__slot {
+  width: 100%;
+  min-width: 0;
+}
+
+.dual-deck__slot:not(.is-active) {
+  display: none;
+}
+
+.dual-deck__turntable {
+  width: 100%;
 }
 
 .app-footer {
@@ -116,7 +189,15 @@ textarea {
 
 @media (max-width: 520px) {
   .app-shell {
-    gap: clamp(18px, 4vh, 28px);
+    gap: clamp(15px, 2.8vh, 23px);
+  }
+
+  .app-header {
+    gap: 10px;
+  }
+
+  .app-header h1 {
+    font-size: clamp(1.25rem, 6vw, 1.65rem);
   }
 
   .app-header__mode {
@@ -124,8 +205,100 @@ textarea {
     font-size: 0.48rem;
   }
 
+  .deck-selector {
+    width: 100%;
+  }
+
+  .deck-selector__button {
+    font-size: 0.65rem;
+  }
+
   .app-footer {
     flex-wrap: wrap;
     font-size: 0.49rem;
+  }
+}
+
+@media (orientation: landscape) {
+  .app-shell {
+    gap: clamp(8px, 1.8vh, 18px);
+  }
+
+  .app-header h1 {
+    font-size: clamp(1.1rem, 2.5vw, 2rem);
+  }
+
+  .deck-selector {
+    display: none;
+  }
+
+  .deck-workspace {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .dual-deck-layout {
+    display: grid;
+    width: min(100%, 1320px, calc((100svh - 160px) * 2 + 16px));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .dual-deck-layout .dual-deck__slot {
+    position: relative;
+    display: flex;
+    aspect-ratio: 1;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dual-deck__turntable {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 78.4%;
+    transform: translate(-50%, -50%) rotate(-45deg);
+  }
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .app-shell {
+    height: 100vh;
+    height: 100svh;
+    min-height: 0;
+    gap: 0;
+    padding:
+      max(5px, env(safe-area-inset-top))
+      max(8px, env(safe-area-inset-right))
+      max(5px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+  }
+
+  .app-header,
+  .app-footer {
+    display: none;
+  }
+
+  .deck-workspace {
+    width: 100%;
+    height: 100%;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
+  .dual-deck-layout {
+    width: min(
+      100%,
+      calc(
+        (100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 12px) * 2 + 8px
+      )
+    );
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deck-selector__button {
+    transition: none;
   }
 }
