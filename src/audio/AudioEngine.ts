@@ -24,6 +24,13 @@ export class AudioEngine {
   private isReversed = false;
   private isScratching = false;
 
+  private isBraking = false;
+  private brakeStartedAt = 0;
+  private brakeDurationSec = 0;
+  private brakeInitialRate = 1.0;
+  private brakeTimer: ReturnType<typeof setTimeout> | null = null;
+  private brakingSource: AudioBufferSourceNode | null = null;
+
   private trackName: string | null = null;
   private metadata: AudioMetadata | null = null;
   private duration = 0;
@@ -132,7 +139,18 @@ export class AudioEngine {
    */
   public getState(): AudioEngineState {
     let currentTime = this.logicalPosition;
-    if (this.playbackState === 'playing' && this.audioContext && !this.isScratching) {
+    if (this.isBraking && this.audioContext) {
+      const brakeElapsed = Math.min(
+        this.brakeDurationSec,
+        Math.max(0, this.audioContext.currentTime - this.brakeStartedAt),
+      );
+      const progress = this.brakeDurationSec > 0 ? brakeElapsed / this.brakeDurationSec : 1;
+      const averageRate = this.brakeInitialRate * (1 - 0.5 * progress);
+      currentTime = Math.min(
+        this.duration,
+        Math.max(0, this.logicalPosition + brakeElapsed * averageRate),
+      );
+    } else if (this.playbackState === 'playing' && this.audioContext && !this.isScratching) {
       if (this.isCoasting) {
         // Linear deceleration from coastInitialRate to 0 over coastDurationSec
         const coastElapsed = Math.min(
@@ -179,7 +197,7 @@ export class AudioEngine {
   private startTicker(): void {
     this.stopTicker();
     this.tickerTimer = setInterval(() => {
-      if (this.playbackState === 'playing') {
+      if (this.playbackState === 'playing' || this.isBraking) {
         // The AudioBufferSourceNode's native onended event is the only authoritative
         // end-of-track signal. Do not stop it from this 100ms UI ticker: estimated
         // logical time can reach duration a render quantum before the final samples
@@ -435,6 +453,7 @@ export class AudioEngine {
     const ctx = this.getOrCreateContext();
     const gain = this.getOrCreateGainNode();
 
+    this.cancelPendingBrake();
     this.stopCurrentSourceNode();
 
     const generation = ++this.sourceGeneration;
@@ -562,20 +581,50 @@ export class AudioEngine {
   public endScratch(resumePlayback: boolean): void {
     this.isScratching = false;
 
-    // Immediately stop any active scratch source (especially reversed source or variable scratch rate)
-    this.stopCurrentSourceNode();
-
     if (resumePlayback && this.audioBuffer) {
+      // Replace the scratch source with clean forward playback at the exact hand position.
+      this.stopCurrentSourceNode();
       this.isReversed = false;
-      // Restart forward playback directly from exact scratch position at base rate
       this.startSourceAt(this.logicalPosition, false);
       this.playbackState = 'playing';
       this.error = null;
       this.startTicker();
       this.notify();
-    } else {
-      this.pause();
+      return;
     }
+
+    // When the motor is off, finish the free-spin at its final position.
+    // Do not invoke the motor's 250ms brake: the platter physics have already
+    // brought the manual push to rest.
+    const source = this.currentSource;
+    this.currentSource = null;
+    this.isReversed = false;
+    this.stopTicker();
+    this.playbackState = this.audioBuffer ? 'paused' : 'idle';
+
+    if (source && this.gainNode && this.audioContext) {
+      const now = this.audioContext.currentTime;
+      try {
+        this.gainNode.gain.cancelScheduledValues(now);
+        this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
+        this.gainNode.gain.linearRampToValueAtTime(0, now + 0.02);
+        source.onended = null;
+        setTimeout(() => {
+          try {
+            source.stop();
+            source.disconnect();
+          } catch {
+            // The scratch source may already have ended.
+          }
+        }, 25);
+      } catch {
+        this.stopSource(source);
+      }
+    } else if (source) {
+      this.stopSource(source);
+    }
+
+    this.notify();
   }
 
   /**
@@ -646,7 +695,9 @@ export class AudioEngine {
     // source disconnection as the dedicated Pause button. Stopping the source
     // directly here was the power-only click/pop.
     this.isCoasting = false;
-    this.pause();
+    // The 1.2s motor coast already supplied the deceleration; only de-click
+    // the final shutdown instead of adding a second audible brake.
+    this.pause(0);
   }
 
   /**
@@ -763,9 +814,11 @@ export class AudioEngine {
   }
 
   /**
-   * Pauses playback immediately and records the logical position.
+   * Brakes the platter to a pause while preserving the final track position.
+   *
+   * @param durationMs - Mechanical brake duration; use 0 after a completed motor coast.
    */
-  public pause(): void {
+  public pause(durationMs = 250): void {
     this.stopCoastTimer();
     this.stopSpinUpTimer();
     this.playCounter++;
@@ -774,13 +827,53 @@ export class AudioEngine {
     }
 
     this.updateLogicalPositionBeforeStopping();
-    this.stopTicker();
-
     const srcToStop = this.currentSource;
     this.currentSource = null;
+    this.playbackState = 'paused';
 
-    if (this.gainNode && this.audioContext && srcToStop) {
-      const now = this.audioContext.currentTime;
+    if (!srcToStop || !this.gainNode || !this.audioContext) {
+      this.stopTicker();
+      this.stopCurrentSourceNode();
+      this.notify();
+      return;
+    }
+
+    const now = this.audioContext.currentTime;
+    try {
+      srcToStop.onended = null;
+    } catch {
+      // The source is retired manually after the brake.
+    }
+
+    if (durationMs > 0) {
+      this.isBraking = true;
+      this.brakeStartedAt = now;
+      this.brakeDurationSec = durationMs / 1000;
+      this.brakeInitialRate = this.currentPlaybackRate;
+      const end = now + this.brakeDurationSec;
+
+      try {
+        srcToStop.playbackRate.cancelScheduledValues(now);
+        srcToStop.playbackRate.setValueAtTime(this.brakeInitialRate, now);
+        srcToStop.playbackRate.linearRampToValueAtTime(0, end);
+
+        // Keep the audio present during the mechanical slowdown, then fade only
+        // the final 20ms to silence so the last sample cannot click.
+        const fadeStart = Math.max(now, end - 0.02);
+        this.gainNode.gain.cancelScheduledValues(now);
+        this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
+        this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, fadeStart);
+        this.gainNode.gain.linearRampToValueAtTime(0, end);
+      } catch {
+        // AudioParam automation is best-effort in test/mock environments.
+      }
+
+      this.brakingSource = srcToStop;
+      this.brakeTimer = setTimeout(() => {
+        this.finishPauseBrake(srcToStop);
+      }, durationMs + 5);
+      this.startTicker();
+    } else {
       try {
         this.gainNode.gain.cancelScheduledValues(now);
         this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
@@ -789,28 +882,50 @@ export class AudioEngine {
         // mock
       }
 
-      // Detach onended immediately to prevent spurious playback ended events
-      try {
-        srcToStop.onended = null;
-      } catch {
-        // ignore
-      }
-
-      // Keep source playing and connected until the gain fade completes (15ms + buffer)
-      setTimeout(() => {
-        try {
-          srcToStop.stop();
-          srcToStop.disconnect();
-        } catch {
-          // ignore
-        }
-      }, 20);
-    } else {
-      this.stopCurrentSourceNode();
+      setTimeout(() => this.stopSource(srcToStop), 20);
+      this.stopTicker();
     }
 
-    this.playbackState = 'paused';
     this.notify();
+  }
+
+  private finishPauseBrake(source: AudioBufferSourceNode): void {
+    const isCurrentBrake = this.brakingSource === source;
+    if (isCurrentBrake) {
+      this.logicalPosition = this.getState().currentTime;
+      this.brakingSource = null;
+      this.isBraking = false;
+      this.brakeTimer = null;
+    }
+
+    this.stopSource(source);
+    if (isCurrentBrake) {
+      this.stopTicker();
+      this.notify();
+    }
+  }
+
+  private cancelPendingBrake(): void {
+    if (this.brakeTimer !== null) {
+      clearTimeout(this.brakeTimer);
+      this.brakeTimer = null;
+    }
+    const source = this.brakingSource;
+    this.brakingSource = null;
+    this.isBraking = false;
+    if (source) {
+      this.stopSource(source);
+    }
+  }
+
+  private stopSource(source: AudioBufferSourceNode): void {
+    try {
+      source.onended = null;
+      source.stop();
+      source.disconnect();
+    } catch {
+      // The source may already have ended or been disconnected.
+    }
   }
 
   /**
@@ -819,6 +934,7 @@ export class AudioEngine {
   public stop(): void {
     this.stopCoastTimer();
     this.stopSpinUpTimer();
+    this.cancelPendingBrake();
     this.playCounter++;
 
     const srcToStop = this.currentSource;
