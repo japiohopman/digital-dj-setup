@@ -236,7 +236,7 @@ export function Turntable({
           <text x="316" y="331" fill="#4a5355" fontSize="4.7" fontWeight="700" letterSpacing="0.65">QUARTZ DIRECT DRIVE TURNTABLE SYSTEM</text>
           <text x="420" y="323" textAnchor="end" fill="#454e50" fontSize="6.2" fontWeight="800">SL-1200MK2</text>
           <text x="27" y="326" fill="#4c5557" fontSize="5.8" fontWeight="800" letterSpacing="1.1">{deckLabel}</text>
-          {[[17, 17], [436, 17], [17, 335], [436, 335]].map(([x, y]) => (
+          {([[17, 17], [436, 17], [17, 335], [436, 335]] as const).map(([x, y]) => (
             <g key={`${x}-${y}`}>
               <circle cx={x} cy={y} r="3.2" fill="#7c8587" stroke="#3a4244" strokeWidth="0.8" />
               <path d={`M${x - 1.6} ${y} H${x + 1.6}`} stroke="#303739" strokeWidth="0.65" />
