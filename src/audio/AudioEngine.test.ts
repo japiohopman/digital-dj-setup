@@ -576,26 +576,39 @@ describe('AudioEngine', () => {
     engine.dispose();
   });
 
-  it('routes audio through a GainNode with de-click ramps on play and pause', async () => {
+  it('routes audio through a GainNode and gives Pause a short mechanical brake', async () => {
     const engine = createEngine();
     await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'declick-test.mp3');
 
     expect(mockContext.createGain).toHaveBeenCalled();
 
+    mockContext.currentTime = 2;
     await engine.play();
     const source = mockContext.createdSources[0];
+    const gain = mockContext.createdGainParams[0];
     expect(source).toBeDefined();
+    expect(gain).toBeDefined();
 
-    // Source connects to GainNode, not directly to destination
+    // Source connects to GainNode, not directly to destination.
     expect(source?.connect).toHaveBeenCalledWith(expect.objectContaining({ gain: expect.anything() }));
 
-    // Pause schedules de-click ramp to 0 before stopping source
+    // Pause ramps the record's audio rate down over 250ms instead of cutting it like a CD player.
     engine.pause();
     expect(engine.getState().playbackState).toBe('paused');
+    expect(source?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(0, 2.25);
+    expect(gain?.linearRampToValueAtTime).toHaveBeenCalledWith(0, 2.25);
+    expect(source?.stop).not.toHaveBeenCalled();
 
-    // Advance 25ms to allow de-click timeout to execute
-    await vi.advanceTimersByTimeAsync(25);
-    expect(source?.stop).toHaveBeenCalled();
+    // Halfway through the brake, the track position continues advancing at a lower average rate.
+    mockContext.currentTime = 2.125;
+    expect(engine.getState().currentTime).toBeCloseTo(2.09375);
+
+    // At 250ms the platter and audio have reached rest; the source is then retired.
+    mockContext.currentTime = 2.25;
+    await vi.advanceTimersByTimeAsync(255);
+    expect(engine.getState().currentTime).toBeCloseTo(2.125);
+    expect(source?.stop).toHaveBeenCalledTimes(1);
+    expect(source?.disconnect).toHaveBeenCalledTimes(1);
 
     engine.dispose();
   });
