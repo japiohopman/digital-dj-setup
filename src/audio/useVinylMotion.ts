@@ -362,7 +362,10 @@ export function useVinylMotion({
       // Platter angle increases with forward track movement; reverse hand movement is negative.
       const velocity = -delta / (radsPerMs * elapsedMs);
       lastPointerVelocityRef.current = Math.max(-4, Math.min(4, velocity));
-      const nextAngle = Math.max(0, angleRef.current - delta);
+      const proposedAngle = angleRef.current - delta;
+      const nextAngle = maxAngle === Infinity
+        ? Math.max(0, proposedAngle)
+        : Math.max(0, Math.min(maxAngle, proposedAngle));
 
       angleRef.current = nextAngle;
       setAngle(nextAngle);
