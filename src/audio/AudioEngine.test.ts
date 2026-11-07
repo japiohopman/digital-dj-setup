@@ -674,7 +674,7 @@ describe('AudioEngine', () => {
     engine.dispose();
   });
 
-  it('keeps source alive during pause de-click fade and only stops it after completion', async () => {
+  it('keeps source alive throughout the mechanical pause brake and only stops it after completion', async () => {
     const engine = createEngine();
     await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'fade-timing.mp3');
 
@@ -682,21 +682,21 @@ describe('AudioEngine', () => {
     const source = mockContext.createdSources[0];
     expect(source).toBeDefined();
 
-    // Trigger pause
     engine.pause();
 
-    // Immediately after pause call, source is NOT yet stopped or disconnected
+    // The source remains connected throughout the quarter-second slowdown.
     expect(source?.stop).not.toHaveBeenCalled();
     expect(source?.disconnect).not.toHaveBeenCalled();
 
-    // Advance 10ms (midway through de-click fade)
-    await vi.advanceTimersByTimeAsync(10);
+    await vi.advanceTimersByTimeAsync(100);
     expect(source?.stop).not.toHaveBeenCalled();
 
-    // Advance remaining time past the 20ms fade completion window
-    await vi.advanceTimersByTimeAsync(15);
-    expect(source?.stop).toHaveBeenCalled();
-    expect(source?.disconnect).toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(150);
+    expect(source?.stop).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(5);
+    expect(source?.stop).toHaveBeenCalledTimes(1);
+    expect(source?.disconnect).toHaveBeenCalledTimes(1);
 
     engine.dispose();
   });
