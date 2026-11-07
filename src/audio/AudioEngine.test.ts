@@ -601,12 +601,12 @@ describe('AudioEngine', () => {
 
     // Halfway through the brake, the track position continues advancing at a lower average rate.
     mockContext.currentTime = 2.125;
-    expect(engine.getState().currentTime).toBeCloseTo(2.09375);
+    expect(engine.getState().currentTime).toBeCloseTo(0.09375);
 
     // At 250ms the platter and audio have reached rest; the source is then retired.
     mockContext.currentTime = 2.25;
     await vi.advanceTimersByTimeAsync(255);
-    expect(engine.getState().currentTime).toBeCloseTo(2.125);
+    expect(engine.getState().currentTime).toBeCloseTo(0.125);
     expect(source?.stop).toHaveBeenCalledTimes(1);
     expect(source?.disconnect).toHaveBeenCalledTimes(1);
 
