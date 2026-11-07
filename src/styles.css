@@ -187,8 +187,14 @@ textarea {
   width: 6px;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: #c59a58;
-  box-shadow: 0 0 7px rgb(197 154 88 / 50%);
+  background: #64748b;
+  box-shadow: 0 0 5px rgb(100 116 139 / 40%);
+  transition: all 0.2s ease;
+}
+
+.app-footer__status.is-active {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgb(34 197 94 / 70%);
 }
 
 @media (max-width: 520px) {

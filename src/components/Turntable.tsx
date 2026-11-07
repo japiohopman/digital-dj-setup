@@ -1,4 +1,5 @@
-import { useState, useRef, type CSSProperties, type PointerEvent, type KeyboardEvent } from 'react';
+import { useState, useRef, type CSSProperties, type PointerEvent, type KeyboardEvent, type ChangeEvent } from 'react';
+import type { DeckTransport } from '../audio/types';
 
 /**
  * Supported playback RPM speeds for the turntable deck.
@@ -27,6 +28,8 @@ export interface TurntableProps {
   initiallyHasRecord?: boolean;
   /** Whether a slipmat is placed on the platter. */
   initiallyHasSlipmat?: boolean;
+  /** Optional DeckTransport instance connected to the deck's audio engine. */
+  transport?: DeckTransport;
 }
 
 /**
@@ -45,6 +48,7 @@ export function Turntable({
   initiallySpinning = true,
   initiallyHasRecord = true,
   initiallyHasSlipmat = false,
+  transport,
 }: TurntableProps) {
   const motorActive = initiallyMotorOn !== undefined ? initiallyMotorOn : initiallySpinning;
   const [isPowered, setIsPowered] = useState(initiallyPowered);
@@ -55,6 +59,7 @@ export function Turntable({
   const [hasSlipmat] = useState(initiallyHasSlipmat);
   const [pitch, setPitch] = useState<number>(0);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
 
   const updatePitchFromPointer = (clientY: number, clientX: number) => {
@@ -135,12 +140,37 @@ export function Turntable({
     if (!nextPower) {
       setIsMotorOn(false);
       setIsLightOn(false);
+      if (transport && transport.isPlaying) {
+        transport.pause();
+      }
     }
   };
 
   const handleStartStopToggle = () => {
     if (!isPowered) return;
-    setIsMotorOn((prev) => !prev);
+    const nextMotor = !isMotorOn;
+    setIsMotorOn(nextMotor);
+
+    if (transport && transport.isLoaded) {
+      if (nextMotor) {
+        void transport.play();
+      } else {
+        transport.pause();
+      }
+    }
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && transport) {
+      void transport.loadTrack(file);
+    }
+    // Clear input so selecting the same file triggers change again
+    e.target.value = '';
+  };
+
+  const handleOpenFileDialog = () => {
+    fileInputRef.current?.click();
   };
 
   const handleSpeedChange = (newSpeed: TurntableSpeed) => {
@@ -161,15 +191,25 @@ export function Turntable({
     setPitch(0);
   };
 
+  // If a track is loaded, the platter only spins when actually playing
+  // If no track is loaded, platter spins if motor is on
+  const isSpinning = isPowered && isMotorOn && (!transport?.isLoaded || transport.isPlaying);
+
   const classes = [
     'turntable',
     isPowered ? 'power-on' : '',
-    isMotorOn ? 'motor-on' : '',
+    isSpinning ? 'motor-on' : '',
     hasRecord ? 'has-record' : '',
     hasSlipmat ? 'has-slipmat' : '',
   ]
     .filter(Boolean)
     .join(' ');
+
+  const formatTime = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const remainder = Math.floor(secs % 60);
+    return `${mins}:${remainder.toString().padStart(2, '0')}`;
+  };
 
   const baseDuration = speed === 33 ? 1.8 : 1.3333;
   const effectiveDuration = baseDuration / (1 + pitch / 100);
@@ -278,6 +318,84 @@ export function Turntable({
 
         <div className="model-badge" aria-hidden="true">
           <span>{modelName}</span>
+        </div>
+
+        {/* Track Loading and Audio Transport Info Bar */}
+        <div className="deck-audio-panel" role="region" aria-label={`${deckLabel} audio transport`}>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="audio/*,.mp3,.wav,.ogg,.flac,.aac,.m4a"
+            className="deck-file-input"
+            aria-label={`${deckLabel} Select audio file`}
+            tabIndex={-1}
+          />
+
+          <div className="deck-audio-controls">
+            <button
+              type="button"
+              className="deck-load-btn"
+              onClick={handleOpenFileDialog}
+              disabled={!isPowered}
+              aria-label={`${deckLabel} Load audio track`}
+            >
+              <span className="deck-load-icon" aria-hidden="true">▲</span>
+              LOAD TRACK
+            </button>
+
+            {transport && transport.isLoaded && (
+              <div className="deck-transport-actions">
+                <button
+                  type="button"
+                  className={`deck-action-btn${transport.isPlaying ? ' active' : ''}`}
+                  onClick={() => {
+                    if (transport.isPlaying) {
+                      transport.pause();
+                    } else if (isPowered) {
+                      setIsMotorOn(true);
+                      void transport.play();
+                    }
+                  }}
+                  disabled={!isPowered}
+                  aria-label={`${deckLabel} ${transport.isPlaying ? 'Pause' : 'Play'}`}
+                >
+                  {transport.isPlaying ? 'PAUSE' : 'PLAY'}
+                </button>
+                <button
+                  type="button"
+                  className="deck-action-btn"
+                  onClick={() => {
+                    transport.stop();
+                    setIsMotorOn(false);
+                  }}
+                  disabled={!isPowered}
+                  aria-label={`${deckLabel} Stop`}
+                >
+                  STOP
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="deck-audio-readout">
+            {transport?.playbackState === 'loading' ? (
+              <span className="deck-audio-status loading">DECODING AUDIO...</span>
+            ) : transport?.error ? (
+              <span className="deck-audio-status error" role="alert">{transport.error}</span>
+            ) : transport?.trackName ? (
+              <div className="deck-track-meta">
+                <span className="deck-track-name" title={transport.trackName}>
+                  {transport.trackName}
+                </span>
+                <span className="deck-track-time">
+                  {formatTime(transport.currentTime)} / {formatTime(transport.duration)}
+                </span>
+              </div>
+            ) : (
+              <span className="deck-audio-status idle">NO TRACK LOADED</span>
+            )}
+          </div>
         </div>
 
         {/* Authentic Technics Pitch Control Assembly */}

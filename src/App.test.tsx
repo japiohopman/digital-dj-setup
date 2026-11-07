@@ -4,13 +4,15 @@ import { describe, expect, it } from 'vitest';
 import { App } from './App';
 
 describe('App dual-deck workspace', () => {
-  it('renders two independent instances of the reusable turntable', () => {
+  it('renders two independent instances of the reusable turntable with Web Audio connected', () => {
     const markup = renderToStaticMarkup(<App />);
 
     expect(markup).toContain('id="deck-a-panel"');
     expect(markup).toContain('id="deck-b-panel"');
     expect(markup).toContain('DECK A Technics-inspired turntable');
     expect(markup).toContain('DECK B Technics-inspired turntable');
+    expect(markup).toContain('WEB AUDIO ENGINE CONNECTED');
+    expect(markup).toContain('INDEPENDENT DUAL TRANSPORT');
     expect(markup.match(/class="turntable power-on motor-on has-record"/g)).toHaveLength(2);
   });
 

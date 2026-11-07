@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import type { DeckTransport } from '../audio/types';
 import { Turntable } from './Turntable';
 
 describe('Turntable deck configuration and isolation', () => {
@@ -112,5 +113,84 @@ describe('Turntable static markup', () => {
 
     expect(markup).not.toContain('motor-on');
     expect(markup).toContain('disabled=""');
+  });
+
+  it('renders track transport controls and metadata when transport is provided', () => {
+    const mockTransport: DeckTransport = {
+      trackName: 'ahhh-fresh.wav',
+      duration: 180,
+      currentTime: 45,
+      playbackState: 'playing',
+      isPlaying: true,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+    };
+
+    const markup = renderToStaticMarkup(
+      <Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />,
+    );
+
+    expect(markup).toContain('class="deck-audio-panel"');
+    expect(markup).toContain('LOAD TRACK');
+    expect(markup).toContain('ahhh-fresh.wav');
+    expect(markup).toContain('0:45 / 3:00');
+    expect(markup).toContain('PAUSE');
+    expect(markup).toContain('STOP');
+    // Platter is spinning because audio is playing
+    expect(markup).toContain('motor-on');
+  });
+
+  it('does not spin platter when track is paused even if motor button is active', () => {
+    const mockTransport: DeckTransport = {
+      trackName: 'breakbeat.mp3',
+      duration: 120,
+      currentTime: 10,
+      playbackState: 'paused',
+      isPlaying: false,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+    };
+
+    const markup = renderToStaticMarkup(
+      <Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />,
+    );
+
+    // Motor class should not be present because track is loaded but paused
+    expect(markup).not.toContain('motor-on');
+    expect(markup).toContain('PLAY');
+  });
+
+  it('displays decoding error in the audio panel', () => {
+    const mockTransport: DeckTransport = {
+      trackName: null,
+      duration: 0,
+      currentTime: 0,
+      playbackState: 'idle',
+      isPlaying: false,
+      isLoaded: false,
+      error: 'Failed to decode audio: corrupted file',
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+    };
+
+    const markup = renderToStaticMarkup(
+      <Turntable deckLabel="DECK B" transport={mockTransport} />,
+    );
+
+    expect(markup).toContain('role="alert"');
+    expect(markup).toContain('Failed to decode audio: corrupted file');
   });
 });

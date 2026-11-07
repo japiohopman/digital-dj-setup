@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { useDeckTransport } from './audio/useDeckTransport';
 import { Turntable } from './components/Turntable';
 import './components/Turntable.css';
 
@@ -7,6 +8,10 @@ type ActiveDeck = 'a' | 'b';
 
 export function App() {
   const [activeDeck, setActiveDeck] = useState<ActiveDeck>('a');
+  const transportA = useDeckTransport();
+  const transportB = useDeckTransport();
+
+  const isAudioActive = transportA.isPlaying || transportB.isPlaying;
 
   return (
     <main className="app-shell">
@@ -48,7 +53,7 @@ export function App() {
             id="deck-a-panel"
           >
             <div className="dual-deck__turntable">
-              <Turntable deckLabel="DECK A" modelName="SL-1200 MK2" />
+              <Turntable deckLabel="DECK A" modelName="SL-1200 MK2" transport={transportA} />
             </div>
           </div>
 
@@ -59,15 +64,15 @@ export function App() {
             id="deck-b-panel"
           >
             <div className="dual-deck__turntable">
-              <Turntable deckLabel="DECK B" modelName="SL-1200 MK2" />
+              <Turntable deckLabel="DECK B" modelName="SL-1200 MK2" transport={transportB} />
             </div>
           </div>
         </div>
       </section>
 
       <footer className="app-footer">
-        <span className="app-footer__status" />
-        VISUAL CONTROLS ONLY <span aria-hidden="true">·</span> AUDIO ENGINE NOT CONNECTED
+        <span className={`app-footer__status${isAudioActive ? ' is-active' : ''}`} />
+        WEB AUDIO ENGINE CONNECTED <span aria-hidden="true">·</span> INDEPENDENT DUAL TRANSPORT
       </footer>
     </main>
   );

@@ -62,6 +62,158 @@
 }
 
 /* --------------------------------------------------
+   Deck Audio Panel & Track Display
+-------------------------------------------------- */
+.turntable .deck-audio-panel {
+  position: absolute;
+  top: 2.8%;
+  left: 20%;
+  right: 28%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(14, 16, 18, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 3px 8px;
+  z-index: 15;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.turntable .deck-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.turntable .deck-audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.turntable .deck-load-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #24292e;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  padding: 3px 6px;
+  color: #c59a58;
+  font-family: monospace, sans-serif;
+  font-size: clamp(5px, 0.7vw, 9px);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.turntable .deck-load-btn:hover:not(:disabled) {
+  background: #313840;
+  border-color: #c59a58;
+}
+
+.turntable .deck-load-icon {
+  font-size: 7px;
+  color: #c59a58;
+}
+
+.turntable .deck-transport-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.turntable .deck-action-btn {
+  background: #181b1d;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  padding: 3px 6px;
+  color: #adb5bd;
+  font-family: monospace, sans-serif;
+  font-size: clamp(5px, 0.65vw, 8px);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.turntable .deck-action-btn:hover:not(:disabled) {
+  background: #23272a;
+  color: #fff;
+}
+
+.turntable .deck-action-btn.active {
+  background: #1c3b24;
+  border-color: #22c55e;
+  color: #86efac;
+}
+
+.turntable .deck-audio-readout {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.turntable .deck-audio-status {
+  font-family: monospace, sans-serif;
+  font-size: clamp(5px, 0.65vw, 8px);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.turntable .deck-audio-status.idle {
+  color: #6c757d;
+}
+
+.turntable .deck-audio-status.loading {
+  color: #f59e0b;
+}
+
+.turntable .deck-audio-status.error {
+  color: #ef4444;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.turntable .deck-track-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  max-width: 100%;
+}
+
+.turntable .deck-track-name {
+  font-family: helvetica, arial, sans-serif;
+  font-size: clamp(6px, 0.75vw, 10px);
+  font-weight: 700;
+  color: #e5e5e5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+
+.turntable .deck-track-time {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: clamp(5px, 0.65vw, 8px);
+  color: #38bdf8;
+  letter-spacing: 0.03em;
+}
+
+/* --------------------------------------------------
    Authentic Technics SL-1200 Pitch Control Assembly
    Positioned in the lower-right quadrant of unrotated deck;
    when rotated -90deg in battle mode, it sits horizontally
