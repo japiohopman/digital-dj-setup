@@ -166,6 +166,10 @@ textarea {
   display: none;
 }
 
+.dual-deck__center-panel {
+  display: none;
+}
+
 .dual-deck__turntable {
   width: 100%;
 }
@@ -221,79 +225,84 @@ textarea {
 
 @media (orientation: landscape) {
   .app-shell {
-    gap: clamp(8px, 1.8vh, 18px);
-  }
-
-  .app-header h1 {
-    font-size: clamp(1.1rem, 2.5vw, 2rem);
-  }
-
-  .deck-selector {
-    display: none;
-  }
-
-  .deck-workspace {
-    min-height: 0;
-    flex: 1 1 auto;
-  }
-
-  .dual-deck-layout {
-    display: grid;
-    width: min(100%, 1320px, calc((100svh - 160px) * 2 + 16px));
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .dual-deck-layout .dual-deck__slot {
-    position: relative;
-    display: flex;
-    aspect-ratio: 1;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .dual-deck__turntable {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 78.4%;
-    transform: translate(-50%, -50%) rotate(-90deg);
-  }
-}
-
-@media (orientation: landscape) and (max-height: 520px) {
-  .app-shell {
     height: 100vh;
     height: 100svh;
     min-height: 0;
-    gap: 0;
     padding:
-      max(5px, env(safe-area-inset-top))
-      max(8px, env(safe-area-inset-right))
-      max(5px, env(safe-area-inset-bottom))
-      max(8px, env(safe-area-inset-left));
+      max(4px, env(safe-area-inset-top))
+      max(6px, env(safe-area-inset-right))
+      max(4px, env(safe-area-inset-bottom))
+      max(6px, env(safe-area-inset-left));
+    gap: 0;
+    justify-content: center;
+    overflow: hidden;
   }
 
   .app-header,
-  .app-footer {
+  .app-footer,
+  .deck-selector {
     display: none;
   }
 
   .deck-workspace {
     width: 100%;
     height: 100%;
+    max-width: 100vw;
+    max-height: 100vh;
+    max-height: 100svh;
     flex: 1 1 auto;
+    align-items: center;
+    justify-content: center;
     overflow: hidden;
   }
 
   .dual-deck-layout {
-    width: min(
-      100%,
-      calc(
-        (100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 12px) * 2 + 8px
-      )
-    );
-    gap: 8px;
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: clamp(12px, 3vw, 40px);
+  }
+
+  .dual-deck-layout .dual-deck__slot {
+    position: relative;
+    display: flex;
+    flex: 1 1 0%;
+    height: 100%;
+    max-height: 100%;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .dual-deck__center-panel {
+    display: flex;
+    flex: 0 0 clamp(48px, 14vw, 220px);
+    height: 100%;
+    min-width: 0;
+    pointer-events: none;
+  }
+
+  /*
+   * In battle setup, the turntable is rotated -90deg.
+   * Its unrotated aspect ratio is 1256 / 1010 (~1.2435 wide : 1 high).
+   * When rotated -90deg:
+   *   Rotated visual width  = unrotated height
+   *   Rotated visual height = unrotated width
+   * Therefore, to make the turntable fill the height of the slot container:
+   *   unrotated width should be proportional to the container height (~100% of height).
+   */
+  .dual-deck__turntable {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    /* Fill vertical space of slot with minimal margin */
+    width: min(calc(100% * 1256 / 1010), calc(100vh - 12px), calc(100svh - 12px));
+    max-width: none;
+    transform: translate(-50%, -50%) rotate(-90deg);
   }
 }
 
