@@ -1,0 +1,65 @@
+import type { AudioMetadata } from './metadata';
+
+/**
+ * State representing current playback progress and lifecycle.
+ */
+export type AudioPlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'stopped';
+
+export type { AudioMetadata };
+
+/**
+ * Public snapshot of the audio engine state.
+ */
+export interface AudioEngineState {
+  /** Name of the loaded audio track, or null if no track loaded. */
+  trackName: string | null;
+  /** Parsed track metadata including title, artist, album, and artwork Blob URL. */
+  metadata: AudioMetadata | null;
+  /** Total duration in seconds, or 0 if not loaded. */
+  duration: number;
+  /** Current playback timestamp in seconds. */
+  currentTime: number;
+  /** Current lifecycle playback state. */
+  playbackState: AudioPlaybackState;
+  /** Human-readable error message, or null if healthy. */
+  error: string | null;
+}
+
+/**
+ * Listener callback function for engine state updates.
+ */
+export type AudioEngineListener = (state: AudioEngineState) => void;
+
+/**
+ * Constructor options for the audio engine.
+ */
+export interface AudioEngineOptions {
+  /** Optional custom AudioContext factory for testing or environments with specific policies. */
+  audioContextFactory?: (() => AudioContext) | undefined;
+}
+
+/**
+ * Transport controls exposed to consumers (e.g. React hooks, UI components).
+ */
+export interface DeckTransport {
+  trackName: string | null;
+  metadata: AudioMetadata | null;
+  duration: number;
+  currentTime: number;
+  playbackState: AudioPlaybackState;
+  isPlaying: boolean;
+  isLoaded: boolean;
+  error: string | null;
+  loadTrack: (file: File) => Promise<void>;
+  play: (offset?: number) => Promise<void>;
+  pause: (durationMs?: number) => void;
+  stop: () => void;
+  togglePlayPause: () => Promise<void>;
+  scratch: (speed: number, isReversed: boolean, position: number) => void;
+  endScratch: (resumePlayback: boolean) => void;
+  seek: (position: number) => void;
+  setPlaybackRate: (rate: number) => void;
+  coastDown: (durationMs?: number) => void;
+  cancelCoastDown: () => void;
+  spinUp: (durationMs?: number) => Promise<void>;
+}

@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
+import type { DeckTransport } from '../audio/types';
 import { Turntable } from './Turntable';
 
 describe('Turntable deck configuration and isolation', () => {
@@ -9,7 +10,7 @@ describe('Turntable deck configuration and isolation', () => {
 
     expect(markup).toContain('class="turntable power-on motor-on has-record"');
     expect(markup).toContain('aria-pressed="true"');
-    expect(markup).not.toContain('disabled=""');
+    expect(markup).toContain('aria-label="DECK 01 Start / Stop" aria-pressed="true"');
   });
 
   it('renders unpowered state with controls disabled', () => {
@@ -112,5 +113,696 @@ describe('Turntable static markup', () => {
 
     expect(markup).not.toContain('motor-on');
     expect(markup).toContain('disabled=""');
+  });
+
+  it('renders track transport controls and metadata when transport is provided', () => {
+    const mockTransport: DeckTransport = {
+      trackName: 'ahhh-fresh.wav',
+      metadata: {
+        title: 'ahhh-fresh.wav',
+        artist: 'DJ Qbert',
+        album: 'Super Seal Breaks',
+        artworkUrl: null,
+      },
+      duration: 180,
+      currentTime: 45,
+      playbackState: 'playing',
+      isPlaying: true,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+    };
+
+    const markup = renderToStaticMarkup(
+      <Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />,
+    );
+
+    expect(markup).toContain('class="deck-audio-panel"');
+    expect(markup).toContain('LOAD TRACK');
+    expect(markup).toContain('ahhh-fresh.wav');
+    expect(markup).toContain('0:45 / 3:00');
+    expect(markup).toContain('PAUSE');
+    expect(markup).toContain('STOP');
+    // Center record label displays track name and duration
+    expect(markup).toContain('PLAYING TRACK');
+    expect(markup).toContain('DJ Qbert - ahhh-fresh.wav');
+    // Platter is spinning because audio is playing
+    expect(markup).toContain('motor-on');
+  });
+
+  it('renders embedded cover artwork on the rotating record when available', () => {
+    const mockTransport: DeckTransport = {
+      trackName: 'champion-sound.flac',
+      metadata: {
+        title: 'Champion Sound',
+        artist: 'Jaylib',
+        album: 'Champion Sound',
+        artworkUrl: 'blob:http://localhost:5173/mock-art-uuid',
+      },
+      duration: 150,
+      currentTime: 30,
+      playbackState: 'playing',
+      isPlaying: true,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+    };
+
+    const markup = renderToStaticMarkup(
+      <Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />,
+    );
+
+    expect(markup).toContain('class="record-artwork"');
+    expect(markup).toContain('blob:http://localhost:5173/mock-art-uuid');
+    expect(markup).toContain('class="artwork-center-hole"');
+  });
+
+  it('does not spin platter when track is paused even if motor button is active', () => {
+    const mockTransport: DeckTransport = {
+      trackName: 'breakbeat.mp3',
+      metadata: {
+        title: 'breakbeat.mp3',
+        artist: null,
+        album: null,
+        artworkUrl: null,
+      },
+      duration: 120,
+      currentTime: 10,
+      playbackState: 'paused',
+      isPlaying: false,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+    };
+
+    const markup = renderToStaticMarkup(
+      <Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />,
+    );
+
+    // Motor class should not be present because track is loaded but paused
+    expect(markup).not.toContain('motor-on');
+    expect(markup).toContain('PLAY');
+  });
+
+  it('displays decoding error in the audio panel', () => {
+    const mockTransport: DeckTransport = {
+      trackName: null,
+      metadata: null,
+      duration: 0,
+      currentTime: 0,
+      playbackState: 'idle',
+      isPlaying: false,
+      isLoaded: false,
+      error: 'Failed to decode audio: corrupted file',
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+    };
+
+    const markup = renderToStaticMarkup(
+      <Turntable deckLabel="DECK B" transport={mockTransport} />,
+    );
+
+    expect(markup).toContain('role="alert"');
+    expect(markup).toContain('Failed to decode audio: corrupted file');
+  });
+});
+
+// Configure React 18/19 testing environment flag to silence act warning in vitest jsdom
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+import { createRoot } from 'react-dom/client';
+import { act } from 'react';
+
+describe('Turntable interactive controls', () => {
+  it('triggers loadTrack and play on file input change', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: null,
+      metadata: null,
+      duration: 120,
+      currentTime: 0,
+      playbackState: 'idle',
+      isPlaying: false,
+      isLoaded: false,
+      error: null,
+      loadTrack: vi.fn().mockResolvedValue(undefined),
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+    };
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />);
+    });
+
+    const fileInput = container.querySelector('input.deck-file-input') as HTMLInputElement;
+    expect(fileInput).toBeDefined();
+
+    const file = new File(['audio-binary'], 'fresh_cut.wav', { type: 'audio/wav' });
+    Object.defineProperty(fileInput, 'files', {
+      value: [file],
+      writable: true,
+    });
+
+    await act(async () => {
+      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(mockTransport.loadTrack).toHaveBeenCalledWith(file);
+    await Promise.resolve();
+    expect(mockTransport.play).toHaveBeenCalled();
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('triggers loadTrack on drag and drop onto the record platter', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: null,
+      metadata: null,
+      duration: 120,
+      currentTime: 0,
+      playbackState: 'idle',
+      isPlaying: false,
+      isLoaded: false,
+      error: null,
+      loadTrack: vi.fn().mockResolvedValue(undefined),
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+    };
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />);
+    });
+
+    const recordHolder = container.querySelector('.record-holder') as HTMLDivElement;
+    expect(recordHolder).toBeDefined();
+
+    const file = new File(['audio-binary'], 'dj_battle_tool.mp3', { type: 'audio/mp3' });
+    const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: {
+        files: [file],
+      },
+    });
+
+    await act(async () => {
+      recordHolder.dispatchEvent(dropEvent);
+    });
+
+    expect(mockTransport.loadTrack).toHaveBeenCalledWith(file);
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('handles play, pause, and stop button clicks', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: 'anthem.wav',
+      metadata: null,
+      duration: 180,
+      currentTime: 20,
+      playbackState: 'playing',
+      isPlaying: true,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+    };
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />);
+    });
+
+    const pauseBtn = container.querySelector('button[aria-label="DECK A Pause"]') as HTMLButtonElement;
+    expect(pauseBtn).toBeDefined();
+    await act(async () => {
+      pauseBtn.click();
+    });
+    expect(mockTransport.pause).toHaveBeenCalled();
+
+    const stopBtn = container.querySelector('button[aria-label="DECK A Stop"]') as HTMLButtonElement;
+    expect(stopBtn).toBeDefined();
+    await act(async () => {
+      stopBtn.click();
+    });
+    expect(mockTransport.stop).toHaveBeenCalled();
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('power switch initiates coastDown when turned off during playback', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: 'anthem.wav',
+      metadata: null,
+      duration: 180,
+      currentTime: 20,
+      playbackState: 'playing',
+      isPlaying: true,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+    };
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />);
+    });
+
+    const powerDial = container.querySelector('button[aria-label="DECK A Power"]') as HTMLButtonElement;
+    expect(powerDial).toBeDefined();
+    await act(async () => {
+      powerDial.click();
+    });
+
+    expect(mockTransport.coastDown).toHaveBeenCalledWith(1200);
+
+    // Power restored while still coasting: should call cancelCoastDown
+    await act(async () => {
+      powerDial.click();
+    });
+    expect(mockTransport.cancelCoastDown).toHaveBeenCalled();
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('START/STOP button acts as immediate Play/Pause with no coast-down', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: 'anthem.wav',
+      metadata: null,
+      duration: 180,
+      currentTime: 20,
+      playbackState: 'playing',
+      isPlaying: true,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+    };
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />);
+    });
+
+    const startStopBtn = container.querySelector('button[aria-label="DECK A Start / Stop"]') as HTMLButtonElement;
+    expect(startStopBtn).toBeDefined();
+
+    // Click START/STOP while playing -> immediate pause
+    await act(async () => {
+      startStopBtn.click();
+    });
+
+    expect(mockTransport.pause).toHaveBeenCalled();
+    expect(mockTransport.coastDown).not.toHaveBeenCalled();
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('triggers spinUp when Power is turned ON from fully stopped state with motor active', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: 'spinup-deck.wav',
+      metadata: null,
+      duration: 180,
+      currentTime: 25,
+      playbackState: 'paused',
+      isPlaying: false,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // Initially powered OFF, but motor active
+    await act(async () => {
+      root.render(
+        <Turntable
+          deckLabel="DECK A"
+          transport={mockTransport}
+          initiallyPowered={false}
+          initiallyMotorOn={true}
+        />,
+      );
+    });
+
+    const powerDial = container.querySelector('button[aria-label="DECK A Power"]') as HTMLButtonElement;
+    expect(powerDial).toBeDefined();
+
+    // Turn power ON from stopped
+    await act(async () => {
+      powerDial.click();
+    });
+
+    // Should call spinUp(450) preserving track position
+    expect(mockTransport.spinUp).toHaveBeenCalledWith(450);
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('retains motor intent across full coast-down and triggers spinUp on subsequent Power ON', async () => {
+    vi.useFakeTimers();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: 'power-cycle.wav',
+      metadata: null,
+      duration: 200,
+      currentTime: 40,
+      playbackState: 'playing',
+      isPlaying: true,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // Deck initially powered ON and motor ON
+    await act(async () => {
+      root.render(
+        <Turntable
+          deckLabel="DECK A"
+          transport={mockTransport}
+          initiallyPowered={true}
+          initiallyMotorOn={true}
+        />,
+      );
+    });
+
+    const powerDial = container.querySelector('button[aria-label="DECK A Power"]') as HTMLButtonElement;
+    expect(powerDial).toBeDefined();
+
+    // 1. Turn power OFF -> starts coastDown
+    await act(async () => {
+      powerDial.click();
+    });
+    expect(mockTransport.coastDown).toHaveBeenCalledWith(1200);
+
+    // 2. Advance time past the 1200ms coast duration to reach fully stopped state
+    await act(async () => {
+      vi.advanceTimersByTime(1300);
+    });
+
+    const turntableElem = container.querySelector('.turntable');
+    expect(turntableElem?.classList.contains('coasting')).toBe(false);
+
+    // 3. Turn power ON from fully stopped -> must call spinUp(450) because motor intent was retained!
+    await act(async () => {
+      powerDial.click();
+    });
+
+    expect(mockTransport.spinUp).toHaveBeenCalledWith(450);
+    expect(turntableElem?.classList.contains('spinning-up')).toBe(true);
+
+    // 4. Advance 450ms -> should complete spinUp and enter driven state
+    await act(async () => {
+      vi.advanceTimersByTime(450);
+    });
+    expect(turntableElem?.classList.contains('spinning-up')).toBe(false);
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+    vi.useRealTimers();
+  });
+
+  it('does NOT trigger spinUp on Power ON if motor was explicitly disengaged before power-off', async () => {
+    vi.useFakeTimers();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: 'power-cycle-stopped.wav',
+      metadata: null,
+      duration: 200,
+      currentTime: 40,
+      playbackState: 'paused',
+      isPlaying: false,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn().mockResolvedValue(undefined),
+    };
+
+    // Deck initially powered ON but motor disengaged
+    await act(async () => {
+      root.render(
+        <Turntable
+          deckLabel="DECK A"
+          transport={mockTransport}
+          initiallyPowered={true}
+          initiallyMotorOn={false}
+        />,
+      );
+    });
+
+    const powerDial = container.querySelector('button[aria-label="DECK A Power"]') as HTMLButtonElement;
+
+    // Power OFF
+    await act(async () => {
+      powerDial.click();
+    });
+
+    // Advance past coast duration
+    await act(async () => {
+      vi.advanceTimersByTime(1300);
+    });
+
+    // Power ON
+    await act(async () => {
+      powerDial.click();
+    });
+
+    // Should NOT call spinUp since motor was disengaged
+    expect(mockTransport.spinUp).not.toHaveBeenCalled();
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+    vi.useRealTimers();
+  });
+
+  it('accelerates platter only without audio calls when Power ON from stopped with no track loaded', async () => {
+    vi.useFakeTimers();
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: null,
+      metadata: null,
+      duration: 0,
+      currentTime: 0,
+      playbackState: 'idle',
+      isPlaying: false,
+      isLoaded: false,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+    };
+
+    await act(async () => {
+      root.render(
+        <Turntable
+          deckLabel="DECK A"
+          transport={mockTransport}
+          initiallyPowered={false}
+          initiallyMotorOn={true}
+        />,
+      );
+    });
+
+    const powerDial = container.querySelector('button[aria-label="DECK A Power"]') as HTMLButtonElement;
+    await act(async () => {
+      powerDial.click();
+    });
+
+    // No track loaded -> spinUp audio not called, but platter enters spinning-up
+    expect(mockTransport.spinUp).not.toHaveBeenCalled();
+    const turntableElem = container.querySelector('.turntable');
+    expect(turntableElem?.classList.contains('spinning-up')).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(450);
+    });
+    expect(turntableElem?.classList.contains('spinning-up')).toBe(false);
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+    vi.useRealTimers();
   });
 });

@@ -1,4 +1,6 @@
-import { useState, useRef, type CSSProperties, type PointerEvent, type KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, type CSSProperties, type PointerEvent, type KeyboardEvent, type ChangeEvent } from 'react';
+import type { DeckTransport } from '../audio/types';
+import { useVinylMotion, type TurntableMotorState } from '../audio/useVinylMotion';
 
 /**
  * Supported playback RPM speeds for the turntable deck.
@@ -27,6 +29,8 @@ export interface TurntableProps {
   initiallyHasRecord?: boolean;
   /** Whether a slipmat is placed on the platter. */
   initiallyHasSlipmat?: boolean;
+  /** Optional DeckTransport instance connected to the deck's audio engine. */
+  transport?: DeckTransport;
 }
 
 /**
@@ -45,17 +49,59 @@ export function Turntable({
   initiallySpinning = true,
   initiallyHasRecord = true,
   initiallyHasSlipmat = false,
+  transport,
 }: TurntableProps) {
   const motorActive = initiallyMotorOn !== undefined ? initiallyMotorOn : initiallySpinning;
   const [isPowered, setIsPowered] = useState(initiallyPowered);
-  const [isMotorOn, setIsMotorOn] = useState(initiallyPowered && motorActive);
+  const [isMotorOn, setIsMotorOn] = useState(motorActive);
+  const [motorState, setMotorState] = useState<TurntableMotorState>(
+    initiallyPowered && motorActive ? 'driven' : 'stopped',
+  );
   const [speed, setSpeed] = useState<TurntableSpeed>(initialSpeed);
   const [isLightOn, setIsLightOn] = useState(false);
   const [hasRecord] = useState(initiallyHasRecord);
   const [hasSlipmat] = useState(initiallyHasSlipmat);
   const [pitch, setPitch] = useState<number>(0);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isDragOverRecord, setIsDragOverRecord] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
+  const recordRef = useRef<HTMLDivElement | null>(null);
+  const coastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const spinUpTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep live refs of power and motor state to avoid stale closures in async file loaders
+  const isPoweredRef = useRef(isPowered);
+  isPoweredRef.current = isPowered;
+  const isMotorOnRef = useRef(isMotorOn);
+  isMotorOnRef.current = isMotorOn;
+
+  // Cleanup coast and spin-up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (coastTimeoutRef.current !== null) {
+        clearTimeout(coastTimeoutRef.current);
+      }
+      if (spinUpTimeoutRef.current !== null) {
+        clearTimeout(spinUpTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const {
+    angle: vinylAngle,
+    isScratching,
+    discRef,
+    onPointerDown: onVinylPointerDown,
+  } = useVinylMotion({
+    isPowered,
+    isMotorOn,
+    speedRpm: speed,
+    pitch,
+    motorState,
+    transport,
+    centerElementRef: recordRef,
+  });
 
   const updatePitchFromPointer = (clientY: number, clientX: number) => {
     if (!trackRef.current) return;
@@ -132,15 +178,147 @@ export function Turntable({
   const handlePowerToggle = () => {
     const nextPower = !isPowered;
     setIsPowered(nextPower);
+
     if (!nextPower) {
-      setIsMotorOn(false);
+      // Power turned OFF
       setIsLightOn(false);
+      if (spinUpTimeoutRef.current !== null) {
+        clearTimeout(spinUpTimeoutRef.current);
+        spinUpTimeoutRef.current = null;
+      }
+
+      const wasSpinning = isMotorOn || (transport?.isPlaying ?? false);
+
+      if (wasSpinning) {
+        // Initiate realistic motor coast-down: audio and platter decelerate together over 1200ms
+        setMotorState('coasting');
+        // Do NOT clear isMotorOn: retain motor START/STOP intent across power toggles
+
+        if (transport && transport.isPlaying) {
+          transport.coastDown(1200);
+        }
+
+        if (coastTimeoutRef.current !== null) {
+          clearTimeout(coastTimeoutRef.current);
+        }
+        coastTimeoutRef.current = setTimeout(() => {
+          setMotorState('stopped');
+          coastTimeoutRef.current = null;
+        }, 1200);
+      } else {
+        setMotorState('stopped');
+        if (transport) {
+          transport.pause();
+        }
+      }
+    } else {
+      // Power turned ON
+      if (coastTimeoutRef.current !== null) {
+        // Power restored while still coasting: restore motor torque seamlessly!
+        clearTimeout(coastTimeoutRef.current);
+        coastTimeoutRef.current = null;
+        setMotorState('driven');
+        if (transport && transport.isPlaying) {
+          transport.cancelCoastDown();
+        }
+      } else {
+        // Power restored from fully stopped
+        // If motor START/STOP was left in ON position, spin up smoothly over 450ms from preserved position
+        if (isMotorOn) {
+          setMotorState('spinning-up');
+          if (transport && transport.isLoaded) {
+            void transport.spinUp(450);
+          }
+          if (spinUpTimeoutRef.current !== null) {
+            clearTimeout(spinUpTimeoutRef.current);
+          }
+          spinUpTimeoutRef.current = setTimeout(() => {
+            setMotorState('driven');
+            spinUpTimeoutRef.current = null;
+          }, 450);
+        } else {
+          setMotorState('stopped');
+        }
+      }
     }
   };
 
   const handleStartStopToggle = () => {
     if (!isPowered) return;
-    setIsMotorOn((prev) => !prev);
+    const nextMotor = !isMotorOn;
+    setIsMotorOn(nextMotor);
+
+    if (spinUpTimeoutRef.current !== null) {
+      clearTimeout(spinUpTimeoutRef.current);
+      spinUpTimeoutRef.current = null;
+    }
+
+    if (nextMotor) {
+      // Technics high-torque motor spin-up to 33/45 RPM
+      setMotorState('spinning-up');
+      if (transport && transport.isLoaded) {
+        void transport.spinUp(450);
+      }
+      spinUpTimeoutRef.current = setTimeout(() => {
+        setMotorState('driven');
+        spinUpTimeoutRef.current = null;
+      }, 450);
+    } else {
+      // START/STOP button provides immediate Play/Pause (no coast-down)
+      setMotorState('stopped');
+      if (transport && transport.isLoaded) {
+        transport.pause();
+      }
+    }
+  };
+
+  const handleLoadTrackFile = (file: File) => {
+    if (!transport || !isPoweredRef.current) return;
+    void transport.loadTrack(file).then(() => {
+      // Re-verify power and motor state on live refs after async decoding completes
+      if (isPoweredRef.current && isMotorOnRef.current) {
+        void transport.play();
+      } else {
+        transport.pause();
+      }
+    });
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleLoadTrackFile(file);
+    }
+    // Clear input so selecting the same file triggers change again
+    e.target.value = '';
+  };
+
+  const handleRecordDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragOverRecord) {
+      setIsDragOverRecord(true);
+    }
+  };
+
+  const handleRecordDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOverRecord(false);
+  };
+
+  const handleRecordDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOverRecord(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleLoadTrackFile(file);
+    }
+  };
+
+  const handleOpenFileDialog = () => {
+    fileInputRef.current?.click();
   };
 
   const handleSpeedChange = (newSpeed: TurntableSpeed) => {
@@ -161,20 +339,35 @@ export function Turntable({
     setPitch(0);
   };
 
+  // If a track is loaded, the platter only spins when actually playing, coasting or spinning up
+  // If no track loaded, platter spins if motor is on, coasting or spinning up
+  const isSpinning =
+    motorState === 'coasting' ||
+    motorState === 'spinning-up' ||
+    (isPowered && isMotorOn && (!transport?.isLoaded || transport.isPlaying));
+
   const classes = [
     'turntable',
     isPowered ? 'power-on' : '',
-    isMotorOn ? 'motor-on' : '',
+    isSpinning || isScratching ? 'motor-on' : '',
     hasRecord ? 'has-record' : '',
     hasSlipmat ? 'has-slipmat' : '',
+    isScratching ? 'is-scratching' : '',
+    motorState === 'coasting' ? 'coasting' : '',
+    motorState === 'spinning-up' ? 'spinning-up' : '',
   ]
     .filter(Boolean)
     .join(' ');
 
-  const baseDuration = speed === 33 ? 1.8 : 1.3333;
-  const effectiveDuration = baseDuration / (1 + pitch / 100);
-  const spinStyle: CSSProperties = {
-    animationDuration: `${effectiveDuration.toFixed(4)}s`,
+  const formatTime = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const remainder = Math.floor(secs % 60);
+    return `${mins}:${remainder.toString().padStart(2, '0')}`;
+  };
+
+  // Direct rotation style applied from continuous physics angle
+  const rotateTransformStyle: CSSProperties = {
+    transform: `rotate(${vinylAngle}rad)`,
   };
 
   // Convert pitch (-8 to +8) to percentage along the fader slot (0% = +8, 50% = 0, 100% = -8)
@@ -202,24 +395,82 @@ export function Turntable({
       />
 
       <div className="bd">
-        <div className="platter" style={spinStyle} />
+        <div className="platter" style={rotateTransformStyle} />
 
         <div className="slipmat-holder">
-          <div className="slipmat" style={spinStyle} />
+          <div className="slipmat" style={rotateTransformStyle} />
         </div>
 
-        <div className="record-holder">
-          <div className="record" style={spinStyle}>
-            <div className="label">
-              <span className="label-text-brand">TECHNICS</span>
-              <span className="label-text-side">{deckLabel}</span>
-              <span className="label-text-speed">{speed === 33 ? '33 RPM' : '45 RPM'}</span>
-            </div>
+        <div
+          className={`record-holder${isDragOverRecord ? ' drag-over' : ''}`}
+          ref={discRef}
+          tabIndex={0}
+          onPointerDown={onVinylPointerDown}
+          onDragOver={handleRecordDragOver}
+          onDragLeave={handleRecordDragLeave}
+          onDrop={handleRecordDrop}
+          onKeyDown={(e) => {
+            if (!transport || !transport.isLoaded) return;
+            if (e.key === 'ArrowRight') {
+              e.preventDefault();
+              transport.seek(transport.currentTime + 2);
+            } else if (e.key === 'ArrowLeft') {
+              e.preventDefault();
+              transport.seek(Math.max(0, transport.currentTime - 2));
+            } else if (e.key === ' ') {
+              e.preventDefault();
+              void transport.togglePlayPause();
+            }
+          }}
+          role="slider"
+          aria-label={`${deckLabel} interactive vinyl record - drag to scratch or drop audio track`}
+          aria-valuemin={0}
+          aria-valuemax={transport?.duration || 100}
+          aria-valuenow={Math.round(transport?.currentTime || 0)}
+          aria-valuetext={`${formatTime(transport?.currentTime || 0)} of ${formatTime(transport?.duration || 0)}`}
+        >
+          <div className="record" ref={recordRef} style={rotateTransformStyle}>
+            {transport?.metadata?.artworkUrl ? (
+              <div
+                className="record-artwork"
+                style={{ backgroundImage: `url(${transport.metadata.artworkUrl})` }}
+                role="img"
+                aria-label={`Album art for ${transport.metadata.title}`}
+              >
+                <div className="artwork-center-hole" />
+              </div>
+            ) : (
+              <div className="label">
+                <span className="label-text-brand">
+                  {transport?.trackName ? 'PLAYING TRACK' : 'TECHNICS'}
+                </span>
+                <span
+                  className="label-text-side"
+                  title={transport?.metadata?.title || transport?.trackName || deckLabel}
+                >
+                  {transport?.metadata?.artist
+                    ? `${transport.metadata.artist} - ${transport.metadata.title}`
+                    : transport?.metadata?.title || transport?.trackName || deckLabel}
+                </span>
+                <span className="label-text-speed">
+                  {transport?.isLoaded
+                    ? `${formatTime(transport.currentTime)} / ${formatTime(transport.duration)}`
+                    : speed === 33
+                      ? '33 RPM'
+                      : '45 RPM'}
+                </span>
+              </div>
+            )}
           </div>
-          <div className="record-grooves" style={spinStyle} />
+          {isDragOverRecord && (
+            <div className="record-drop-overlay" aria-hidden="true">
+              <span>DROP AUDIO HERE</span>
+            </div>
+          )}
+          <div className="record-grooves" style={rotateTransformStyle} />
         </div>
 
-        <div className="spindle" style={spinStyle} />
+        <div className="spindle" style={rotateTransformStyle} />
 
         <div className="power-light" aria-hidden="true" />
 
@@ -278,6 +529,93 @@ export function Turntable({
 
         <div className="model-badge" aria-hidden="true">
           <span>{modelName}</span>
+        </div>
+
+        {/* Track Loading and Audio Transport Info Bar */}
+        <div className="deck-audio-panel" role="region" aria-label={`${deckLabel} audio transport`}>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="audio/*,.mp3,.wav,.ogg,.flac,.aac,.m4a"
+            className="deck-file-input"
+            aria-label={`${deckLabel} Select audio file`}
+            tabIndex={-1}
+          />
+
+          <div className="deck-audio-controls">
+            <button
+              type="button"
+              className="deck-load-btn"
+              onClick={handleOpenFileDialog}
+              disabled={!isPowered || !transport}
+              aria-label={`${deckLabel} Load audio track`}
+            >
+              <span className="deck-load-icon" aria-hidden="true">▲</span>
+              LOAD TRACK
+            </button>
+
+            {transport && transport.isLoaded && (
+              <div className="deck-transport-actions">
+                <button
+                  type="button"
+                  className={`deck-action-btn${transport.isPlaying ? ' active' : ''}`}
+                  onClick={() => {
+                    if (transport.isPlaying) {
+                      transport.pause();
+                    } else if (isPowered) {
+                      setIsMotorOn(true);
+                      void transport.play();
+                    }
+                  }}
+                  disabled={!isPowered}
+                  aria-label={`${deckLabel} ${transport.isPlaying ? 'Pause' : 'Play'}`}
+                >
+                  {transport.isPlaying ? 'PAUSE' : 'PLAY'}
+                </button>
+                <button
+                  type="button"
+                  className="deck-action-btn"
+                  onClick={() => {
+                    transport.stop();
+                    setIsMotorOn(false);
+                  }}
+                  disabled={!isPowered}
+                  aria-label={`${deckLabel} Stop`}
+                >
+                  STOP
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="deck-audio-readout">
+            {transport?.playbackState === 'loading' ? (
+              <span className="deck-audio-status loading">DECODING AUDIO...</span>
+            ) : transport?.error ? (
+              <span className="deck-audio-status error" role="alert">{transport.error}</span>
+            ) : transport?.trackName ? (
+              <div className="deck-track-meta">
+                <span
+                  className="deck-track-name"
+                  title={
+                    transport.metadata?.artist
+                      ? `${transport.metadata.artist} — ${transport.metadata.title}`
+                      : transport.trackName
+                  }
+                >
+                  {transport.metadata?.artist
+                    ? `${transport.metadata.artist} — ${transport.metadata.title}`
+                    : transport.trackName}
+                </span>
+                <span className="deck-track-time">
+                  {formatTime(transport.currentTime)} / {formatTime(transport.duration)}
+                </span>
+              </div>
+            ) : (
+              <span className="deck-audio-status idle">NO TRACK LOADED</span>
+            )}
+          </div>
         </div>
 
         {/* Authentic Technics Pitch Control Assembly */}
