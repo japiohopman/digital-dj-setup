@@ -7,6 +7,8 @@ import { Turntable } from './Turntable';
 
 describe('Turntable deck configuration and isolation', () => {
   it('keeps the vinyl hand-operable when the power dial is off without turning the motor on', () => {
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
     const { container, unmount } = render(
       <Turntable deckLabel="DECK A" initiallyPowered={false} initiallyMotorOn={false} />,
     );
@@ -25,6 +27,7 @@ describe('Turntable deck configuration and isolation', () => {
 
     fireEvent.pointerUp(window, { pointerId: 7 });
     unmount();
+    vi.unstubAllGlobals();
   });
 
   it('renders a fully powered and spinning deck by default', () => {
