@@ -91,6 +91,7 @@ export function Turntable({
   const {
     angle: vinylAngle,
     isScratching,
+    isFreeSpinning,
     discRef,
     onPointerDown: onVinylPointerDown,
   } = useVinylMotion({
@@ -264,11 +265,15 @@ export function Turntable({
         spinUpTimeoutRef.current = null;
       }, 450);
     } else {
-      // START/STOP button provides immediate Play/Pause (no coast-down)
-      setMotorState('stopped');
+      // START/STOP pauses with a short 250ms mechanical brake rather than a digital hard cut.
+      setMotorState('braking');
       if (transport && transport.isLoaded) {
-        transport.pause();
+        transport.pause(250);
       }
+      spinUpTimeoutRef.current = setTimeout(() => {
+        setMotorState('stopped');
+        spinUpTimeoutRef.current = null;
+      }, 250);
     }
   };
 
@@ -344,6 +349,8 @@ export function Turntable({
   const isSpinning =
     motorState === 'coasting' ||
     motorState === 'spinning-up' ||
+    motorState === 'braking' ||
+    isFreeSpinning ||
     (isPowered && isMotorOn && (!transport?.isLoaded || transport.isPlaying));
 
   const classes = [
@@ -353,8 +360,10 @@ export function Turntable({
     hasRecord ? 'has-record' : '',
     hasSlipmat ? 'has-slipmat' : '',
     isScratching ? 'is-scratching' : '',
+    isFreeSpinning ? 'free-spinning' : '',
     motorState === 'coasting' ? 'coasting' : '',
     motorState === 'spinning-up' ? 'spinning-up' : '',
+    motorState === 'braking' ? 'braking' : '',
   ]
     .filter(Boolean)
     .join(' ');
