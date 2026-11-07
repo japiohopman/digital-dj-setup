@@ -180,12 +180,11 @@ export class AudioEngine {
     this.stopTicker();
     this.tickerTimer = setInterval(() => {
       if (this.playbackState === 'playing') {
-        const current = this.getState().currentTime;
-        if (current >= this.duration) {
-          this.handlePlaybackEnded();
-        } else {
-          this.notify();
-        }
+        // The AudioBufferSourceNode's native onended event is the only authoritative
+        // end-of-track signal. Do not stop it from this 100ms UI ticker: estimated
+        // logical time can reach duration a render quantum before the final samples
+        // have actually left the output, which creates an audible discontinuity.
+        this.notify();
       }
     }, 100);
   }
@@ -327,21 +326,31 @@ export class AudioEngine {
    * Applies an inaudible short terminal fade (~5-10ms) to the ends of all audio channels
    * to guarantee that the final PCM sample reaches 0 smoothly, eliminating clicks on natural track end.
    */
+  /**
+   * Applies a short raised-cosine fade to the final 20ms of every decoded channel.
+   *
+   * The zero-slope start and end avoid introducing a new edge, and the final
+   * sample is exactly zero before the source naturally reaches its buffer end.
+   *
+   * @param buffer - Decoded audio buffer to prepare for click-free natural playback end.
+   */
   private applyTerminalEdgeFade(buffer: AudioBuffer): void {
-    // 5ms fade window in samples
-    const fadeSamples = Math.min(Math.floor(buffer.sampleRate * 0.005), Math.floor(buffer.length / 2));
-    if (fadeSamples <= 0) return;
+    const fadeSamples = Math.min(
+      Math.round(buffer.sampleRate * 0.02),
+      Math.floor(buffer.length / 2),
+    );
+    if (fadeSamples < 2) return;
 
-    for (let c = 0; c < buffer.numberOfChannels; c++) {
-      const data = buffer.getChannelData(c);
-      const totalLen = data.length;
-      // Fade out at end of buffer
+    for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+      const data = buffer.getChannelData(channel);
+      const fadeStart = data.length - fadeSamples;
+
       for (let i = 0; i < fadeSamples; i++) {
-        const idx = totalLen - 1 - i;
-        const rampFactor = i / fadeSamples; // 0 at the very last sample, ramp up to 1
-        const sample = data[idx];
+        const progress = i / (fadeSamples - 1);
+        const gain = 0.5 * (1 + Math.cos(Math.PI * progress));
+        const sample = data[fadeStart + i];
         if (sample !== undefined) {
-          data[idx] = sample * rampFactor;
+          data[fadeStart + i] = sample * gain;
         }
       }
     }
@@ -435,7 +444,7 @@ export class AudioEngine {
 
     source.onended = () => {
       if (this.currentSource === source && this.sourceGeneration === generation && !this.isScratching) {
-        this.handlePlaybackEnded();
+        this.handlePlaybackEnded(source, generation);
       }
     };
 
@@ -848,9 +857,28 @@ export class AudioEngine {
     this.notify();
   }
 
-  private handlePlaybackEnded(): void {
+  private handlePlaybackEnded(source: AudioBufferSourceNode, generation: number): void {
+    // Ignore a delayed end event from a source that has already been replaced.
+    if (this.currentSource !== source || this.sourceGeneration !== generation) {
+      return;
+    }
+
+    this.currentSource = null;
+    this.sourceGeneration++;
     this.stopTicker();
-    this.stopCurrentSourceNode();
+    this.stopCoastTimer();
+    this.stopSpinUpTimer();
+
+    // onended means the source has already completed naturally. Disconnect it,
+    // but do not call stop(): ending the source a second time is unnecessary and
+    // risks cutting the final output quantum on some browser implementations.
+    try {
+      source.onended = null;
+      source.disconnect();
+    } catch {
+      // The source may already have been disconnected by the browser.
+    }
+
     this.logicalPosition = this.duration;
     this.playbackState = 'stopped';
     this.notify();
