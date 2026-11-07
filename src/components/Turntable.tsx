@@ -350,13 +350,12 @@ export function Turntable({
     motorState === 'coasting' ||
     motorState === 'spinning-up' ||
     motorState === 'braking' ||
-    isFreeSpinning ||
     (isPowered && isMotorOn && (!transport?.isLoaded || transport.isPlaying));
 
   const classes = [
     'turntable',
     isPowered ? 'power-on' : '',
-    isSpinning || isScratching ? 'motor-on' : '',
+    isSpinning || (isScratching && isPowered) ? 'motor-on' : '',
     hasRecord ? 'has-record' : '',
     hasSlipmat ? 'has-slipmat' : '',
     isScratching ? 'is-scratching' : '',
