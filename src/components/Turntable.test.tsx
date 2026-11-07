@@ -1,35 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server';
-import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { DeckTransport } from '../audio/types';
 import { Turntable } from './Turntable';
 
 describe('Turntable deck configuration and isolation', () => {
-  it('keeps the vinyl hand-operable when the power dial is off without turning the motor on', () => {
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
-    vi.stubGlobal('cancelAnimationFrame', vi.fn());
-    const { container, unmount } = render(
-      <Turntable deckLabel="DECK A" initiallyPowered={false} initiallyMotorOn={false} />,
-    );
-    const recordHolder = container.querySelector('.record-holder');
-
-    expect(recordHolder).not.toBeNull();
-    fireEvent.pointerDown(recordHolder as Element, {
-      pointerId: 7,
-      clientX: 150,
-      clientY: 100,
-    });
-
-    const deck = container.querySelector('.turntable');
-    expect(deck?.classList.contains('is-scratching')).toBe(true);
-    expect(deck?.classList.contains('motor-on')).toBe(false);
-
-    fireEvent.pointerUp(window, { pointerId: 7 });
-    unmount();
-    vi.unstubAllGlobals();
-  });
-
   it('renders a fully powered and spinning deck by default', () => {
     const markup = renderToStaticMarkup(<Turntable deckLabel="DECK 01" />);
 

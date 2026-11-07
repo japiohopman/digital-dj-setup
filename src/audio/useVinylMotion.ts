@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from 'react';
 import type { DeckTransport } from './types';
 
-export type TurntableMotorState = 'driven' | 'coasting' | 'spinning-up' | 'braking' | 'stopped';
+export type TurntableMotorState = 'driven' | 'coasting' | 'spinning-up' | 'stopped';
 
 export interface UseVinylMotionOptions {
   isPowered: boolean;
@@ -14,20 +14,6 @@ export interface UseVinylMotionOptions {
 }
 
 const TWO_PI = Math.PI * 2;
-const FREE_SPIN_DECAY_MS = 160;
-const FREE_SPIN_STOP_THRESHOLD = 0.04;
-
-/**
- * Applies bearing friction to a manually pushed platter without changing its direction.
- *
- * @param velocity - Signed speed relative to the selected nominal platter speed.
- * @param elapsedMs - Time elapsed since the previous animation frame.
- * @returns New signed speed after natural free-spin decay.
- */
-export function decayFreeSpinVelocity(velocity: number, elapsedMs: number): number {
-  if (elapsedMs <= 0) return velocity;
-  return velocity * Math.exp(-elapsedMs / FREE_SPIN_DECAY_MS);
-}
 
 // Normalized angle delta between two radians
 const normalizeDelta = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
@@ -68,7 +54,6 @@ export function useVinylMotion({
 }: UseVinylMotionOptions) {
   const [angle, setAngle] = useState(0);
   const [isScratching, setIsScratching] = useState(false);
-  const [isFreeSpinning, setIsFreeSpinning] = useState(false);
 
   const angleRef = useRef(0);
   const anglePreviousRef = useRef(0);
@@ -81,9 +66,6 @@ export function useVinylMotion({
   const discRef = useRef<HTMLDivElement | null>(null);
   const draggingSpeedsRef = useRef<number[]>([]);
   const lastScratchDirectionRef = useRef(false);
-  const lastPointerMoveAtRef = useRef(performance.now());
-  const lastPointerVelocityRef = useRef(0);
-  const freeSpinVelocityRef = useRef(0);
 
   // Calculate rotations per second based on 33.333 or 45 RPM and pitch
   // 33.333 RPM = 33.333 / 60 = ~0.5555 rps; 45 RPM = 45 / 60 = 0.75 rps
@@ -140,7 +122,6 @@ export function useVinylMotion({
   // Auto-rotate and physics loop with coast-down and spin-up support
   const coastProgressRef = useRef<{ start: number; duration: number } | null>(null);
   const spinUpProgressRef = useRef<{ start: number; duration: number } | null>(null);
-  const brakeProgressRef = useRef<{ start: number; duration: number } | null>(null);
 
   useEffect(() => {
     if (motorState === 'coasting') {
@@ -153,12 +134,6 @@ export function useVinylMotion({
       spinUpProgressRef.current = { start: performance.now(), duration: 450 };
     } else {
       spinUpProgressRef.current = null;
-    }
-
-    if (motorState === 'braking') {
-      brakeProgressRef.current = { start: performance.now(), duration: 250 };
-    } else {
-      brakeProgressRef.current = null;
     }
   }, [motorState]);
 
@@ -188,19 +163,33 @@ export function useVinylMotion({
         spinUpFactor = 0.2 + 0.8 * progress;
       }
 
-      const isBraking = motorState === 'braking' && brakeProgressRef.current !== null;
-      let brakeFactor = 1.0;
-      if (isBraking) {
-        const elapsed = now - brakeProgressRef.current!.start;
-        const progress = Math.min(1, Math.max(0, elapsed / brakeProgressRef.current!.duration));
-        brakeFactor = 1 - progress;
-      }
-
       const isMotorSpinning = isPowered && isMotorOn;
       const isAudioPlaying = transport?.isPlaying;
 
-      if (isScratchingRef.current) {
-        // While a finger is down, the platter position is controlled directly by its movement.
+      if (!isScratchingRef.current) {
+        // If track is loaded, rotate when track is actively playing, coasting or spinning up
+        // If no track loaded, rotate if motor is on, coasting or spinning up
+        const shouldRotate = isCoasting
+          ? coastFactor > 0.001
+          : isSpinningUp
+            ? true
+            : transport?.isLoaded
+              ? isAudioPlaying
+              : isMotorSpinning;
+
+        // Respect prefers-reduced-motion: skip continuous visual platter rotation while keeping audio playing
+        if (shouldRotate && !prefersReducedMotionRef.current) {
+          const speedMod = isCoasting ? coastFactor : isSpinningUp ? spinUpFactor : 1.0;
+          const deltaAngle = radsPerMs * dt * speedMod;
+          let newAngle = angleRef.current + deltaAngle;
+          if (maxAngle !== Infinity && newAngle > maxAngle) {
+            newAngle = maxAngle;
+          }
+          angleRef.current = newAngle;
+          setAngle(newAngle);
+        }
+      } else {
+        // When scratching: compute instantaneous rotation velocity and direction
         const deltaAngle = angleRef.current - anglePreviousRef.current;
         const expectedAngleDelta = radsPerMs * dt;
         const instantSpeed = calculateScratchSpeedMagnitude(deltaAngle, expectedAngleDelta);
@@ -220,66 +209,6 @@ export function useVinylMotion({
 
         if (transport && transport.isLoaded) {
           transport.scratch(avgSpeed, isReversed, currentSeconds);
-        }
-      } else if (Math.abs(freeSpinVelocityRef.current) > FREE_SPIN_STOP_THRESHOLD) {
-        // With the motor off, a hand push keeps the platter moving briefly under bearing friction.
-        const signedVelocity = freeSpinVelocityRef.current;
-        const previousAngle = angleRef.current;
-        let nextAngle = previousAngle + radsPerMs * dt * signedVelocity;
-        if (maxAngle !== Infinity) {
-          nextAngle = Math.max(0, Math.min(maxAngle, nextAngle));
-        }
-
-        const actualDelta = nextAngle - previousAngle;
-        angleRef.current = nextAngle;
-        if (actualDelta !== 0) {
-          setAngle(nextAngle);
-          if (transport && transport.isLoaded) {
-            const currentSeconds = effectiveRps > 0 ? nextAngle / (TWO_PI * effectiveRps) : 0;
-            transport.scratch(Math.abs(signedVelocity), signedVelocity < 0, currentSeconds);
-          }
-        }
-
-        freeSpinVelocityRef.current = decayFreeSpinVelocity(signedVelocity, dt);
-        if (
-          Math.abs(freeSpinVelocityRef.current) <= FREE_SPIN_STOP_THRESHOLD ||
-          actualDelta === 0
-        ) {
-          freeSpinVelocityRef.current = 0;
-          setIsFreeSpinning(false);
-          if (transport && transport.isLoaded) {
-            transport.endScratch(false);
-          }
-        }
-      } else {
-        // Powered rotation, motor coast-down, spin-up, and the short mechanical Pause brake
-        // all move the audio-linked platter through their own speed curves.
-        const shouldRotate = isBraking
-          ? brakeFactor > 0.001
-          : isCoasting
-            ? coastFactor > 0.001
-            : isSpinningUp
-              ? true
-              : transport?.isLoaded
-                ? isAudioPlaying
-                : isMotorSpinning;
-
-        // Respect prefers-reduced-motion: skip continuous visual rotation while keeping audio functional.
-        if (shouldRotate && !prefersReducedMotionRef.current) {
-          const speedMod = isBraking
-            ? brakeFactor
-            : isCoasting
-              ? coastFactor
-              : isSpinningUp
-                ? spinUpFactor
-                : 1.0;
-          const deltaAngle = radsPerMs * dt * speedMod;
-          let newAngle = angleRef.current + deltaAngle;
-          if (maxAngle !== Infinity && newAngle > maxAngle) {
-            newAngle = maxAngle;
-          }
-          angleRef.current = newAngle;
-          setAngle(newAngle);
         }
       }
 
@@ -301,7 +230,7 @@ export function useVinylMotion({
   }, [isPowered, isMotorOn, motorState, transport, radsPerMs, maxAngle, effectiveRps]);
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    // The platter remains freely hand-operable with the power dial off.
+    if (!isPowered) return;
     if (activePointerIdRef.current !== null && activePointerIdRef.current !== e.pointerId) {
       // Ignore additional pointers on the same deck
       return;
@@ -324,10 +253,6 @@ export function useVinylMotion({
     setIsScratching(true);
     draggingSpeedsRef.current = [];
     lastScratchDirectionRef.current = false;
-    lastPointerMoveAtRef.current = performance.now();
-    lastPointerVelocityRef.current = 0;
-    freeSpinVelocityRef.current = 0;
-    setIsFreeSpinning(false);
 
     // Capture pointer
     try {
@@ -356,16 +281,7 @@ export function useVinylMotion({
       );
 
       const delta = normalizeDelta(angleFrom, angleCurrent);
-      const now = performance.now();
-      const elapsedMs = Math.max(1, now - lastPointerMoveAtRef.current);
-      lastPointerMoveAtRef.current = now;
-      // Platter angle increases with forward track movement; reverse hand movement is negative.
-      const velocity = -delta / (radsPerMs * elapsedMs);
-      lastPointerVelocityRef.current = Math.max(-4, Math.min(4, velocity));
-      const proposedAngle = angleRef.current - delta;
-      const nextAngle = maxAngle === Infinity
-        ? Math.max(0, proposedAngle)
-        : Math.max(0, Math.min(maxAngle, proposedAngle));
+      const nextAngle = Math.max(0, angleRef.current - delta);
 
       angleRef.current = nextAngle;
       setAngle(nextAngle);
@@ -391,51 +307,21 @@ export function useVinylMotion({
       setIsScratching(false);
       draggingFromRef.current = null;
 
-      const shouldResumeMotor = isPowered && isMotorOn;
-      if (transport && transport.isLoaded) {
-        if (shouldResumeMotor) {
-          // A powered motor takes over at its nominal speed when the hand is released.
-          freeSpinVelocityRef.current = 0;
-          setIsFreeSpinning(false);
-          transport.endScratch(true);
-        } else {
-          // With the motor off, preserve the last measured hand velocity and let the
-          // platter glide to rest rather than snapping to a stop on pointer release.
-          const elapsedSinceLastMove = Math.max(0, performance.now() - lastPointerMoveAtRef.current);
-          const signedReleaseSpeed = decayFreeSpinVelocity(
-            lastPointerVelocityRef.current,
-            elapsedSinceLastMove,
-          );
-
-          if (Math.abs(signedReleaseSpeed) > FREE_SPIN_STOP_THRESHOLD) {
-            freeSpinVelocityRef.current = signedReleaseSpeed;
-            setIsFreeSpinning(true);
-          } else {
-            freeSpinVelocityRef.current = 0;
-            setIsFreeSpinning(false);
-            transport.endScratch(false);
-          }
-        }
-      } else {
-        const elapsedSinceLastMove = Math.max(0, performance.now() - lastPointerMoveAtRef.current);
-        const signedReleaseSpeed = decayFreeSpinVelocity(
-          lastPointerVelocityRef.current,
-          elapsedSinceLastMove,
-        );
-        freeSpinVelocityRef.current = shouldResumeMotor ? 0 : signedReleaseSpeed;
-        setIsFreeSpinning(Math.abs(freeSpinVelocityRef.current) > FREE_SPIN_STOP_THRESHOLD);
+      if (transport) {
+        // Resume playback if motor is on and track is loaded
+        const shouldResume = isMotorOn;
+        transport.endScratch(shouldResume);
       }
     };
 
     window.addEventListener('pointermove', onPointerMove, { passive: false });
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
-  }, [isPowered, isMotorOn, transport, centerElementRef, radsPerMs]);
+  }, [isPowered, isMotorOn, transport, centerElementRef]);
 
   return {
     angle,
     isScratching,
-    isFreeSpinning,
     discRef,
     onPointerDown,
   };

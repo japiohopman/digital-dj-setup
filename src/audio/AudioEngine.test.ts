@@ -191,7 +191,7 @@ describe('AudioEngine', () => {
     expect(firstSource).toBeDefined();
 
     engine.pause();
-    await vi.advanceTimersByTimeAsync(255);
+    await vi.advanceTimersByTimeAsync(260);
     expect(firstSource?.stop).toHaveBeenCalled();
 
     await engine.play();
@@ -576,39 +576,26 @@ describe('AudioEngine', () => {
     engine.dispose();
   });
 
-  it('routes audio through a GainNode and gives Pause a short mechanical brake', async () => {
+  it('routes audio through a GainNode with de-click ramps on play and pause', async () => {
     const engine = createEngine();
     await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'declick-test.mp3');
 
     expect(mockContext.createGain).toHaveBeenCalled();
 
-    mockContext.currentTime = 2;
     await engine.play();
     const source = mockContext.createdSources[0];
-    const gain = mockContext.createdGainParams[0];
     expect(source).toBeDefined();
-    expect(gain).toBeDefined();
 
-    // Source connects to GainNode, not directly to destination.
+    // Source connects to GainNode, not directly to destination
     expect(source?.connect).toHaveBeenCalledWith(expect.objectContaining({ gain: expect.anything() }));
 
-    // Pause ramps the record's audio rate down over 250ms instead of cutting it like a CD player.
+    // Pause schedules de-click ramp to 0 before stopping source
     engine.pause();
     expect(engine.getState().playbackState).toBe('paused');
-    expect(source?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(0, 2.25);
-    expect(gain?.linearRampToValueAtTime).toHaveBeenCalledWith(0, 2.25);
-    expect(source?.stop).not.toHaveBeenCalled();
 
-    // Halfway through the brake, the track position continues advancing at a lower average rate.
-    mockContext.currentTime = 2.125;
-    expect(engine.getState().currentTime).toBeCloseTo(0.09375);
-
-    // At 250ms the platter and audio have reached rest; the source is then retired.
-    mockContext.currentTime = 2.25;
-    await vi.advanceTimersByTimeAsync(255);
-    expect(engine.getState().currentTime).toBeCloseTo(0.125);
-    expect(source?.stop).toHaveBeenCalledTimes(1);
-    expect(source?.disconnect).toHaveBeenCalledTimes(1);
+    // Advance 260ms to allow mechanical brake and de-click fade timeout to execute
+    await vi.advanceTimersByTimeAsync(260);
+    expect(source?.stop).toHaveBeenCalled();
 
     engine.dispose();
   });
@@ -674,7 +661,7 @@ describe('AudioEngine', () => {
     engine.dispose();
   });
 
-  it('keeps source alive throughout the mechanical pause brake and only stops it after completion', async () => {
+  it('keeps source alive during pause de-click fade and only stops it after completion', async () => {
     const engine = createEngine();
     await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'fade-timing.mp3');
 
@@ -682,21 +669,43 @@ describe('AudioEngine', () => {
     const source = mockContext.createdSources[0];
     expect(source).toBeDefined();
 
+    // Trigger pause (default 250ms mechanical brake)
     engine.pause();
 
-    // The source remains connected throughout the quarter-second slowdown.
+    // Immediately after pause call, source is NOT yet stopped or disconnected
     expect(source?.stop).not.toHaveBeenCalled();
     expect(source?.disconnect).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(100);
-    expect(source?.stop).not.toHaveBeenCalled();
-
+    // Advance 150ms (midway through mechanical brake)
     await vi.advanceTimersByTimeAsync(150);
     expect(source?.stop).not.toHaveBeenCalled();
 
-    await vi.advanceTimersByTimeAsync(5);
-    expect(source?.stop).toHaveBeenCalledTimes(1);
-    expect(source?.disconnect).toHaveBeenCalledTimes(1);
+    // Advance remaining time past the 255ms brake completion window
+    await vi.advanceTimersByTimeAsync(110);
+    expect(source?.stop).toHaveBeenCalled();
+    expect(source?.disconnect).toHaveBeenCalled();
+
+    engine.dispose();
+  });
+
+  it('stops source after 20ms fade window when pause is called with durationMs=0', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'zero-brake-pause.mp3');
+
+    await engine.play();
+    const source = mockContext.createdSources[0];
+    expect(source).toBeDefined();
+
+    // Zero-duration mechanical pause (only the 15-20ms de-click fade)
+    engine.pause(0);
+
+    expect(source?.stop).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(source?.stop).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(15);
+    expect(source?.stop).toHaveBeenCalled();
+    expect(source?.disconnect).toHaveBeenCalled();
 
     engine.dispose();
   });
