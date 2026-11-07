@@ -139,6 +139,8 @@ describe('Turntable static markup', () => {
       endScratch: vi.fn(),
       seek: vi.fn(),
       setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -182,6 +184,8 @@ describe('Turntable static markup', () => {
       endScratch: vi.fn(),
       seek: vi.fn(),
       setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -217,6 +221,8 @@ describe('Turntable static markup', () => {
       endScratch: vi.fn(),
       seek: vi.fn(),
       setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -247,6 +253,8 @@ describe('Turntable static markup', () => {
       endScratch: vi.fn(),
       seek: vi.fn(),
       setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -288,6 +296,8 @@ describe('Turntable interactive controls', () => {
       endScratch: vi.fn(),
       seek: vi.fn(),
       setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
     };
 
     await act(async () => {
@@ -340,6 +350,8 @@ describe('Turntable interactive controls', () => {
       endScratch: vi.fn(),
       seek: vi.fn(),
       setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
     };
 
     await act(async () => {
@@ -392,6 +404,8 @@ describe('Turntable interactive controls', () => {
       endScratch: vi.fn(),
       seek: vi.fn(),
       setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
     };
 
     await act(async () => {
@@ -418,7 +432,7 @@ describe('Turntable interactive controls', () => {
     container.remove();
   });
 
-  it('power switch immediately pauses transport when turned off', async () => {
+  it('power switch initiates coastDown when turned off during playback', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -441,6 +455,8 @@ describe('Turntable interactive controls', () => {
       endScratch: vi.fn(),
       seek: vi.fn(),
       setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
     };
 
     await act(async () => {
@@ -453,7 +469,61 @@ describe('Turntable interactive controls', () => {
       powerDial.click();
     });
 
+    expect(mockTransport.coastDown).toHaveBeenCalledWith(1200);
+
+    // Power restored while still coasting: should call cancelCoastDown
+    await act(async () => {
+      powerDial.click();
+    });
+    expect(mockTransport.cancelCoastDown).toHaveBeenCalled();
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('START/STOP button acts as immediate Play/Pause with no coast-down', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: 'anthem.wav',
+      metadata: null,
+      duration: 180,
+      currentTime: 20,
+      playbackState: 'playing',
+      isPlaying: true,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+    };
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />);
+    });
+
+    const startStopBtn = container.querySelector('button[aria-label="DECK A Start / Stop"]') as HTMLButtonElement;
+    expect(startStopBtn).toBeDefined();
+
+    // Click START/STOP while playing -> immediate pause
+    await act(async () => {
+      startStopBtn.click();
+    });
+
     expect(mockTransport.pause).toHaveBeenCalled();
+    expect(mockTransport.coastDown).not.toHaveBeenCalled();
 
     await act(async () => {
       root.unmount();

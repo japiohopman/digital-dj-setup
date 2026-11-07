@@ -1,6 +1,6 @@
-import { useState, useRef, type CSSProperties, type PointerEvent, type KeyboardEvent, type ChangeEvent } from 'react';
+import { useState, useRef, useEffect, type CSSProperties, type PointerEvent, type KeyboardEvent, type ChangeEvent } from 'react';
 import type { DeckTransport } from '../audio/types';
-import { useVinylMotion } from '../audio/useVinylMotion';
+import { useVinylMotion, type TurntableMotorState } from '../audio/useVinylMotion';
 
 /**
  * Supported playback RPM speeds for the turntable deck.
@@ -54,6 +54,9 @@ export function Turntable({
   const motorActive = initiallyMotorOn !== undefined ? initiallyMotorOn : initiallySpinning;
   const [isPowered, setIsPowered] = useState(initiallyPowered);
   const [isMotorOn, setIsMotorOn] = useState(initiallyPowered && motorActive);
+  const [motorState, setMotorState] = useState<TurntableMotorState>(
+    initiallyPowered && motorActive ? 'driven' : 'stopped',
+  );
   const [speed, setSpeed] = useState<TurntableSpeed>(initialSpeed);
   const [isLightOn, setIsLightOn] = useState(false);
   const [hasRecord] = useState(initiallyHasRecord);
@@ -64,12 +67,22 @@ export function Turntable({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const recordRef = useRef<HTMLDivElement | null>(null);
+  const coastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep live refs of power and motor state to avoid stale closures in async file loaders
   const isPoweredRef = useRef(isPowered);
   isPoweredRef.current = isPowered;
   const isMotorOnRef = useRef(isMotorOn);
   isMotorOnRef.current = isMotorOn;
+
+  // Cleanup coast timer on unmount
+  useEffect(() => {
+    return () => {
+      if (coastTimeoutRef.current !== null) {
+        clearTimeout(coastTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const {
     angle: vinylAngle,
@@ -81,6 +94,7 @@ export function Turntable({
     isMotorOn,
     speedRpm: speed,
     pitch,
+    motorState,
     transport,
     centerElementRef: recordRef,
   });
@@ -160,12 +174,48 @@ export function Turntable({
   const handlePowerToggle = () => {
     const nextPower = !isPowered;
     setIsPowered(nextPower);
+
     if (!nextPower) {
-      setIsMotorOn(false);
+      // Power turned OFF
       setIsLightOn(false);
-      if (transport) {
-        // Unconditionally pause/stop any current or in-flight playback
-        transport.pause();
+      const wasSpinning = isMotorOn || (transport?.isPlaying ?? false);
+
+      if (wasSpinning) {
+        // Initiate realistic motor coast-down: audio and platter decelerate together over 1200ms
+        setMotorState('coasting');
+        setIsMotorOn(false);
+
+        if (transport && transport.isPlaying) {
+          transport.coastDown(1200);
+        }
+
+        if (coastTimeoutRef.current !== null) {
+          clearTimeout(coastTimeoutRef.current);
+        }
+        coastTimeoutRef.current = setTimeout(() => {
+          setMotorState('stopped');
+          coastTimeoutRef.current = null;
+        }, 1200);
+      } else {
+        setIsMotorOn(false);
+        setMotorState('stopped');
+        if (transport) {
+          transport.pause();
+        }
+      }
+    } else {
+      // Power turned ON
+      if (coastTimeoutRef.current !== null) {
+        // Power restored while still coasting: restore motor torque seamlessly!
+        clearTimeout(coastTimeoutRef.current);
+        coastTimeoutRef.current = null;
+        setIsMotorOn(true);
+        setMotorState('driven');
+        if (transport && transport.isPlaying) {
+          transport.cancelCoastDown();
+        }
+      } else {
+        setMotorState(isMotorOn ? 'driven' : 'stopped');
       }
     }
   };
@@ -174,11 +224,13 @@ export function Turntable({
     if (!isPowered) return;
     const nextMotor = !isMotorOn;
     setIsMotorOn(nextMotor);
+    setMotorState(nextMotor ? 'driven' : 'stopped');
 
     if (transport && transport.isLoaded) {
       if (nextMotor) {
         void transport.play();
       } else {
+        // START/STOP button provides immediate Play/Pause (no coast-down)
         transport.pause();
       }
     }
@@ -251,9 +303,11 @@ export function Turntable({
     setPitch(0);
   };
 
-  // If a track is loaded, the platter only spins when actually playing
-  // If no track is loaded, platter spins if motor is on
-  const isSpinning = isPowered && isMotorOn && (!transport?.isLoaded || transport.isPlaying);
+  // If a track is loaded, the platter only spins when actually playing or coasting
+  // If no track loaded, platter spins if motor is on or coasting
+  const isSpinning =
+    motorState === 'coasting' ||
+    (isPowered && isMotorOn && (!transport?.isLoaded || transport.isPlaying));
 
   const classes = [
     'turntable',
@@ -262,6 +316,7 @@ export function Turntable({
     hasRecord ? 'has-record' : '',
     hasSlipmat ? 'has-slipmat' : '',
     isScratching ? 'is-scratching' : '',
+    motorState === 'coasting' ? 'coasting' : '',
   ]
     .filter(Boolean)
     .join(' ');

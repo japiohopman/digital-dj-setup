@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from 'react';
 import type { DeckTransport } from './types';
 
+export type TurntableMotorState = 'driven' | 'coasting' | 'stopped';
+
 export interface UseVinylMotionOptions {
   isPowered: boolean;
   isMotorOn: boolean;
   speedRpm: 33 | 45;
   pitch: number; // -8 to +8 percentage
+  motorState?: TurntableMotorState | undefined;
   transport?: DeckTransport | undefined;
   centerElementRef?: React.RefObject<HTMLElement | null> | undefined;
 }
@@ -28,6 +31,7 @@ export function useVinylMotion({
   isMotorOn,
   speedRpm,
   pitch,
+  motorState,
   transport,
   centerElementRef,
 }: UseVinylMotionOptions) {
@@ -97,7 +101,17 @@ export function useVinylMotion({
     }
   }, [transport?.currentTime, effectiveRps, transport]);
 
-  // Auto-rotate and physics loop
+  // Auto-rotate and physics loop with coast-down support
+  const coastProgressRef = useRef<{ start: number; duration: number } | null>(null);
+
+  useEffect(() => {
+    if (motorState === 'coasting') {
+      coastProgressRef.current = { start: performance.now(), duration: 1200 };
+    } else {
+      coastProgressRef.current = null;
+    }
+  }, [motorState]);
+
   useEffect(() => {
     let active = true;
 
@@ -107,17 +121,29 @@ export function useVinylMotion({
       const now = performance.now();
       const dt = Math.min(100, Math.max(1, now - timestampPreviousRef.current));
 
+      const isCoasting = motorState === 'coasting' && coastProgressRef.current !== null;
+      let coastFactor = 1.0;
+      if (isCoasting) {
+        const elapsed = now - coastProgressRef.current!.start;
+        const progress = Math.min(1, Math.max(0, elapsed / coastProgressRef.current!.duration));
+        coastFactor = 1 - progress; // Linear decay 1 -> 0
+      }
+
       const isMotorSpinning = isPowered && isMotorOn;
       const isAudioPlaying = transport?.isPlaying;
 
       if (!isScratchingRef.current) {
-        // If track is loaded, only auto-rotate when track is actively playing
-        // If no track loaded, rotate if motor is on
-        const shouldRotate = transport?.isLoaded ? isAudioPlaying : isMotorSpinning;
+        // If track is loaded, rotate when track is actively playing or coasting
+        // If no track loaded, rotate if motor is on or coasting
+        const shouldRotate = isCoasting
+          ? coastFactor > 0.001
+          : transport?.isLoaded
+            ? isAudioPlaying
+            : isMotorSpinning;
 
         // Respect prefers-reduced-motion: skip continuous visual platter rotation while keeping audio playing
         if (shouldRotate && !prefersReducedMotionRef.current) {
-          const deltaAngle = radsPerMs * dt;
+          const deltaAngle = radsPerMs * dt * (isCoasting ? coastFactor : 1.0);
           let newAngle = angleRef.current + deltaAngle;
           if (maxAngle !== Infinity && newAngle > maxAngle) {
             newAngle = maxAngle;
@@ -163,7 +189,7 @@ export function useVinylMotion({
         rafIdRef.current = null;
       }
     };
-  }, [isPowered, isMotorOn, transport, radsPerMs, maxAngle, effectiveRps]);
+  }, [isPowered, isMotorOn, motorState, transport, radsPerMs, maxAngle, effectiveRps]);
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     if (!isPowered) return;

@@ -93,6 +93,16 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     engineRef.current.setPlaybackRate(rate);
   }, []);
 
+  const coastDown = useCallback((durationMs?: number) => {
+    if (!engineRef.current) return;
+    engineRef.current.coastDown(durationMs);
+  }, []);
+
+  const cancelCoastDown = useCallback(() => {
+    if (!engineRef.current) return;
+    engineRef.current.cancelCoastDown();
+  }, []);
+
   return {
     trackName: state.trackName,
     metadata: state.metadata,
@@ -111,5 +121,7 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     endScratch,
     seek,
     setPlaybackRate,
+    coastDown,
+    cancelCoastDown,
   };
 }

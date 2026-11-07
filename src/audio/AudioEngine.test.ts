@@ -410,4 +410,85 @@ describe('AudioEngine', () => {
 
     engine.dispose();
   });
+
+  it('decelerates audio during power-off coastDown and pauses at final position', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'coast-track.mp3');
+
+    mockContext.currentTime = 0;
+    await engine.play();
+    expect(engine.getState().playbackState).toBe('playing');
+
+    const source = mockContext.createdSources[0];
+    expect(source).toBeDefined();
+
+    // Initiate 1200ms coast-down
+    engine.coastDown(1200);
+
+    // Advance audio context time to match elapsed time during coast
+    mockContext.currentTime = 1.2;
+
+    // Should schedule deceleration down to 0
+    expect(source?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
+    expect(engine.getState().playbackState).toBe('playing');
+
+    // Advance timers by 1200ms to complete coast-down
+    await vi.advanceTimersByTimeAsync(1200);
+
+    // Audio should now be paused and source stopped
+    expect(engine.getState().playbackState).toBe('paused');
+    expect(source?.isStopped).toBe(true);
+
+    engine.dispose();
+  });
+
+  it('restores motor torque when cancelCoastDown is called during coast-down', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'coast-track.mp3');
+
+    mockContext.currentTime = 0;
+    await engine.play();
+
+    const source = mockContext.createdSources[0];
+    expect(source).toBeDefined();
+
+    // Start coasting
+    engine.coastDown(1200);
+    await vi.advanceTimersByTimeAsync(400);
+
+    // Power restored mid-coast
+    engine.cancelCoastDown();
+
+    // Source should NOT be stopped
+    expect(source?.isStopped).toBe(false);
+    expect(engine.getState().playbackState).toBe('playing');
+
+    // Timer expires later, but should not pause because coast was canceled
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(engine.getState().playbackState).toBe('playing');
+
+    engine.dispose();
+  });
+
+  it('scales scratch playback rate by configured base playback rate', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'scratch-rate.mp3');
+
+    // Set deck to 45 RPM (+35% speed: 1.35x)
+    engine.setPlaybackRate(1.35);
+
+    // Scratch with hand speed 1.5x
+    engine.scratch(1.5, false, 5);
+
+    const activeSource = mockContext.createdSources[0];
+    expect(activeSource).toBeDefined();
+
+    // Playback rate should be 1.5 * 1.35 = 2.025
+    expect(activeSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(
+      expect.closeTo(2.025, 3),
+      expect.any(Number),
+    );
+
+    engine.dispose();
+  });
 });

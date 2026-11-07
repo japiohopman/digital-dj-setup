@@ -59,4 +59,6 @@ export interface DeckTransport {
   endScratch: (resumePlayback: boolean) => void;
   seek: (position: number) => void;
   setPlaybackRate: (rate: number) => void;
+  coastDown: (durationMs?: number) => void;
+  cancelCoastDown: () => void;
 }

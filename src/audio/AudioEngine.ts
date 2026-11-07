@@ -36,6 +36,12 @@ export class AudioEngine {
   private playCounter = 0;
   private isDisposed = false;
 
+  private isCoasting = false;
+  private coastTimer: ReturnType<typeof setTimeout> | null = null;
+  private coastStartedAt = 0;
+  private coastDurationSec = 0;
+  private coastInitialRate = 1.0;
+
   private tickerTimer: ReturnType<typeof setInterval> | null = null;
   private readonly listeners = new Set<AudioEngineListener>();
 
@@ -108,8 +114,21 @@ export class AudioEngine {
   public getState(): AudioEngineState {
     let currentTime = this.logicalPosition;
     if (this.playbackState === 'playing' && this.audioContext && !this.isScratching) {
-      const elapsed = (this.audioContext.currentTime - this.playStartedAt) * this.currentPlaybackRate;
-      currentTime = Math.min(this.duration, Math.max(0, this.logicalPosition + elapsed));
+      if (this.isCoasting) {
+        // Linear deceleration from coastInitialRate to 0 over coastDurationSec
+        const coastElapsed = Math.min(
+          this.coastDurationSec,
+          Math.max(0, this.audioContext.currentTime - this.coastStartedAt),
+        );
+        // Average rate during linear ramp: coastInitialRate * (1 - 0.5 * (coastElapsed / coastDurationSec))
+        const progress = this.coastDurationSec > 0 ? coastElapsed / this.coastDurationSec : 1;
+        const avgRate = this.coastInitialRate * (1 - 0.5 * progress);
+        const elapsed = coastElapsed * avgRate;
+        currentTime = Math.min(this.duration, Math.max(0, this.logicalPosition + elapsed));
+      } else {
+        const elapsed = (this.audioContext.currentTime - this.playStartedAt) * this.currentPlaybackRate;
+        currentTime = Math.min(this.duration, Math.max(0, this.logicalPosition + elapsed));
+      }
     }
 
     return {
@@ -304,9 +323,12 @@ export class AudioEngine {
       return;
     }
 
-    if (this.playbackState === 'playing' && !this.isScratching) {
+    if (this.playbackState === 'playing' && !this.isScratching && !this.isCoasting) {
       return;
     }
+
+    // Cancel any active coast-down
+    this.stopCoastTimer();
 
     const currentPlayId = ++this.playCounter;
 
@@ -385,7 +407,7 @@ export class AudioEngine {
       return;
     }
 
-    if (this.playbackState === 'playing' && this.audioContext && !this.isScratching) {
+    if (this.playbackState === 'playing' && this.audioContext && !this.isScratching && !this.isCoasting) {
       // Re-base current position using the old rate before updating to the new rate
       const elapsed = (this.audioContext.currentTime - this.playStartedAt) * this.currentPlaybackRate;
       this.logicalPosition = Math.min(this.duration, Math.max(0, this.logicalPosition + elapsed));
@@ -413,6 +435,7 @@ export class AudioEngine {
   public scratch(speed: number, reversed: boolean, position: number): void {
     if (!this.audioBuffer) return;
 
+    this.stopCoastTimer();
     this.isScratching = true;
     const ctx = this.getOrCreateContext();
     if (ctx.state === 'suspended') {
@@ -429,7 +452,9 @@ export class AudioEngine {
 
     if (this.currentSource) {
       const absSpeed = Math.abs(speed);
-      const targetRate = Math.max(0.001, Math.min(4.0, absSpeed));
+      // Scale instantaneous scratch speed by current deck playback rate
+      const scaledSpeed = absSpeed * this.currentPlaybackRate;
+      const targetRate = Math.max(0.001, Math.min(4.0, scaledSpeed));
       const now = ctx.currentTime;
       this.currentSource.playbackRate.cancelScheduledValues(now);
       this.currentSource.playbackRate.linearRampToValueAtTime(targetRate, now + 0.02);
@@ -480,7 +505,92 @@ export class AudioEngine {
   /**
    * Pauses playback and records the logical position.
    */
+  /**
+   * Initiates an authentic Technics motor inertia coast-down.
+   * Audio playback rate ramps smoothly down to 0 over durationMs, decelerating
+   * in tandem with the visual platter before pausing at the final position.
+   *
+   * @param durationMs - Coast-down deceleration duration in milliseconds (default 1200ms).
+   */
+  public coastDown(durationMs = 1200): void {
+    if (this.playbackState !== 'playing' || !this.audioBuffer || !this.currentSource || this.isScratching) {
+      return;
+    }
+
+    this.stopCoastTimer();
+
+    const ctx = this.getOrCreateContext();
+    this.updateLogicalPositionBeforeStopping();
+    this.playStartedAt = ctx.currentTime;
+    this.coastStartedAt = ctx.currentTime;
+    this.coastDurationSec = Math.max(0.1, durationMs / 1000);
+    this.coastInitialRate = this.currentPlaybackRate;
+    this.isCoasting = true;
+
+    // Schedule linear deceleration of playbackRate to 0
+    const now = ctx.currentTime;
+    const end = now + this.coastDurationSec;
+    try {
+      this.currentSource.playbackRate.cancelScheduledValues(now);
+      this.currentSource.playbackRate.setValueAtTime(this.currentPlaybackRate, now);
+      this.currentSource.playbackRate.linearRampToValueAtTime(0, end);
+    } catch {
+      // AudioParam scheduling might fail in mock environments
+    }
+
+    this.coastTimer = setTimeout(() => {
+      this.finishCoastDown();
+    }, durationMs);
+  }
+
+  private finishCoastDown(): void {
+    if (this.isCoasting) {
+      this.updateLogicalPositionBeforeStopping();
+      this.stopCurrentSourceNode();
+      this.stopTicker();
+      this.isCoasting = false;
+      this.playbackState = 'paused';
+      this.notify();
+    }
+  }
+
+  /**
+   * Cancels any active coast-down and restores motor torque, ramping playback rate
+   * back up to target nominal speed without jumping the track position.
+   */
+  public cancelCoastDown(): void {
+    if (!this.isCoasting) return;
+    this.stopCoastTimer();
+
+    if (this.playbackState === 'playing' && this.currentSource && this.audioContext) {
+      this.updateLogicalPositionBeforeStopping();
+      this.playStartedAt = this.audioContext.currentTime;
+
+      const now = this.audioContext.currentTime;
+      try {
+        this.currentSource.playbackRate.cancelScheduledValues(now);
+        this.currentSource.playbackRate.setValueAtTime(0.2, now);
+        this.currentSource.playbackRate.linearRampToValueAtTime(this.currentPlaybackRate, now + 0.15);
+      } catch {
+        // mock
+      }
+      this.notify();
+    }
+  }
+
+  private stopCoastTimer(): void {
+    if (this.coastTimer !== null) {
+      clearTimeout(this.coastTimer);
+      this.coastTimer = null;
+    }
+    this.isCoasting = false;
+  }
+
+  /**
+   * Pauses playback immediately and records the logical position.
+   */
   public pause(): void {
+    this.stopCoastTimer();
     this.playCounter++;
     if (this.playbackState !== 'playing' || !this.audioBuffer) {
       return;
@@ -498,6 +608,7 @@ export class AudioEngine {
    * Stops playback and resets logical position to 0.
    */
   public stop(): void {
+    this.stopCoastTimer();
     this.playCounter++;
     this.stopCurrentSourceNode();
     this.stopTicker();
@@ -520,8 +631,19 @@ export class AudioEngine {
 
   private updateLogicalPositionBeforeStopping(): void {
     if (this.playbackState === 'playing' && this.audioContext) {
-      const elapsed = (this.audioContext.currentTime - this.playStartedAt) * this.currentPlaybackRate;
-      this.logicalPosition = Math.min(this.duration, Math.max(0, this.logicalPosition + elapsed));
+      if (this.isCoasting) {
+        const coastElapsed = Math.min(
+          this.coastDurationSec,
+          Math.max(0, this.audioContext.currentTime - this.coastStartedAt),
+        );
+        const progress = this.coastDurationSec > 0 ? coastElapsed / this.coastDurationSec : 1;
+        const avgRate = this.coastInitialRate * (1 - 0.5 * progress);
+        const elapsed = coastElapsed * avgRate;
+        this.logicalPosition = Math.min(this.duration, Math.max(0, this.logicalPosition + elapsed));
+      } else {
+        const elapsed = (this.audioContext.currentTime - this.playStartedAt) * this.currentPlaybackRate;
+        this.logicalPosition = Math.min(this.duration, Math.max(0, this.logicalPosition + elapsed));
+      }
     }
   }
 
@@ -543,6 +665,7 @@ export class AudioEngine {
    */
   public dispose(): void {
     this.isDisposed = true;
+    this.stopCoastTimer();
     this.loadCounter++;
     this.playCounter++;
     this.stop();
