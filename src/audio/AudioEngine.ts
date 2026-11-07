@@ -17,7 +17,10 @@ export class AudioEngine {
   private readonly contextFactory: () => AudioContext;
 
   private audioBuffer: AudioBuffer | null = null;
+  private audioBufferReversed: AudioBuffer | null = null;
   private currentSource: AudioBufferSourceNode | null = null;
+  private isReversed = false;
+  private isScratching = false;
 
   private trackName: string | null = null;
   private duration = 0;
@@ -191,6 +194,7 @@ export class AudioEngine {
       });
 
       this.audioBuffer = decoded;
+      this.audioBufferReversed = this.createReversedAudioBuffer(decoded, ctx);
       this.duration = decoded.duration;
       this.logicalPosition = 0;
       this.playbackState = 'stopped';
@@ -208,14 +212,36 @@ export class AudioEngine {
   }
 
   /**
-   * Starts or resumes audio playback from the current logical track position.
+   * Generates a reversed AudioBuffer for reverse audio playback and scratching.
    */
-  public async play(): Promise<void> {
+  private createReversedAudioBuffer(buffer: AudioBuffer, ctx: AudioContext): AudioBuffer {
+    const reversed = ctx.createBuffer(
+      buffer.numberOfChannels,
+      buffer.length,
+      buffer.sampleRate,
+    );
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const forwardData = buffer.getChannelData(c);
+      const reversedData = reversed.getChannelData(c);
+      for (let i = 0, j = buffer.length - 1; i < buffer.length; i++, j--) {
+        const sample = forwardData[j];
+        if (sample !== undefined) {
+          reversedData[i] = sample;
+        }
+      }
+    }
+    return reversed;
+  }
+
+  /**
+   * Starts or resumes audio playback from the given or current logical track position.
+   */
+  public async play(offsetPosition?: number): Promise<void> {
     if (!this.audioBuffer) {
       return;
     }
 
-    if (this.playbackState === 'playing') {
+    if (this.playbackState === 'playing' && !this.isScratching) {
       return;
     }
 
@@ -227,35 +253,101 @@ export class AudioEngine {
       return;
     }
 
-    const ctx = this.getOrCreateContext();
-
-    // Reset position to beginning if at the end of track
-    if (this.logicalPosition >= this.duration) {
+    if (offsetPosition !== undefined) {
+      this.logicalPosition = Math.max(0, Math.min(this.duration, offsetPosition));
+    } else if (this.logicalPosition >= this.duration) {
       this.logicalPosition = 0;
     }
 
-    this.stopCurrentSourceNode();
-
-    const source = ctx.createBufferSource();
-    source.buffer = this.audioBuffer;
-    source.connect(ctx.destination);
-
-    source.onended = () => {
-      // Only handle if this source node is still the active one
-      if (this.currentSource === source) {
-        this.handlePlaybackEnded();
-      }
-    };
-
-    const offset = Math.max(0, Math.min(this.duration, this.logicalPosition));
-    this.playStartedAt = ctx.currentTime;
-    source.start(0, offset);
-    this.currentSource = source;
+    this.isReversed = false;
+    this.isScratching = false;
+    this.startSourceAt(this.logicalPosition, false);
     this.playbackState = 'playing';
     this.error = null;
 
     this.startTicker();
     this.notify();
+  }
+
+  private startSourceAt(position: number, reversed: boolean): void {
+    if (!this.audioBuffer || !this.audioBufferReversed) return;
+    const ctx = this.getOrCreateContext();
+
+    this.stopCurrentSourceNode();
+
+    const source = ctx.createBufferSource();
+    source.buffer = reversed ? this.audioBufferReversed : this.audioBuffer;
+    source.connect(ctx.destination);
+
+    source.onended = () => {
+      if (this.currentSource === source && !this.isScratching) {
+        this.handlePlaybackEnded();
+      }
+    };
+
+    const clampedPos = Math.max(0, Math.min(this.duration, position));
+    const startOffset = reversed ? Math.max(0, this.duration - clampedPos) : clampedPos;
+
+    this.playStartedAt = ctx.currentTime;
+    this.logicalPosition = clampedPos;
+    this.isReversed = reversed;
+
+    source.start(0, startOffset);
+    this.currentSource = source;
+  }
+
+  /**
+   * Realtime scratching handler matching vinyl motion.
+   * Modulates playback speed and switches between forward and reverse buffers.
+   */
+  public scratch(speed: number, reversed: boolean, position: number): void {
+    if (!this.audioBuffer) return;
+
+    this.isScratching = true;
+    const ctx = this.getOrCreateContext();
+    if (ctx.state === 'suspended') {
+      void ctx.resume();
+    }
+
+    const clampedPos = Math.max(0, Math.min(this.duration, position));
+    this.logicalPosition = clampedPos;
+
+    if (!this.currentSource || reversed !== this.isReversed) {
+      this.startSourceAt(clampedPos, reversed);
+    }
+    this.playbackState = 'playing';
+
+    if (this.currentSource) {
+      const absSpeed = Math.abs(speed);
+      const targetRate = Math.max(0.001, Math.min(4.0, absSpeed));
+      const now = ctx.currentTime;
+      this.currentSource.playbackRate.cancelScheduledValues(now);
+      this.currentSource.playbackRate.linearRampToValueAtTime(targetRate, now + 0.02);
+    }
+  }
+
+  /**
+   * Concludes scratching, resetting playback rate and resuming standard playback if desired.
+   */
+  public endScratch(resumePlayback: boolean): void {
+    this.isScratching = false;
+    if (resumePlayback && this.audioBuffer) {
+      void this.play(this.logicalPosition);
+    } else {
+      this.pause();
+    }
+  }
+
+  /**
+   * Seeks to a specific logical track position.
+   */
+  public seek(position: number): void {
+    this.logicalPosition = Math.max(0, Math.min(this.duration, position));
+    if (this.playbackState === 'playing') {
+      void this.play(this.logicalPosition);
+    } else {
+      this.notify();
+    }
   }
 
   /**

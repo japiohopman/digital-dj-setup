@@ -129,6 +129,9 @@ describe('Turntable static markup', () => {
       pause: vi.fn(),
       stop: vi.fn(),
       togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -159,6 +162,9 @@ describe('Turntable static markup', () => {
       pause: vi.fn(),
       stop: vi.fn(),
       togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -184,6 +190,9 @@ describe('Turntable static markup', () => {
       pause: vi.fn(),
       stop: vi.fn(),
       togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(

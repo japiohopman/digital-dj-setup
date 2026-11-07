@@ -1,5 +1,6 @@
 import { useState, useRef, type CSSProperties, type PointerEvent, type KeyboardEvent, type ChangeEvent } from 'react';
 import type { DeckTransport } from '../audio/types';
+import { useVinylMotion } from '../audio/useVinylMotion';
 
 /**
  * Supported playback RPM speeds for the turntable deck.
@@ -61,6 +62,19 @@ export function Turntable({
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
+
+  const {
+    angle: vinylAngle,
+    isScratching,
+    discRef,
+    onPointerDown: onVinylPointerDown,
+  } = useVinylMotion({
+    isPowered,
+    isMotorOn,
+    speedRpm: speed,
+    pitch,
+    transport,
+  });
 
   const updatePitchFromPointer = (clientY: number, clientX: number) => {
     if (!trackRef.current) return;
@@ -198,9 +212,10 @@ export function Turntable({
   const classes = [
     'turntable',
     isPowered ? 'power-on' : '',
-    isSpinning ? 'motor-on' : '',
+    isSpinning || isScratching ? 'motor-on' : '',
     hasRecord ? 'has-record' : '',
     hasSlipmat ? 'has-slipmat' : '',
+    isScratching ? 'is-scratching' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -211,10 +226,9 @@ export function Turntable({
     return `${mins}:${remainder.toString().padStart(2, '0')}`;
   };
 
-  const baseDuration = speed === 33 ? 1.8 : 1.3333;
-  const effectiveDuration = baseDuration / (1 + pitch / 100);
-  const spinStyle: CSSProperties = {
-    animationDuration: `${effectiveDuration.toFixed(4)}s`,
+  // Direct rotation style applied from continuous physics angle
+  const rotateTransformStyle: CSSProperties = {
+    transform: `rotate(${vinylAngle}rad)`,
   };
 
   // Convert pitch (-8 to +8) to percentage along the fader slot (0% = +8, 50% = 0, 100% = -8)
@@ -242,24 +256,30 @@ export function Turntable({
       />
 
       <div className="bd">
-        <div className="platter" style={spinStyle} />
+        <div className="platter" style={rotateTransformStyle} />
 
         <div className="slipmat-holder">
-          <div className="slipmat" style={spinStyle} />
+          <div className="slipmat" style={rotateTransformStyle} />
         </div>
 
-        <div className="record-holder">
-          <div className="record" style={spinStyle}>
+        <div
+          className="record-holder"
+          ref={discRef}
+          onPointerDown={onVinylPointerDown}
+          role="img"
+          aria-label={`${deckLabel} interactive vinyl record - drag to scratch`}
+        >
+          <div className="record" style={rotateTransformStyle}>
             <div className="label">
               <span className="label-text-brand">TECHNICS</span>
               <span className="label-text-side">{deckLabel}</span>
               <span className="label-text-speed">{speed === 33 ? '33 RPM' : '45 RPM'}</span>
             </div>
           </div>
-          <div className="record-grooves" style={spinStyle} />
+          <div className="record-grooves" style={rotateTransformStyle} />
         </div>
 
-        <div className="spindle" style={spinStyle} />
+        <div className="spindle" style={rotateTransformStyle} />
 
         <div className="power-light" aria-hidden="true" />
 

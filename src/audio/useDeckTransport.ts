@@ -66,6 +66,21 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     }
   }, []);
 
+  const scratch = useCallback((speed: number, isReversed: boolean, position: number) => {
+    if (!engineRef.current) return;
+    engineRef.current.scratch(speed, isReversed, position);
+  }, []);
+
+  const endScratch = useCallback((resumePlayback: boolean) => {
+    if (!engineRef.current) return;
+    engineRef.current.endScratch(resumePlayback);
+  }, []);
+
+  const seek = useCallback((position: number) => {
+    if (!engineRef.current) return;
+    engineRef.current.seek(position);
+  }, []);
+
   return {
     trackName: state.trackName,
     duration: state.duration,
@@ -79,5 +94,8 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     pause,
     stop,
     togglePlayPause,
+    scratch,
+    endScratch,
+    seek,
   };
 }

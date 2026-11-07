@@ -29,7 +29,7 @@ export type AudioEngineListener = (state: AudioEngineState) => void;
  */
 export interface AudioEngineOptions {
   /** Optional custom AudioContext factory for testing or environments with specific policies. */
-  audioContextFactory?: () => AudioContext;
+  audioContextFactory?: (() => AudioContext) | undefined;
 }
 
 /**
@@ -44,8 +44,11 @@ export interface DeckTransport {
   isLoaded: boolean;
   error: string | null;
   loadTrack: (file: File) => Promise<void>;
-  play: () => Promise<void>;
+  play: (offset?: number) => Promise<void>;
   pause: () => void;
   stop: () => void;
   togglePlayPause: () => Promise<void>;
+  scratch: (speed: number, isReversed: boolean, position: number) => void;
+  endScratch: (resumePlayback: boolean) => void;
+  seek: (position: number) => void;
 }

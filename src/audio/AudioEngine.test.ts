@@ -1,12 +1,21 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { AudioEngine } from './AudioEngine';
 
+class MockAudioParam {
+  value = 1;
+  cancelScheduledValues = vi.fn();
+  linearRampToValueAtTime = vi.fn((val: number) => {
+    this.value = val;
+  });
+}
+
 class MockAudioBufferSourceNode {
   buffer: AudioBuffer | null = null;
   onended: (() => void) | null = null;
   startedAtOffset: number | null = null;
   isStarted = false;
   isStopped = false;
+  playbackRate = new MockAudioParam();
 
   connect = vi.fn();
   disconnect = vi.fn();
@@ -39,12 +48,31 @@ class MockAudioContext {
     if (buffer.byteLength === 0) {
       throw new Error('Unsupported audio format');
     }
+    const sampleLength = 1000;
+    const ch0 = new Float32Array(sampleLength);
+    const ch1 = new Float32Array(sampleLength);
     return {
-      duration: 120, // 2 minutes mock track
-      length: 120 * 44100,
+      duration: 120, // 2 minutes mock track duration
+      length: sampleLength,
       numberOfChannels: 2,
       sampleRate: 44100,
-      getChannelData: vi.fn(),
+      getChannelData: vi.fn((ch: number) => (ch === 0 ? ch0 : ch1)),
+      copyFromChannel: vi.fn(),
+      copyToChannel: vi.fn(),
+    } as unknown as AudioBuffer;
+  });
+
+  createBuffer = vi.fn((channels: number, length: number, sampleRate: number) => {
+    const channelArrays: Float32Array[] = [];
+    for (let i = 0; i < channels; i++) {
+      channelArrays.push(new Float32Array(length));
+    }
+    return {
+      duration: length / sampleRate,
+      length,
+      numberOfChannels: channels,
+      sampleRate,
+      getChannelData: vi.fn((ch: number) => channelArrays[ch] ?? new Float32Array(length)),
       copyFromChannel: vi.fn(),
       copyToChannel: vi.fn(),
     } as unknown as AudioBuffer;
@@ -233,5 +261,31 @@ describe('AudioEngine', () => {
 
     deckA.dispose();
     deckB.dispose();
+  });
+
+  it('supports bidirectional scratching and playbackRate modulation', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'scratch-cue.wav');
+
+    // Scratch forward with 1.5x speed
+    engine.scratch(1.5, false, 12);
+    expect(mockContext.createdSources).toHaveLength(1);
+    const firstSource = mockContext.createdSources[0];
+    expect(firstSource).toBeDefined();
+    expect(firstSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(1.5, expect.any(Number));
+
+    // Scratch backward with 2.0x speed
+    engine.scratch(2.0, true, 11);
+    // When switching direction to reversed buffer, a new source is started with the reversed buffer
+    expect(mockContext.createdSources).toHaveLength(2);
+    const secondSource = mockContext.createdSources[1];
+    expect(secondSource).toBeDefined();
+    expect(secondSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(2.0, expect.any(Number));
+
+    // endScratch resumes normal forward playback if requested
+    engine.endScratch(true);
+    expect(engine.getState().playbackState).toBe('playing');
+
+    engine.dispose();
   });
 });

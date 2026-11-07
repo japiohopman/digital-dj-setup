@@ -541,18 +541,8 @@
 .turntable .record-grooves,
 .turntable .record,
 .turntable .slipmat {
-  transition-property: transform;
   transform-origin: 50% 50%;
-  animation: spin 1.8s linear infinite;
-  animation-play-state: paused;
-}
-
-.turntable.power-on.motor-on .platter,
-.turntable.power-on.motor-on .spindle,
-.turntable.power-on.motor-on .record-grooves,
-.turntable.power-on.motor-on .record,
-.turntable.power-on.motor-on .slipmat {
-  animation-play-state: running;
+  will-change: transform;
 }
 
 .turntable .record-holder,
@@ -563,9 +553,15 @@
   width: 100%;
   height: 100%;
   opacity: 0;
-  transition: all 0.35s;
-  transform: scale3d(1.15, 1.15, 1.15);
+  transition: opacity 0.35s ease;
   transform-origin: 42% 50%;
+  touch-action: none;
+  cursor: grab;
+}
+
+.turntable.is-scratching .record-holder,
+.turntable .record-holder:active {
+  cursor: grabbing;
 }
 
 .turntable.has-record .record-holder,
