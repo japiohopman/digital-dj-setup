@@ -4,18 +4,20 @@ import { describe, expect, it } from 'vitest';
 import { Turntable } from './Turntable';
 
 describe('Turntable', () => {
-  it('renders the main hardware elements and accessible controls', () => {
+  it('renders the main SL-1200MK2 hardware and accessible controls', () => {
     const markup = renderToStaticMarkup(<Turntable />);
 
-    expect(markup).toContain('Technics-inspired turntable');
+    expect(markup).toContain('Technics SL-1200 MK2 turntable');
     expect(markup).toContain('turntable__platter');
     expect(markup).toContain('turntable__record');
     expect(markup).toContain('Tonearm and cartridge');
+    expect(markup).toContain('counterweight');
     expect(markup).toContain('aria-label="Power"');
     expect(markup).toContain('START / STOP');
     expect(markup).toContain('33 and one third revolutions per minute');
     expect(markup).toContain('45 revolutions per minute');
     expect(markup).toContain('aria-label="Target light"');
+    expect(markup).toContain('SL-1200MK2');
   });
 
   it('supports a reusable deck label, model and initial speed', () => {
