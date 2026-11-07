@@ -16,6 +16,8 @@ describe('Turntable', () => {
     expect(markup).toContain('aria-label="DECK 01 33 RPM"');
     expect(markup).toContain('aria-label="DECK 01 45 RPM"');
     expect(markup).toContain('aria-label="DECK 01 Target light"');
+    expect(markup).toContain('aria-label="DECK 01 Pitch Control"');
+    expect(markup).toContain('aria-label="DECK 01 pitch slider"');
     expect(markup).toContain('/turntable/landscape/tt_case_and_lighting.png');
   });
 

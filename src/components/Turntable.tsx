@@ -32,6 +32,7 @@ export function Turntable({
   const [isLightOn, setIsLightOn] = useState(false);
   const [hasRecord] = useState(initiallyHasRecord);
   const [hasSlipmat] = useState(initiallyHasSlipmat);
+  const [pitch, setPitch] = useState<number>(0);
 
   const handlePowerToggle = () => {
     const nextPower = !isPowered;
@@ -57,6 +58,14 @@ export function Turntable({
     setIsLightOn((prev) => !prev);
   };
 
+  const handlePitchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPitch(parseFloat(e.target.value));
+  };
+
+  const handleResetPitch = () => {
+    setPitch(0);
+  };
+
   const classes = [
     'turntable',
     isPowered ? 'power-on' : '',
@@ -67,8 +76,10 @@ export function Turntable({
     .filter(Boolean)
     .join(' ');
 
+  const baseDuration = speed === 33 ? 1.8 : 1.3333;
+  const effectiveDuration = baseDuration / (1 + pitch / 100);
   const spinStyle: CSSProperties = {
-    animationDuration: speed === 33 ? '1.8s' : '1.333s',
+    animationDuration: `${effectiveDuration.toFixed(4)}s`,
   };
 
   return (
@@ -169,6 +180,41 @@ export function Turntable({
 
         <div className="model-badge" aria-hidden="true">
           <span>{modelName}</span>
+        </div>
+
+        {/* Pitch Control Assembly (battle mode: top edge / native mode: right edge) */}
+        <div className="pitch-control" role="group" aria-label={`${deckLabel} Pitch Control`}>
+          <div className="pitch-scale">
+            <span className="scale-mark pos">+8</span>
+            <span className="scale-mark zero">0</span>
+            <span className="scale-mark neg">-8</span>
+          </div>
+          <div className="pitch-track">
+            <input
+              type="range"
+              min="-8"
+              max="8"
+              step="0.1"
+              value={pitch}
+              onChange={handlePitchChange}
+              className="pitch-slider"
+              aria-label={`${deckLabel} pitch slider`}
+              aria-valuemin={-8}
+              aria-valuemax={8}
+              aria-valuenow={pitch}
+              aria-valuetext={`${pitch > 0 ? '+' : ''}${pitch.toFixed(1)}%`}
+            />
+          </div>
+          <button
+            type="button"
+            className={`pitch-zero-led${pitch === 0 ? ' active' : ''}`}
+            onClick={handleResetPitch}
+            title="Reset pitch to 0% (Quartz Lock)"
+            aria-label={`${deckLabel} Reset pitch to 0%`}
+          />
+          <div className="pitch-readout" aria-hidden="true">
+            {pitch > 0 ? `+${pitch.toFixed(1)}%` : `${pitch.toFixed(1)}%`}
+          </div>
         </div>
       </div>
     </div>
