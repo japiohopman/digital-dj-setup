@@ -28,7 +28,7 @@ The mixer reference has not been selected yet. Keep mixer design and implementat
 - Do not start the next feature while the current PR is waiting for review, unless the user explicitly requests it.
 - Keep explanations practical and brief. Prefer the next concrete action over long theoretical descriptions.
 - Ask only when a product decision is genuinely blocking; otherwise make a conservative, clearly documented choice.
-- Do not merge PRs without explicit user approval.
+- The user has delegated merge authority to the assistant for this repository. Merge a PR once its scope and acceptance criteria are met, CI is green and the review finds no unresolved blockers. Do not ask the user to click Merge or repeat approval for a PR that meets those conditions.
 
 ## Current roadmap
 
@@ -41,4 +41,4 @@ The mixer reference has not been selected yet. Keep mixer design and implementat
 
 ## Definition of done
 
-A task is ready for review only when its issue scope and acceptance criteria are met, required checks pass, and the PR explains the changes and their validation.
+A task is ready to merge when its issue scope and acceptance criteria are met, required checks pass, and review identifies no unresolved blocking issues. Update the issue and close it after a successful merge.
