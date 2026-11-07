@@ -257,7 +257,7 @@ textarea {
     top: 50%;
     left: 50%;
     width: 78.4%;
-    transform: translate(-50%, -50%) rotate(-45deg);
+    transform: translate(-50%, -50%) rotate(-90deg);
   }
 }
 
