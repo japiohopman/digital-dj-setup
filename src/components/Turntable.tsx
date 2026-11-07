@@ -63,6 +63,13 @@ export function Turntable({
   const [isDragOverRecord, setIsDragOverRecord] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
+  const recordRef = useRef<HTMLDivElement | null>(null);
+
+  // Keep live refs of power and motor state to avoid stale closures in async file loaders
+  const isPoweredRef = useRef(isPowered);
+  isPoweredRef.current = isPowered;
+  const isMotorOnRef = useRef(isMotorOn);
+  isMotorOnRef.current = isMotorOn;
 
   const {
     angle: vinylAngle,
@@ -75,6 +82,7 @@ export function Turntable({
     speedRpm: speed,
     pitch,
     transport,
+    centerElementRef: recordRef,
   });
 
   const updatePitchFromPointer = (clientY: number, clientX: number) => {
@@ -155,7 +163,8 @@ export function Turntable({
     if (!nextPower) {
       setIsMotorOn(false);
       setIsLightOn(false);
-      if (transport && transport.isPlaying) {
+      if (transport) {
+        // Unconditionally pause/stop any current or in-flight playback
         transport.pause();
       }
     }
@@ -176,10 +185,13 @@ export function Turntable({
   };
 
   const handleLoadTrackFile = (file: File) => {
-    if (!transport) return;
+    if (!transport || !isPoweredRef.current) return;
     void transport.loadTrack(file).then(() => {
-      if (isPowered && isMotorOn) {
+      // Re-verify power and motor state on live refs after async decoding completes
+      if (isPoweredRef.current && isMotorOnRef.current) {
         void transport.play();
+      } else {
+        transport.pause();
       }
     });
   };
@@ -324,7 +336,7 @@ export function Turntable({
           aria-valuenow={Math.round(transport?.currentTime || 0)}
           aria-valuetext={`${formatTime(transport?.currentTime || 0)} of ${formatTime(transport?.duration || 0)}`}
         >
-          <div className="record" style={rotateTransformStyle}>
+          <div className="record" ref={recordRef} style={rotateTransformStyle}>
             {transport?.metadata?.artworkUrl ? (
               <div
                 className="record-artwork"
@@ -443,7 +455,7 @@ export function Turntable({
               type="button"
               className="deck-load-btn"
               onClick={handleOpenFileDialog}
-              disabled={!isPowered}
+              disabled={!isPowered || !transport}
               aria-label={`${deckLabel} Load audio track`}
             >
               <span className="deck-load-icon" aria-hidden="true">▲</span>
@@ -491,8 +503,17 @@ export function Turntable({
               <span className="deck-audio-status error" role="alert">{transport.error}</span>
             ) : transport?.trackName ? (
               <div className="deck-track-meta">
-                <span className="deck-track-name" title={transport.trackName}>
-                  {transport.trackName}
+                <span
+                  className="deck-track-name"
+                  title={
+                    transport.metadata?.artist
+                      ? `${transport.metadata.artist} — ${transport.metadata.title}`
+                      : transport.trackName
+                  }
+                >
+                  {transport.metadata?.artist
+                    ? `${transport.metadata.artist} — ${transport.metadata.title}`
+                    : transport.trackName}
                 </span>
                 <span className="deck-track-time">
                   {formatTime(transport.currentTime)} / {formatTime(transport.duration)}

@@ -7,6 +7,9 @@ import type { DeckTransport, AudioEngineState, AudioEngineOptions } from './type
  *
  * Keeps AudioContext, AudioBuffer and AudioBufferSourceNode completely outside
  * React component state. Exposes high-level transport state and controls.
+ *
+ * @param options - Optional engine configuration options, such as custom AudioContext factories for testing.
+ * @returns Fully typed deck transport controls and reactive state.
  */
 export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
   const engineRef = useRef<AudioEngine | null>(null);
@@ -85,6 +88,11 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     engineRef.current.seek(position);
   }, []);
 
+  const setPlaybackRate = useCallback((rate: number) => {
+    if (!engineRef.current) return;
+    engineRef.current.setPlaybackRate(rate);
+  }, []);
+
   return {
     trackName: state.trackName,
     metadata: state.metadata,
@@ -102,5 +110,6 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     scratch,
     endScratch,
     seek,
+    setPlaybackRate,
   };
 }

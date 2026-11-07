@@ -58,4 +58,5 @@ export interface DeckTransport {
   scratch: (speed: number, isReversed: boolean, position: number) => void;
   endScratch: (resumePlayback: boolean) => void;
   seek: (position: number) => void;
+  setPlaybackRate: (rate: number) => void;
 }

@@ -55,6 +55,8 @@ export class AudioEngine {
 
   /**
    * Lazily initializes or returns the deck's AudioContext.
+   *
+   * @returns Active AudioContext instance.
    */
   private getOrCreateContext(): AudioContext {
     if (!this.audioContext) {
@@ -65,6 +67,8 @@ export class AudioEngine {
 
   /**
    * Ensures the AudioContext is running after user interaction.
+   *
+   * @throws Error if resume fails.
    */
   private async ensureContextRunning(): Promise<void> {
     const ctx = this.getOrCreateContext();
@@ -83,6 +87,9 @@ export class AudioEngine {
   /**
    * Subscribes a listener to engine state changes.
    * Returns an unsubscribe function.
+   *
+   * @param listener - Callback receiving current state snapshots.
+   * @returns Cleanup unsubscribe function.
    */
   public subscribe(listener: AudioEngineListener): () => void {
     this.listeners.add(listener);
@@ -95,6 +102,8 @@ export class AudioEngine {
 
   /**
    * Returns the current snapshot of engine state.
+   *
+   * @returns Frozen state snapshot.
    */
   public getState(): AudioEngineState {
     let currentTime = this.logicalPosition;
@@ -143,6 +152,9 @@ export class AudioEngine {
 
   /**
    * Loads and decodes an audio file into the deck.
+   *
+   * @param file - File object or raw ArrayBuffer.
+   * @param name - Optional track name override.
    */
   public async loadTrack(file: File | ArrayBuffer, name?: string): Promise<void> {
     const requestId = ++this.loadCounter;
@@ -258,6 +270,10 @@ export class AudioEngine {
 
   /**
    * Generates a reversed AudioBuffer for reverse audio playback and scratching.
+   *
+   * @param buffer - Original forward AudioBuffer.
+   * @param ctx - AudioContext for buffer allocation.
+   * @returns Newly allocated reversed AudioBuffer.
    */
   private createReversedAudioBuffer(buffer: AudioBuffer, ctx: AudioContext): AudioBuffer {
     const reversed = ctx.createBuffer(
@@ -280,6 +296,8 @@ export class AudioEngine {
 
   /**
    * Starts or resumes audio playback from the given or current logical track position.
+   *
+   * @param offsetPosition - Optional position in seconds from which to start playback.
    */
   public async play(offsetPosition?: number): Promise<void> {
     if (!this.audioBuffer || this.isDisposed) {
@@ -355,21 +373,42 @@ export class AudioEngine {
 
   /**
    * Sets the playback rate factor based on turntable speed (33/45 RPM) and pitch fader.
+   *
+   * If the deck is actively playing, re-bases the logical playback position to ensure that
+   * `getCurrentTime()` remains continuous and monotonic without backward or forward jumps.
+   *
+   * @param rate - Target playback rate multiplier (clamped between 0.1 and 4.0).
    */
   public setPlaybackRate(rate: number): void {
     const clamped = Math.max(0.1, Math.min(4.0, rate));
-    this.currentPlaybackRate = clamped;
-
-    if (this.currentSource && !this.isScratching && this.audioContext) {
-      const now = this.audioContext.currentTime;
-      this.currentSource.playbackRate.cancelScheduledValues(now);
-      this.currentSource.playbackRate.linearRampToValueAtTime(clamped, now + 0.05);
+    if (Math.abs(this.currentPlaybackRate - clamped) < 0.0001) {
+      return;
     }
+
+    if (this.playbackState === 'playing' && this.audioContext && !this.isScratching) {
+      // Re-base current position using the old rate before updating to the new rate
+      const elapsed = (this.audioContext.currentTime - this.playStartedAt) * this.currentPlaybackRate;
+      this.logicalPosition = Math.min(this.duration, Math.max(0, this.logicalPosition + elapsed));
+      this.playStartedAt = this.audioContext.currentTime;
+
+      if (this.currentSource) {
+        const now = this.audioContext.currentTime;
+        this.currentSource.playbackRate.cancelScheduledValues(now);
+        this.currentSource.playbackRate.setValueAtTime(clamped, now);
+      }
+    }
+
+    this.currentPlaybackRate = clamped;
+    this.notify();
   }
 
   /**
    * Realtime scratching handler matching vinyl motion.
    * Modulates playback speed and switches between forward and reverse buffers.
+   *
+   * @param speed - Scratch speed magnitude multiplier.
+   * @param reversed - Whether movement is backward.
+   * @param position - Target logical position in seconds.
    */
   public scratch(speed: number, reversed: boolean, position: number): void {
     if (!this.audioBuffer) return;
@@ -398,13 +437,28 @@ export class AudioEngine {
   }
 
   /**
-   * Concludes scratching, resetting playback rate and resuming standard playback if desired.
+   * Concludes scratching, resetting playback rate and resuming standard forward playback if desired.
+   *
+   * Explicitly stops the active scratch source (which may be a reversed buffer or playing at a non-standard
+   * scratch rate) and spawns a clean forward AudioBufferSourceNode starting at the exact scratch position
+   * with the deck's configured base playback rate.
+   *
+   * @param resumePlayback - Whether to return to forward playback (true if platter motor is running).
    */
   public endScratch(resumePlayback: boolean): void {
     this.isScratching = false;
+
+    // Immediately stop any active scratch source (especially reversed source or variable scratch rate)
+    this.stopCurrentSourceNode();
+
     if (resumePlayback && this.audioBuffer) {
       this.isReversed = false;
-      void this.play(this.logicalPosition);
+      // Restart forward playback directly from exact scratch position at base rate
+      this.startSourceAt(this.logicalPosition, false);
+      this.playbackState = 'playing';
+      this.error = null;
+      this.startTicker();
+      this.notify();
     } else {
       this.pause();
     }
@@ -412,6 +466,8 @@ export class AudioEngine {
 
   /**
    * Seeks to a specific logical track position and restarts audio at that position.
+   *
+   * @param position - Timestamp in seconds to seek to.
    */
   public seek(position: number): void {
     this.logicalPosition = Math.max(0, Math.min(this.duration, position));
@@ -464,7 +520,7 @@ export class AudioEngine {
 
   private updateLogicalPositionBeforeStopping(): void {
     if (this.playbackState === 'playing' && this.audioContext) {
-      const elapsed = this.audioContext.currentTime - this.playStartedAt;
+      const elapsed = (this.audioContext.currentTime - this.playStartedAt) * this.currentPlaybackRate;
       this.logicalPosition = Math.min(this.duration, Math.max(0, this.logicalPosition + elapsed));
     }
   }

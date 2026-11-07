@@ -14,6 +14,9 @@ export interface AudioMetadata {
 
 /**
  * Strips file extension and replaces common separators for clean display fallback.
+ *
+ * @param filename - Base name of the file (e.g. "01-super_seal_break.mp3")
+ * @returns Cleaned title string (e.g. "01 super seal break")
  */
 export function formatFilenameFallback(filename: string): string {
   const withoutExt = filename.replace(/\.[^/.]+$/, '');
@@ -21,9 +24,17 @@ export function formatFilenameFallback(filename: string): string {
 }
 
 /**
- * Parses ID3v2 tags from an MP3 ArrayBuffer.
+ * Parses ID3v2 (ID3v2.3 and ID3v2.4) tags from a DataView buffer.
+ * Supports Latin1 (ISO-8859-1), UTF-8, and UTF-16 text encodings for TIT2, TPE1, and TALB,
+ * and extracts APIC embedded cover artwork.
+ *
+ * Note: Non-ID3 containers (pure WAV without ID3, FLAC Vorbis comments) fallback gracefully
+ * to filename extraction.
+ *
+ * @param view - DataView of the audio file's initial bytes.
+ * @returns Parsed metadata fields.
  */
-function parseID3v2(view: DataView): Partial<AudioMetadata> {
+export function parseID3v2(view: DataView): Partial<AudioMetadata> {
   const result: Partial<AudioMetadata> = {};
   if (view.byteLength < 10) return result;
 
@@ -73,7 +84,19 @@ function parseID3v2(view: DataView): Partial<AudioMetadata> {
     if (frameId === 'TIT2' || frameId === 'TPE1' || frameId === 'TALB') {
       const encoding = frameBytes[0];
       const textBytes = frameBytes.subarray(1);
-      const text = (encoding === 0 ? latin1Decoder : decoder).decode(textBytes).replace(/\0+$/, '');
+      let rawText: string;
+      if (encoding === 0) {
+        rawText = latin1Decoder.decode(textBytes);
+      } else if (encoding === 1 || encoding === 2) {
+        try {
+          rawText = new TextDecoder(encoding === 2 ? 'utf-16be' : 'utf-16').decode(textBytes);
+        } catch {
+          rawText = decoder.decode(textBytes);
+        }
+      } else {
+        rawText = decoder.decode(textBytes);
+      }
+      const text = rawText.replace(/\0+$/, '').trim();
       if (frameId === 'TIT2') result.title = text;
       if (frameId === 'TPE1') result.artist = text;
       if (frameId === 'TALB') result.album = text;
@@ -121,6 +144,12 @@ function parseID3v2(view: DataView): Partial<AudioMetadata> {
 
 /**
  * Extracts metadata and embedded cover art from an audio file locally.
+ *
+ * Inspects initial bytes for ID3v2 tags (TIT2, TPE1, TALB, and APIC cover images),
+ * falling back gracefully to the cleaned filename if no tags are present or supported.
+ *
+ * @param file - The audio file selected or dropped onto the deck.
+ * @returns Parsed AudioMetadata object with title, artist, album, and artwork Blob URL.
  */
 export async function parseAudioMetadata(file: File): Promise<AudioMetadata> {
   const fallbackTitle = formatFilenameFallback(file.name);

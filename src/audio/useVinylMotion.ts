@@ -7,6 +7,7 @@ export interface UseVinylMotionOptions {
   speedRpm: 33 | 45;
   pitch: number; // -8 to +8 percentage
   transport?: DeckTransport | undefined;
+  centerElementRef?: React.RefObject<HTMLElement | null> | undefined;
 }
 
 const TWO_PI = Math.PI * 2;
@@ -17,6 +18,10 @@ const normalizeDelta = (a: number, b: number) => Math.atan2(Math.sin(a - b), Mat
 /**
  * Custom hook providing realistic vinyl physics, touch/pointer scratching,
  * auto-rotation at Technics 33/45 RPM speeds with pitch modulation, and real-time audio sync.
+ *
+ * @param options - Configuration including power, motor status, speed (33/45 RPM), pitch (-8% to +8%),
+ * optional deck transport instance, and an element reference for center spindle measurement.
+ * @returns Platter rotation angle, scratching state, disc element ref, and pointer-down event handler.
  */
 export function useVinylMotion({
   isPowered,
@@ -24,6 +29,7 @@ export function useVinylMotion({
   speedRpm,
   pitch,
   transport,
+  centerElementRef,
 }: UseVinylMotionOptions) {
   const [angle, setAngle] = useState(0);
   const [isScratching, setIsScratching] = useState(false);
@@ -31,6 +37,7 @@ export function useVinylMotion({
   const angleRef = useRef(0);
   const anglePreviousRef = useRef(0);
   const isScratchingRef = useRef(false);
+  const activePointerIdRef = useRef<number | null>(null);
   const draggingFromRef = useRef<{ x: number; y: number } | null>(null);
   const centerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const rafIdRef = useRef<number | null>(null);
@@ -44,8 +51,51 @@ export function useVinylMotion({
   const effectiveRps = baseRps * (1 + pitch / 100);
   const radsPerMs = (effectiveRps * TWO_PI) / 1000;
 
+  // The base reference speed is standard Technics 33⅓ RPM
+  // Effective playback rate multiplier relative to standard 33⅓ RPM
+  const effectivePlaybackRate = (speedRpm === 45 ? 45 / 33.3333 : 1.0) * (1 + pitch / 100);
+
+  // Synchronize audio engine playback rate when speed or pitch changes
+  useEffect(() => {
+    if (transport?.setPlaybackRate) {
+      transport.setPlaybackRate(effectivePlaybackRate);
+    }
+  }, [transport, effectivePlaybackRate]);
+
   const duration = transport?.duration || 0;
   const maxAngle = duration > 0 ? duration * effectiveRps * TWO_PI : Infinity;
+
+  // Detect prefers-reduced-motion
+  const prefersReducedMotionRef = useRef(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    prefersReducedMotionRef.current = mediaQuery.matches;
+
+    const handler = (e: MediaQueryListEvent) => {
+      prefersReducedMotionRef.current = e.matches;
+    };
+    mediaQuery.addEventListener?.('change', handler);
+    return () => {
+      mediaQuery.removeEventListener?.('change', handler);
+    };
+  }, []);
+
+  // Synchronize platter visual position from transport current time on jumps (seek, stop, load, replay)
+  const lastTransportTimeRef = useRef(transport?.currentTime ?? 0);
+  useEffect(() => {
+    if (!transport || isScratchingRef.current) return;
+    const currentTime = transport.currentTime;
+    const prevTime = lastTransportTimeRef.current;
+    lastTransportTimeRef.current = currentTime;
+
+    // If time jumps backwards or by more than 1.5 seconds, re-align platter angle with track time
+    if (currentTime === 0 || Math.abs(currentTime - prevTime) > 1.5) {
+      const targetAngle = currentTime * effectiveRps * TWO_PI;
+      angleRef.current = targetAngle;
+      setAngle(targetAngle);
+    }
+  }, [transport?.currentTime, effectiveRps, transport]);
 
   // Auto-rotate and physics loop
   useEffect(() => {
@@ -65,7 +115,8 @@ export function useVinylMotion({
         // If no track loaded, rotate if motor is on
         const shouldRotate = transport?.isLoaded ? isAudioPlaying : isMotorSpinning;
 
-        if (shouldRotate) {
+        // Respect prefers-reduced-motion: skip continuous visual platter rotation while keeping audio playing
+        if (shouldRotate && !prefersReducedMotionRef.current) {
           const deltaAngle = radsPerMs * dt;
           let newAngle = angleRef.current + deltaAngle;
           if (maxAngle !== Infinity && newAngle > maxAngle) {
@@ -116,25 +167,43 @@ export function useVinylMotion({
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     if (!isPowered) return;
+    if (activePointerIdRef.current !== null && activePointerIdRef.current !== e.pointerId) {
+      // Ignore additional pointers on the same deck
+      return;
+    }
 
-    if (discRef.current) {
-      const rect = discRef.current.getBoundingClientRect();
+    // Measure scratch center from the spindle / actual record disc if provided,
+    // otherwise fallback to discRef
+    const centerTarget = centerElementRef?.current ?? discRef.current;
+    if (centerTarget) {
+      const rect = centerTarget.getBoundingClientRect();
       centerRef.current = {
         x: rect.left + rect.width / 2,
         y: rect.top + rect.height / 2,
       };
     }
 
+    activePointerIdRef.current = e.pointerId;
     draggingFromRef.current = { x: e.clientX, y: e.clientY };
     isScratchingRef.current = true;
     setIsScratching(true);
     draggingSpeedsRef.current = [];
 
     // Capture pointer
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore in tests
+    }
 
     const onPointerMove = (moveEvent: PointerEvent) => {
-      if (!isScratchingRef.current || !draggingFromRef.current) return;
+      if (
+        !isScratchingRef.current ||
+        !draggingFromRef.current ||
+        moveEvent.pointerId !== activePointerIdRef.current
+      ) {
+        return;
+      }
       moveEvent.preventDefault();
 
       const current = { x: moveEvent.clientX, y: moveEvent.clientY };
@@ -155,6 +224,10 @@ export function useVinylMotion({
     };
 
     const onPointerUp = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== activePointerIdRef.current) {
+        return;
+      }
+
       try {
         e.currentTarget.releasePointerCapture(upEvent.pointerId);
       } catch {
@@ -164,6 +237,7 @@ export function useVinylMotion({
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
 
+      activePointerIdRef.current = null;
       isScratchingRef.current = false;
       setIsScratching(false);
       draggingFromRef.current = null;
@@ -178,7 +252,7 @@ export function useVinylMotion({
     window.addEventListener('pointermove', onPointerMove, { passive: false });
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
-  }, [isPowered, isMotorOn, transport]);
+  }, [isPowered, isMotorOn, transport, centerElementRef]);
 
   return {
     angle,

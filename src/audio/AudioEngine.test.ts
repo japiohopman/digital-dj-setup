@@ -286,7 +286,16 @@ describe('AudioEngine', () => {
     expect(secondSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(2.0, expect.any(Number));
 
     // endScratch resumes normal forward playback if requested
+    // Ensure the reverse scratch source was stopped and a fresh forward source was started
+    expect(secondSource?.isStopped).toBe(false);
     engine.endScratch(true);
+
+    expect(secondSource?.isStopped).toBe(true);
+    expect(mockContext.createdSources).toHaveLength(3);
+    const forwardResumeSource = mockContext.createdSources[2];
+    expect(forwardResumeSource).toBeDefined();
+    expect(forwardResumeSource?.startedAtOffset).toBe(11);
+    expect(forwardResumeSource?.playbackRate.setValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
     expect(engine.getState().playbackState).toBe('playing');
 
     engine.dispose();
@@ -360,6 +369,44 @@ describe('AudioEngine', () => {
 
     // State must remain stopped, not playing
     expect(engine.getState().playbackState).toBe('stopped');
+
+    engine.dispose();
+  });
+
+  it('rebases logical position continuously when playback rate changes while playing and paused', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'speed-test.mp3');
+
+    mockContext.currentTime = 0;
+    await engine.play();
+
+    // Play for 4 seconds at 1.0x rate -> position should be 4
+    mockContext.currentTime = 4;
+    expect(engine.getState().currentTime).toBe(4);
+
+    // Increase playback rate to 1.5x (e.g. 45 RPM or pitch up)
+    engine.setPlaybackRate(1.5);
+    // Right after rate change, position is still 4
+    expect(engine.getState().currentTime).toBe(4);
+
+    // Advance 2 more seconds at 1.5x -> 2 * 1.5 = +3 seconds -> position should be 7
+    mockContext.currentTime = 6;
+    expect(engine.getState().currentTime).toBe(7);
+
+    // Pause preserves position calculated with the active rate
+    engine.pause();
+    expect(engine.getState().playbackState).toBe('paused');
+    expect(engine.getState().currentTime).toBe(7);
+
+    // Change rate while paused
+    engine.setPlaybackRate(2.0);
+    expect(engine.getState().currentTime).toBe(7);
+
+    // Resume at 2.0x
+    mockContext.currentTime = 10;
+    await engine.play();
+    mockContext.currentTime = 12; // 2 seconds at 2.0x = +4 seconds -> 11 seconds
+    expect(engine.getState().currentTime).toBe(11);
 
     engine.dispose();
   });

@@ -10,7 +10,7 @@ describe('Turntable deck configuration and isolation', () => {
 
     expect(markup).toContain('class="turntable power-on motor-on has-record"');
     expect(markup).toContain('aria-pressed="true"');
-    expect(markup).not.toContain('disabled=""');
+    expect(markup).toContain('aria-label="DECK 01 Start / Stop" aria-pressed="true"');
   });
 
   it('renders unpowered state with controls disabled', () => {
@@ -138,6 +138,7 @@ describe('Turntable static markup', () => {
       scratch: vi.fn(),
       endScratch: vi.fn(),
       seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -180,6 +181,7 @@ describe('Turntable static markup', () => {
       scratch: vi.fn(),
       endScratch: vi.fn(),
       seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -214,6 +216,7 @@ describe('Turntable static markup', () => {
       scratch: vi.fn(),
       endScratch: vi.fn(),
       seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -243,6 +246,7 @@ describe('Turntable static markup', () => {
       scratch: vi.fn(),
       endScratch: vi.fn(),
       seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -251,5 +255,209 @@ describe('Turntable static markup', () => {
 
     expect(markup).toContain('role="alert"');
     expect(markup).toContain('Failed to decode audio: corrupted file');
+  });
+});
+
+// Configure React 18/19 testing environment flag to silence act warning in vitest jsdom
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+import { createRoot } from 'react-dom/client';
+import { act } from 'react';
+
+describe('Turntable interactive controls', () => {
+  it('triggers loadTrack and play on file input change', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: null,
+      metadata: null,
+      duration: 120,
+      currentTime: 0,
+      playbackState: 'idle',
+      isPlaying: false,
+      isLoaded: false,
+      error: null,
+      loadTrack: vi.fn().mockResolvedValue(undefined),
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+    };
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />);
+    });
+
+    const fileInput = container.querySelector('input.deck-file-input') as HTMLInputElement;
+    expect(fileInput).toBeDefined();
+
+    const file = new File(['audio-binary'], 'fresh_cut.wav', { type: 'audio/wav' });
+    Object.defineProperty(fileInput, 'files', {
+      value: [file],
+      writable: true,
+    });
+
+    await act(async () => {
+      fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(mockTransport.loadTrack).toHaveBeenCalledWith(file);
+    await Promise.resolve();
+    expect(mockTransport.play).toHaveBeenCalled();
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('triggers loadTrack on drag and drop onto the record platter', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: null,
+      metadata: null,
+      duration: 120,
+      currentTime: 0,
+      playbackState: 'idle',
+      isPlaying: false,
+      isLoaded: false,
+      error: null,
+      loadTrack: vi.fn().mockResolvedValue(undefined),
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+    };
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />);
+    });
+
+    const recordHolder = container.querySelector('.record-holder') as HTMLDivElement;
+    expect(recordHolder).toBeDefined();
+
+    const file = new File(['audio-binary'], 'dj_battle_tool.mp3', { type: 'audio/mp3' });
+    const dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: {
+        files: [file],
+      },
+    });
+
+    await act(async () => {
+      recordHolder.dispatchEvent(dropEvent);
+    });
+
+    expect(mockTransport.loadTrack).toHaveBeenCalledWith(file);
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('handles play, pause, and stop button clicks', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: 'anthem.wav',
+      metadata: null,
+      duration: 180,
+      currentTime: 20,
+      playbackState: 'playing',
+      isPlaying: true,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+    };
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />);
+    });
+
+    const pauseBtn = container.querySelector('button[aria-label="DECK A Pause"]') as HTMLButtonElement;
+    expect(pauseBtn).toBeDefined();
+    await act(async () => {
+      pauseBtn.click();
+    });
+    expect(mockTransport.pause).toHaveBeenCalled();
+
+    const stopBtn = container.querySelector('button[aria-label="DECK A Stop"]') as HTMLButtonElement;
+    expect(stopBtn).toBeDefined();
+    await act(async () => {
+      stopBtn.click();
+    });
+    expect(mockTransport.stop).toHaveBeenCalled();
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('power switch immediately pauses transport when turned off', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    const mockTransport: DeckTransport = {
+      trackName: 'anthem.wav',
+      metadata: null,
+      duration: 180,
+      currentTime: 20,
+      playbackState: 'playing',
+      isPlaying: true,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+    };
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />);
+    });
+
+    const powerDial = container.querySelector('button[aria-label="DECK A Power"]') as HTMLButtonElement;
+    expect(powerDial).toBeDefined();
+    await act(async () => {
+      powerDial.click();
+    });
+
+    expect(mockTransport.pause).toHaveBeenCalled();
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
   });
 });

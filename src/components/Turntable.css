@@ -66,19 +66,19 @@
 -------------------------------------------------- */
 .turntable .deck-audio-panel {
   position: absolute;
-  top: 2.8%;
-  left: 20%;
-  right: 28%;
+  top: 2.2%;
+  left: 18%;
+  right: 26%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  background: rgba(14, 16, 18, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(14, 16, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 4px;
-  padding: 3px 8px;
+  padding: 4px 10px;
   z-index: 15;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(4px);
 }
 
@@ -103,14 +103,16 @@
 .turntable .deck-load-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  gap: 5px;
   background: #24292e;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
-  padding: 3px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 4px;
+  padding: 5px 9px;
+  min-height: 24px;
   color: #c59a58;
   font-family: monospace, sans-serif;
-  font-size: clamp(5px, 0.7vw, 9px);
+  font-size: clamp(8px, 0.85vw, 11px);
   font-weight: 700;
   letter-spacing: 0.05em;
   cursor: pointer;
@@ -122,8 +124,13 @@
   border-color: #c59a58;
 }
 
+.turntable .deck-load-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .turntable .deck-load-icon {
-  font-size: 7px;
+  font-size: 8px;
   color: #c59a58;
 }
 
@@ -134,12 +141,13 @@
 
 .turntable .deck-action-btn {
   background: #181b1d;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
-  padding: 3px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  padding: 5px 8px;
+  min-height: 24px;
   color: #adb5bd;
   font-family: monospace, sans-serif;
-  font-size: clamp(5px, 0.65vw, 8px);
+  font-size: clamp(8px, 0.8vw, 10px);
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -167,13 +175,13 @@
 
 .turntable .deck-audio-status {
   font-family: monospace, sans-serif;
-  font-size: clamp(5px, 0.65vw, 8px);
+  font-size: clamp(8px, 0.8vw, 10px);
   font-weight: 600;
   letter-spacing: 0.05em;
 }
 
 .turntable .deck-audio-status.idle {
-  color: #6c757d;
+  color: #8e9596;
 }
 
 .turntable .deck-audio-status.loading {
@@ -197,20 +205,51 @@
 
 .turntable .deck-track-name {
   font-family: helvetica, arial, sans-serif;
-  font-size: clamp(6px, 0.75vw, 10px);
+  font-size: clamp(8px, 0.9vw, 12px);
   font-weight: 700;
-  color: #e5e5e5;
+  color: #f3f4f6;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 160px;
+  max-width: 220px;
 }
 
 .turntable .deck-track-time {
   font-family: 'SF Mono', Monaco, monospace;
-  font-size: clamp(5px, 0.65vw, 8px);
+  font-size: clamp(8px, 0.8vw, 10px);
   color: #38bdf8;
   letter-spacing: 0.03em;
+}
+
+/* Mobile responsive adjustments for narrow portrait viewports */
+@media (max-width: 480px) {
+  .turntable .deck-audio-panel {
+    top: 1.5%;
+    left: 4%;
+    right: 4%;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .turntable .deck-load-btn,
+  .turntable .deck-action-btn {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .turntable .deck-track-name {
+    font-size: 11px;
+    max-width: 140px;
+  }
+
+  .turntable .deck-track-time {
+    font-size: 10px;
+  }
+
+  .turntable .deck-audio-status {
+    font-size: 10px;
+  }
 }
 
 /* --------------------------------------------------
