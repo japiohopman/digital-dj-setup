@@ -144,6 +144,9 @@ describe('Turntable static markup', () => {
     expect(markup).toContain('0:45 / 3:00');
     expect(markup).toContain('PAUSE');
     expect(markup).toContain('STOP');
+    // Center record label displays track name and duration
+    expect(markup).toContain('PLAYING TRACK');
+    expect(markup).toContain('class="label-text-side" title="ahhh-fresh.wav"');
     // Platter is spinning because audio is playing
     expect(markup).toContain('motor-on');
   });

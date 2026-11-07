@@ -60,6 +60,7 @@ export function Turntable({
   const [hasSlipmat] = useState(initiallyHasSlipmat);
   const [pitch, setPitch] = useState<number>(0);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isDragOverRecord, setIsDragOverRecord] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
 
@@ -174,13 +175,46 @@ export function Turntable({
     }
   };
 
+  const handleLoadTrackFile = (file: File) => {
+    if (!transport) return;
+    void transport.loadTrack(file).then(() => {
+      if (isPowered && isMotorOn) {
+        void transport.play();
+      }
+    });
+  };
+
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && transport) {
-      void transport.loadTrack(file);
+    if (file) {
+      handleLoadTrackFile(file);
     }
     // Clear input so selecting the same file triggers change again
     e.target.value = '';
+  };
+
+  const handleRecordDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragOverRecord) {
+      setIsDragOverRecord(true);
+    }
+  };
+
+  const handleRecordDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOverRecord(false);
+  };
+
+  const handleRecordDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOverRecord(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleLoadTrackFile(file);
+    }
   };
 
   const handleOpenFileDialog = () => {
@@ -263,19 +297,37 @@ export function Turntable({
         </div>
 
         <div
-          className="record-holder"
+          className={`record-holder${isDragOverRecord ? ' drag-over' : ''}`}
           ref={discRef}
           onPointerDown={onVinylPointerDown}
+          onDragOver={handleRecordDragOver}
+          onDragLeave={handleRecordDragLeave}
+          onDrop={handleRecordDrop}
           role="img"
-          aria-label={`${deckLabel} interactive vinyl record - drag to scratch`}
+          aria-label={`${deckLabel} interactive vinyl record - drag to scratch or drop audio track`}
         >
           <div className="record" style={rotateTransformStyle}>
             <div className="label">
-              <span className="label-text-brand">TECHNICS</span>
-              <span className="label-text-side">{deckLabel}</span>
-              <span className="label-text-speed">{speed === 33 ? '33 RPM' : '45 RPM'}</span>
+              <span className="label-text-brand">
+                {transport?.trackName ? 'PLAYING TRACK' : 'TECHNICS'}
+              </span>
+              <span className="label-text-side" title={transport?.trackName || deckLabel}>
+                {transport?.trackName || deckLabel}
+              </span>
+              <span className="label-text-speed">
+                {transport?.isLoaded
+                  ? `${formatTime(transport.currentTime)} / ${formatTime(transport.duration)}`
+                  : speed === 33
+                    ? '33 RPM'
+                    : '45 RPM'}
+              </span>
             </div>
           </div>
+          {isDragOverRecord && (
+            <div className="record-drop-overlay" aria-hidden="true">
+              <span>DROP AUDIO HERE</span>
+            </div>
+          )}
           <div className="record-grooves" style={rotateTransformStyle} />
         </div>
 

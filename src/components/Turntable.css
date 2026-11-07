@@ -559,6 +559,33 @@
   cursor: grab;
 }
 
+.turntable .record-holder.drag-over {
+  outline: 3px dashed #c59a58;
+  outline-offset: -10px;
+  border-radius: 50%;
+}
+
+.turntable .record-drop-overlay {
+  position: absolute;
+  top: 6.3%;
+  left: 8.35%;
+  width: 66.2%;
+  height: 87.994%;
+  border-radius: 100%;
+  background: rgba(197, 154, 88, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  pointer-events: none;
+  font-family: monospace, sans-serif;
+  font-weight: 800;
+  font-size: clamp(8px, 1.2vw, 14px);
+  color: #fff;
+  letter-spacing: 0.1em;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
 .turntable.is-scratching .record-holder,
 .turntable .record-holder:active {
   cursor: grabbing;
