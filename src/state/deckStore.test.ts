@@ -46,6 +46,56 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
+  it('does not start muted audio when the motor starts before the needle is dropped', () => {
+    const transport = makeTransport({ isLoaded: true });
+    const store = createDeckStore(transport, { initiallyMotorOn: false, trackLoaded: true });
+    store.getState().dispatch({ type: 'START_STOP_TOGGLED' });
+
+    expect(store.getState().machine.motorPhase).toBe('spinning-up');
+    expect(store.getState().machine.transport).toBe('paused');
+    expect(transport.spinUp).not.toHaveBeenCalled();
+    store.getState().dispose();
+  });
+
+  it('seeks to the needle drop position before starting motor spin-up', () => {
+    const transport = makeTransport({ isLoaded: true });
+    const store = createDeckStore(transport, { initiallyMotorOn: false, trackLoaded: true });
+    store.getState().dispatch({ type: 'START_STOP_TOGGLED' });
+    store.getState().dispatch({
+      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 42,
+    });
+
+    expect(transport.seek).toHaveBeenCalledWith(42);
+    expect(transport.spinUp).toHaveBeenCalledWith(450);
+    expect(transport.seek.mock.invocationCallOrder[0]).toBeLessThan(
+      transport.spinUp.mock.invocationCallOrder[0] ?? Infinity,
+    );
+    store.getState().dispose();
+  });
+
+  it('ignores stale track-load completions and keeps the latest failure visible', async () => {
+    const resolveFirst: { current?: () => void } = {};
+    const rejectSecond: { current?: (error: Error) => void } = {};
+    const transport = makeTransport({
+      loadTrack: vi.fn()
+        .mockImplementationOnce(() => new Promise<void>((resolve) => { resolveFirst.current = resolve; }))
+        .mockImplementationOnce(() => new Promise<void>((_, reject) => { rejectSecond.current = reject; })),
+    });
+    const store = createDeckStore(transport);
+    const first = store.getState().loadTrack(new File(['first'], 'first.wav'));
+    const second = store.getState().loadTrack(new File(['second'], 'second.wav'));
+
+    resolveFirst.current?.();
+    await first;
+    expect(store.getState().machine.track).toBe('loading');
+
+    rejectSecond.current?.(new Error('latest file failed'));
+    await second;
+    expect(store.getState().machine.track).toBe('error');
+    expect(store.getState().machine.trackError).toBe('latest file failed');
+    store.getState().dispose();
+  });
+
   it('plays only after an outer-lead-in drop with motor and power active', async () => {
     const transport = makeTransport({ isLoaded: true });
     const store = createDeckStore(transport);
