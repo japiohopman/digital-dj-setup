@@ -576,6 +576,23 @@ describe('AudioEngine', () => {
     engine.dispose();
   });
 
+  it('keeps program audio muted until stylus contact is established', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'stylus-gate-test.mp3');
+
+    // The second gain stage is the stylus contact gate and starts closed.
+    expect(mockContext.createdGainParams).toHaveLength(2);
+    expect(mockContext.createdGainParams[1]?.value).toBe(0);
+
+    engine.setStylusContact(true);
+    expect(mockContext.createdGainParams[1]?.value).toBe(1);
+
+    engine.setStylusContact(false);
+    expect(mockContext.createdGainParams[1]?.value).toBe(0);
+
+    engine.dispose();
+  });
+
   it('routes audio through a GainNode with de-click ramps on play and pause', async () => {
     const engine = createEngine();
     await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'declick-test.mp3');
