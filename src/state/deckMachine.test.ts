@@ -140,45 +140,18 @@ describe('deck state machine', () => {
     expect(state.tonearm).toBe('parked');
   });
 
-  it('allows physical scratching with the stylus lifted while keeping program audio muted', () => {
+  it('requires needle contact and a loaded track before scratching', () => {
     const state = createInitialDeckState({ trackLoaded: true });
-    const scratching = apply(state, { type: 'SCRATCH_STARTED' });
-
-    expect(scratching.transport).toBe('scratching');
-    expect(scratching.tonearm).toBe('parked');
-    expect(selectIsTrackAudible(scratching)).toBe(false);
-    expect(selectRecordSoundState(scratching)).toBe('off-record');
-
-    const ended = apply(scratching, { type: 'SCRATCH_ENDED' });
-    expect(ended.transport).toBe('paused');
-    expect(selectIsTrackAudible(ended)).toBe(false);
-  });
-
-  it('keeps scratching audible through the stylus when the needle is down', () => {
-    let state = createInitialDeckState({ trackLoaded: true });
-    state = apply(state, {
+    const result = transitionDeck(state, { type: 'SCRATCH_STARTED' });
+    expect(result.accepted).toBe(false);
+    const ready = apply(state, {
       type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
     });
-    const scratching = apply(state, { type: 'SCRATCH_STARTED' });
-
+    const scratching = apply(ready, { type: 'SCRATCH_STARTED' });
     expect(scratching.transport).toBe('scratching');
     expect(selectIsTrackAudible(scratching)).toBe(true);
     const ended = apply(scratching, { type: 'SCRATCH_ENDED' });
     expect(ended.transport).toBe('playing');
-  });
-
-
-  it('ends scratch back into normal muted playback when the arm is lifted', () => {
-    let state = createInitialDeckState({ trackLoaded: true });
-    state = apply(state, {
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
-    });
-    state = apply(state, { type: 'SCRATCH_STARTED' });
-    state = apply(state, { type: 'ARM_PICKED_UP' });
-    expect(state.transport).toBe('playing');
-    expect(state.tonearm).toBe('lifted');
-    expect(selectIsTrackAudible(state)).toBe(false);
-    expect(selectRecordSoundState(state)).toBe('off-record');
   });
 
   it('keeps the two decks independent', () => {

@@ -19,8 +19,7 @@ The mixer reference has not been selected yet. Keep mixer design and implementat
 - Mobile-first responsive CSS.
 - Keep UI components separate from audio-engine code.
 - Prefer browser-native APIs and a small dependency footprint.
-- Avoid extra state-management libraries by default. Issue #14 is an explicit exception: Zustand vanilla hosts one guarded state machine per deck because power, motor, track, tonearm and transport transitions must have one source of truth. Do not bypass it with direct transport play/pause/stop/seek/stylus commands from UI components or interaction hooks.
-- Keep Web Audio objects inside AudioEngine; keep pointer coordinates and animation-frame state out of Zustand.
+- Do not introduce a state-management library, PWA layer or backend prematurely.
 
 ## Collaboration style
 

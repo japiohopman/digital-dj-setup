@@ -97,6 +97,7 @@ export function Turntable({
   } = useVinylMotion({
     isPowered,
     isMotorOn,
+    isNeedleDown,
     speedRpm: speed,
     pitch,
     motorState,
@@ -135,6 +136,7 @@ export function Turntable({
     armInteraction: machine.armInteraction,
     dispatch,
     isBattleMode: isLandscape,
+    hasRecord,
   });
 
   const updatePitchFromPointer = (clientY: number, clientX: number) => {
@@ -372,7 +374,7 @@ export function Turntable({
             ) : (
               <div className="label">
                 <span className="label-text-brand">
-                  {transport?.trackName ? machine.transport === 'playing' || machine.transport === 'scratching' ? 'PLAYING TRACK' : 'LOADED TRACK' : 'TECHNICS'}
+                  {transport?.trackName ? 'PLAYING TRACK' : 'TECHNICS'}
                 </span>
                 <span
                   className="label-text-side"

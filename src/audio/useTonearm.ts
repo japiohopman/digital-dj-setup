@@ -15,6 +15,7 @@ export interface UseTonearmOptions {
   armState: TonearmState;
   armInteraction: ArmInteraction;
   dispatch: (event: DeckEvent) => boolean;
+  hasRecord?: boolean;
   isBattleMode?: boolean;
   config?: TonearmConfig;
 }

@@ -739,17 +739,18 @@
   cursor: grabbing;
 }
 
-/* A restrained contact shadow remains visible even while the arm is parked. */
-.turntable .tonearm-holder .tonearm {
-  filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.32));
-  transition: transform 140ms ease, filter 140ms ease;
-}
-
-/* Picking up the arm raises it visually; keep that lift during the drag itself. */
-.turntable .tonearm-holder.arm-lifted .tonearm,
-.turntable .tonearm-holder.is-dragging .tonearm {
+/* Subtle elevation shadow when arm is lifted */
+.turntable .tonearm-holder.arm-lifted:not(.is-dragging) .tonearm {
   transform: perspective(700px) rotateX(-7deg) translateY(-2px) scale(1.005);
   filter: drop-shadow(4px 8px 6px rgba(0, 0, 0, 0.5));
+}
+
+.turntable .tonearm-holder.is-dragging .tonearm {
+  filter: drop-shadow(4px 8px 6px rgba(0, 0, 0, 0.5));
+}
+
+.turntable .tonearm-holder .tonearm {
+  transition: transform 140ms ease, filter 140ms ease;
 }
 
 .turntable .tonearm-holder.is-dragging .tonearm {

@@ -1,7 +1,7 @@
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import type { DeckTransport, RecordSoundState } from '../audio/types';
 import {
-  canPlayTrack,
+  canRunMotor,
   createInitialDeckState,
   selectIsTrackAudible,
   selectRecordSoundState,
@@ -41,10 +41,12 @@ export function createDeckStore(
 ): DeckStore {
   const initialMachine = createInitialDeckState({
     ...initial,
-    ...(transport ? {
-      trackLoaded: transport.isLoaded,
-      isPlaying: transport.isPlaying,
-    } : {}),
+    ...(transport?.isLoaded !== undefined || initial.trackLoaded !== undefined
+      ? { trackLoaded: transport?.isLoaded ?? initial.trackLoaded }
+      : {}),
+    ...(transport?.isPlaying !== undefined || initial.isPlaying !== undefined
+      ? { isPlaying: transport?.isPlaying ?? initial.isPlaying }
+      : {}),
   });
   if (transport?.error) {
     initialMachine.track = 'error';
@@ -76,7 +78,7 @@ export function createDeckStore(
   const store = createStore<DeckStoreState>((set, get) => {
     const startSpinUp = (state: DeckMachineState) => {
       clearSpinTimer();
-      if (state.transport === 'playing' && canPlayTrack(state)) {
+      if ((state.track === 'ready' || transport?.isLoaded) && canRunMotor(state)) {
         void transport?.spinUp(SPIN_UP_MS);
       }
       spinTimer = setTimeout(() => {
@@ -160,14 +162,6 @@ export function createDeckStore(
             }
           } else if (event.angle > 2 && next.hasRecord) {
             transport?.playNeedleDropSound?.('wrong');
-          }
-          break;
-
-        case 'ARM_PICKED_UP':
-        case 'ARM_LIFTED':
-        case 'ARM_PARKED':
-          if (previous.transport === 'scratching') {
-            transport?.endScratch(next.transport === 'playing');
           }
           break;
 

@@ -220,9 +220,6 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         ...state,
         tonearm: 'lifted',
         armInteraction: 'dragging',
-        transport: state.transport === 'scratching'
-          ? canPlayTrack(state) ? 'playing' : 'paused'
-          : state.transport,
       }, 'Tonearm picked up: stylus gate closes; motor state is unchanged');
 
     case 'ARM_DRAG_CANCELLED':
@@ -264,17 +261,19 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       return accept(next, 'Valid needle drop: cue position accepted');
     }
 
-    case 'ARM_LIFTED': {
-      const next = { ...state, tonearm: 'lifted' as const, armInteraction: 'idle' as const };
-      if (state.transport === 'scratching') next.transport = canPlayTrack(state) ? 'playing' : 'paused';
-      return accept(next, 'Tonearm lifted: audio muted without changing motor state');
-    }
+    case 'ARM_LIFTED':
+      return accept({
+        ...state,
+        tonearm: 'lifted',
+        armInteraction: 'idle',
+      }, 'Tonearm lifted: audio muted without changing motor state');
 
-    case 'ARM_PARKED': {
-      const next = { ...state, tonearm: 'parked' as const, armInteraction: 'idle' as const };
-      if (state.transport === 'scratching') next.transport = canPlayTrack(state) ? 'playing' : 'paused';
-      return accept(next, 'Tonearm parked in its cradle');
-    }
+    case 'ARM_PARKED':
+      return accept({
+        ...state,
+        tonearm: 'parked',
+        armInteraction: 'idle',
+      }, 'Tonearm parked in its cradle');
 
     case 'ARM_CUE':
       if (state.tonearm !== 'needle-down') return reject(state, 'Cue movement requires the stylus to be down');
@@ -303,15 +302,10 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       return accept(state, 'Playback rate updated');
 
     case 'SCRATCH_STARTED':
-      if (!canPlayTrack(state)) {
-        return reject(state, 'Scratch ignored: requires power, running motor, a loaded track and a record');
+      if (!canPlayTrack(state) || state.tonearm !== 'needle-down') {
+        return reject(state, 'Scratch ignored: requires power, running motor, loaded track and needle contact');
       }
-      return accept(
-        { ...state, transport: 'scratching' },
-        state.tonearm === 'needle-down'
-          ? 'Scratch gesture started with stylus contact'
-          : 'Physical scratch started with stylus lifted; program audio remains muted',
-      );
+      return accept({ ...state, transport: 'scratching' }, 'Scratch gesture started');
 
     case 'SCRATCH_MOVED':
       if (state.transport !== 'scratching') return reject(state, 'Scratch movement ignored without an active scratch');
