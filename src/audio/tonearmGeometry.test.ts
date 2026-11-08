@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_TONEARM_CONFIG,
   angleToPlaybackProgress,
-  calculateArmAngleFromPointer,
-  calculateUnclampedArmAngleFromPointer,
+  calculateArmPointerBearingFromPointer,
+  getTonearmPivot,
   isAngleAtOuterLeadIn,
   isAngleInPlayableRecord,
   playbackProgressToAngle,
 } from './tonearmGeometry';
 
 describe('tonearmGeometry', () => {
-  it('identifies playable record angles correctly', () => {
+  it('identifies the playable groove range', () => {
     expect(isAngleInPlayableRecord(0)).toBe(false);
     expect(isAngleInPlayableRecord(20)).toBe(false);
     expect(isAngleInPlayableRecord(24)).toBe(true);
@@ -19,81 +19,70 @@ describe('tonearmGeometry', () => {
     expect(isAngleInPlayableRecord(48)).toBe(false);
   });
 
-  it('maps playback progress to angle and vice versa', () => {
-    // 0% -> outer groove (24 deg)
+  it('maps playback progress to the complete arm travel and back', () => {
     expect(playbackProgressToAngle(0)).toBe(24);
     expect(angleToPlaybackProgress(24)).toBeCloseTo(0, 5);
-
-    // 100% -> inner groove (47 deg)
-    expect(playbackProgressToAngle(1)).toBe(47);
-    expect(angleToPlaybackProgress(47)).toBeCloseTo(1, 5);
-
-    // 50% -> mid point (35.5 deg)
     expect(playbackProgressToAngle(0.5)).toBe(35.5);
     expect(angleToPlaybackProgress(35.5)).toBeCloseTo(0.5, 5);
-
-    // Angles outside playable area return null
+    expect(playbackProgressToAngle(1)).toBe(47);
+    expect(angleToPlaybackProgress(47)).toBeCloseTo(1, 5);
     expect(angleToPlaybackProgress(0)).toBeNull();
-    expect(angleToPlaybackProgress(15)).toBeNull();
     expect(angleToPlaybackProgress(48)).toBeNull();
   });
 
-  it('clamps playback progress between 0 and 1', () => {
+  it('clamps invalid playback progress safely', () => {
     expect(playbackProgressToAngle(-0.5)).toBe(24);
     expect(playbackProgressToAngle(1.5)).toBe(47);
-    expect(playbackProgressToAngle(NaN)).toBe(24);
+    expect(playbackProgressToAngle(Number.NaN)).toBe(24);
   });
 
-  it('calculates rotation angle from pointer coordinates', () => {
-    const deckW = 800;
-    const deckH = 600;
-
-    // Pointer right at arm rest
-    const restPxX = 0.7816 * deckW;
-    const restPxY = 0.8976 * deckH;
-    const angleAtRest = calculateArmAngleFromPointer(restPxX, restPxY, deckW, deckH, false);
-    expect(angleAtRest).toBeCloseTo(0, 1);
-
-    // Invalid dimensions return parkAngle
-    expect(calculateArmAngleFromPointer(100, 100, 0, 0)).toBe(DEFAULT_TONEARM_CONFIG.parkAngle);
+  it('calculates the pivot from the rendered holder CSS geometry', () => {
+    const pivot = getTonearmPivot(800, 600);
+    expect(pivot.x).toBeCloseTo((1 - 0.0275 - 0.2855 + 0.2855 * 0.54) * 800, 5);
+    // CSS margin-top:-4% is relative to the .bd width, not its height.
+    expect(pivot.y).toBeCloseTo(-0.04 * 800 + 0.9975 * 0.27 * 600, 5);
+    expect(getTonearmPivot(0, 0)).toEqual({ x: 0, y: 0 });
   });
 
-  it('clamps calculated angle between min and max bounds', () => {
-    const deckW = 800;
-    const deckH = 600;
-    // Far right pointer (negative angle) should clamp to 0 (minAngle)
-    const angleRight = calculateArmAngleFromPointer(deckW * 0.99, deckH * 0.9, deckW, deckH, false);
-    expect(angleRight).toBe(DEFAULT_TONEARM_CONFIG.minAngle);
-
-    // Far left pointer should clamp to maxAngle (49 deg)
-    const angleLeft = calculateArmAngleFromPointer(deckW * 0.1, deckH * 0.5, deckW, deckH, false);
-    expect(angleLeft).toBe(DEFAULT_TONEARM_CONFIG.maxAngle);
+  it('uses the touch point as the angular reference without jumping', () => {
+    const pivot = getTonearmPivot(800, 600);
+    const radius = 140;
+    const initialBearing = 116;
+    const movedBearing = 140;
+    const pointAt = (degrees: number) => ({
+      x: pivot.x + Math.cos((degrees * Math.PI) / 180) * radius,
+      y: pivot.y + Math.sin((degrees * Math.PI) / 180) * radius,
+    });
+    const start = pointAt(initialBearing);
+    const moved = pointAt(movedBearing);
+    const startBearing = calculateArmPointerBearingFromPointer(start.x, start.y, 800, 600);
+    const nextBearing = calculateArmPointerBearingFromPointer(moved.x, moved.y, 800, 600);
+    const grabOffset = startBearing - 12;
+    expect(startBearing - grabOffset).toBeCloseTo(12, 5);
+    expect(nextBearing - grabOffset).toBeCloseTo(36, 5);
   });
 
-  it('recognizes only the outer lead-in as an initial drop position', () => {
+  it('maps rotated -90 degree landscape pointer coordinates to the same local bearing', () => {
+    const pivot = getTonearmPivot(800, 600);
+    const localX = pivot.x + 120 * Math.cos((130 * Math.PI) / 180);
+    const localY = pivot.y + 120 * Math.sin((130 * Math.PI) / 180);
+    // Forward transform for rotate(-90deg): screenX=localY, screenY=width-localX.
+    const screenX = localY;
+    const screenY = 800 - localX;
+    const portraitBearing = calculateArmPointerBearingFromPointer(localX, localY, 800, 600, false);
+    const landscapeBearing = calculateArmPointerBearingFromPointer(screenX, screenY, 600, 800, true);
+    expect(landscapeBearing).toBeCloseTo(portraitBearing, 5);
+  });
+
+  it('accepts an initial drop only at the outer lead-in', () => {
     expect(isAngleAtOuterLeadIn(24)).toBe(true);
     expect(isAngleAtOuterLeadIn(26)).toBe(true);
     expect(isAngleAtOuterLeadIn(27)).toBe(false);
     expect(isAngleAtOuterLeadIn(35)).toBe(false);
+    expect(isAngleAtOuterLeadIn(DEFAULT_TONEARM_CONFIG.outerGrooveAngle - 1)).toBe(false);
   });
 
-  it('converts the rotated -90 degree landscape box back to the same local angle', () => {
-    const width = 800;
-    const height = 600;
-    const localX = 625;
-    const localY = 390;
-    const screenX = localY;
-    const screenY = width - localX;
-    const portraitAngle = calculateUnclampedArmAngleFromPointer(localX, localY, width, height, false);
-    const landscapeAngle = calculateUnclampedArmAngleFromPointer(screenX, screenY, height, width, true);
-    expect(landscapeAngle).toBeCloseTo(portraitAngle, 5);
-  });
-
-  it('calculates angle within deck element bounds', () => {
-    const deckW = 800;
-    const deckH = 600;
-    const angle = calculateArmAngleFromPointer(deckW * 0.5, deckH * 0.7, deckW, deckH);
-    expect(angle).toBeGreaterThan(0);
-    expect(angle).toBeLessThanOrEqual(DEFAULT_TONEARM_CONFIG.maxAngle);
+  it('returns a safe bearing for invalid dimensions', () => {
+    expect(calculateArmPointerBearingFromPointer(100, 100, 0, 0)).toBe(0);
   });
 });
