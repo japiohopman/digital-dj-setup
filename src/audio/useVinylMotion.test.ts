@@ -88,6 +88,7 @@ describe('useVinylMotion physical platter input', () => {
     } as unknown as ReactPointerEvent<HTMLDivElement>;
 
     act(() => result.current.onPointerDown(pointerDown));
+    (pointerDown as unknown as { currentTarget: HTMLDivElement }).currentTarget = null;
 
     expect(dispatch).toHaveBeenCalledWith({ type: 'SCRATCH_STARTED' });
     expect(result.current.isScratching).toBe(true);
