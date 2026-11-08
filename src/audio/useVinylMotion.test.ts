@@ -72,6 +72,7 @@ describe('useVinylMotion physical platter input', () => {
       speedRpm: 33,
       pitch: 0,
       motorState: 'running',
+      transportPhase: 'playing',
       transport,
       dispatch,
     }));
