@@ -22,6 +22,8 @@ export interface DeckMachineState {
   transport: TransportPhase;
   /** Transport phase to restore after a physical scratch gesture ends. */
   scratchResumeTransport: ScratchResumePhase | null;
+  /** Whether this track has already had a valid initial needle drop. */
+  hasValidNeedleDrop: boolean;
   tonearm: TonearmState;
   armInteraction: ArmInteraction;
   hasRecord: boolean;
@@ -80,6 +82,7 @@ export function createInitialDeckState(options: InitialDeckState = {}): DeckMach
     track: trackLoaded ? 'ready' : 'empty',
     transport: options.isPlaying ? 'playing' : trackLoaded ? 'paused' : 'idle',
     scratchResumeTransport: null,
+    hasValidNeedleDrop: false,
     tonearm: 'parked',
     armInteraction: 'idle',
     hasRecord: options.hasRecord ?? true,
@@ -198,6 +201,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         trackError: null,
         transport: 'paused',
         scratchResumeTransport: null,
+        hasValidNeedleDrop: false,
         tonearm: 'lifted',
         armInteraction: 'idle',
       }, 'Track loading: arm lifted and output muted; autoplay disabled');
@@ -250,9 +254,10 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       }
 
       const inGroove = isAngleInPlayableRecord(event.angle);
-      const validStart = event.wasAlreadyNeedleDown ||
-        isAngleAtOuterLeadIn(event.angle) && !event.tooFast;
-      const validDrop = state.hasRecord && inGroove && validStart && !event.tooFast;
+      const validStart = state.hasValidNeedleDrop || event.wasAlreadyNeedleDown ||
+        (isAngleAtOuterLeadIn(event.angle) && !event.tooFast);
+      const validDrop = state.hasRecord && inGroove &&
+        isFiniteNonNegative(event.position) && validStart && !event.tooFast;
       if (!validDrop) {
         return accept({
           ...state,
@@ -263,6 +268,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
 
       const next: DeckMachineState = {
         ...state,
+        hasValidNeedleDrop: true,
         tonearm: 'needle-down',
         armInteraction: 'idle',
       };
@@ -285,6 +291,9 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       }, 'Tonearm parked in its cradle');
 
     case 'ARM_CUE':
+      if (state.transport === 'scratching') {
+        return reject(state, 'Cue movement is ignored during an active scratch gesture');
+      }
       if (state.tonearm !== 'needle-down') return reject(state, 'Cue movement requires the stylus to be down');
       if (!isAngleInPlayableRecord(event.angle)) {
         return accept({
