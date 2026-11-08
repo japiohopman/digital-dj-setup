@@ -254,7 +254,10 @@ export function useVinylMotion({
     const finishGesture = (dispatchEnd: boolean, updateState = true) => {
       if (activePointerIdRef.current !== upPointerId) return;
       try {
-        if (e.currentTarget.hasPointerCapture(upPointerId)) {
+        if (
+          typeof e.currentTarget.hasPointerCapture !== 'function' ||
+          e.currentTarget.hasPointerCapture(upPointerId)
+        ) {
           e.currentTarget.releasePointerCapture(upPointerId);
         }
       } catch {
