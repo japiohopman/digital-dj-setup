@@ -38,6 +38,7 @@ export class AudioEngine {
   private isStylusDown = false;
   private recordSoundState: RecordSoundState = 'stopped';
   private recordSoundAssetsPromise: Promise<void> | null = null;
+  private placementCueGeneration = 0;
   private vinylLoopBuffer: AudioBuffer | null = null;
   private offRecordLoopBuffer: AudioBuffer | null = null;
   private correctDropBuffer: AudioBuffer | null = null;
@@ -147,6 +148,7 @@ export class AudioEngine {
   }
 
   public setStylusContact(isContact: boolean): void {
+    if (!isContact) this.placementCueGeneration++;
     if (this.isStylusDown === isContact) {
       return;
     }
@@ -192,6 +194,7 @@ export class AudioEngine {
 
   /** Selects the independent crackle/off-record layer for this deck. */
   public setRecordSoundState(state: RecordSoundState): void {
+    if (state === 'stopped') this.placementCueGeneration++;
     this.recordSoundState = state;
     if (state === 'stopped' || this.isDisposed) {
       this.stopRecordLoop('vinyl');
@@ -205,11 +208,12 @@ export class AudioEngine {
   /** Plays a needle placement cue as a separate audio voice over the track. */
   public playNeedleDropSound(kind: NeedleDropSound): void {
     if (this.isDisposed) return;
+    const cueGeneration = this.placementCueGeneration;
     const context = this.getOrCreateContext();
     void this.ensureContextRunning()
       .then(() => this.ensureRecordSoundAssets(context))
       .then(() => {
-        if (this.isDisposed) return;
+        if (this.isDisposed || cueGeneration !== this.placementCueGeneration) return;
         const buffer = kind === 'correct' ? this.correctDropBuffer : this.wrongDropBuffer;
         if (!buffer) return;
         const source = context.createBufferSource();
@@ -247,16 +251,23 @@ export class AudioEngine {
       }
     };
     this.recordSoundAssetsPromise = Promise.all([
-      decode('vinyl_loop.wav'),
-      decode('not_on_record_loop.wav'),
-      decode('needle_start_record.wav'),
-      decode('needle_placed_wrong.wav'),
+      this.vinylLoopBuffer ? Promise.resolve(this.vinylLoopBuffer) : decode('vinyl_loop.wav'),
+      this.offRecordLoopBuffer ? Promise.resolve(this.offRecordLoopBuffer) : decode('not_on_record_loop.wav'),
+      this.correctDropBuffer ? Promise.resolve(this.correctDropBuffer) : decode('needle_start_record.wav'),
+      this.wrongDropBuffer ? Promise.resolve(this.wrongDropBuffer) : decode('needle_placed_wrong.wav'),
     ]).then(([vinyl, offRecord, correctDrop, wrongDrop]) => {
-      this.vinylLoopBuffer = vinyl;
-      this.offRecordLoopBuffer = offRecord;
-      this.correctDropBuffer = correctDrop;
-      this.wrongDropBuffer = wrongDrop;
+      if (vinyl) this.vinylLoopBuffer = vinyl;
+      if (offRecord) this.offRecordLoopBuffer = offRecord;
+      if (correctDrop) this.correctDropBuffer = correctDrop;
+      if (wrongDrop) this.wrongDropBuffer = wrongDrop;
       this.syncRecordSoundLoops();
+
+      // A failed or missing file should be retried on the next asset request,
+      // without re-fetching sounds that have already decoded successfully.
+      if (!this.vinylLoopBuffer || !this.offRecordLoopBuffer ||
+        !this.correctDropBuffer || !this.wrongDropBuffer) {
+        this.recordSoundAssetsPromise = null;
+      }
     });
     return this.recordSoundAssetsPromise;
   }
