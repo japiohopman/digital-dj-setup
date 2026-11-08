@@ -88,7 +88,6 @@ describe('useVinylMotion physical platter input', () => {
     } as unknown as ReactPointerEvent<HTMLDivElement>;
 
     act(() => result.current.onPointerDown(pointerDown));
-    (pointerDown as unknown as { currentTarget: HTMLDivElement | null }).currentTarget = null;
 
     expect(dispatch).toHaveBeenCalledWith({ type: 'SCRATCH_STARTED' });
     expect(result.current.isScratching).toBe(true);
@@ -133,14 +132,14 @@ describe('useVinylMotion physical platter input', () => {
   });
 
   it('cancels local pointer ownership when the machine ends scratching externally', () => {
-    const dispatch = vi.fn((event: { type: string }) => event.type !== 'BLOCKED');
+    const dispatch = vi.fn(() => true);
     const target = Object.assign(document.createElement('div'), {
       setPointerCapture: vi.fn(),
       hasPointerCapture: vi.fn().mockReturnValue(true),
       releasePointerCapture: vi.fn(),
     });
     const { result, rerender, unmount } = renderHook(
-      ({ transportPhase }) => useVinylMotion({
+      ({ transportPhase }: { transportPhase: 'playing' | 'paused' }) => useVinylMotion({
         isPowered: true,
         isMotorOn: true,
         speedRpm: 33,
@@ -167,7 +166,7 @@ describe('useVinylMotion physical platter input', () => {
     rerender({ transportPhase: 'paused' });
     expect(result.current.isScratching).toBe(false);
     expect(target.releasePointerCapture).toHaveBeenCalledWith(9);
-    expect(dispatch.mock.calls.filter(([entry]) => (entry as { type: string }).type === 'SCRATCH_ENDED')).toHaveLength(0);
+    expect((dispatch.mock.calls as unknown[][]).filter((call) => (call[0] as { type?: string } | undefined)?.type === 'SCRATCH_ENDED')).toHaveLength(0);
     unmount();
   });
 });

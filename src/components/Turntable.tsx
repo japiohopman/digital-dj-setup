@@ -525,8 +525,6 @@ export function Turntable({
               <span className="deck-audio-status loading">DECODING AUDIO...</span>
             ) : machine.track === 'error' ? (
               <span className="deck-audio-status error" role="alert">{machine.trackError || transport?.error || 'Unable to load track'}</span>
-            ) : transport?.error ? (
-              <span className="deck-audio-status error" role="alert">{transport.error}</span>
             ) : transport?.trackName ? (
               <div className="deck-track-meta">
                 <span

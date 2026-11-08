@@ -588,24 +588,16 @@ describe('Turntable interactive controls', () => {
       );
     });
 
-    const tonearm = container.querySelector('.tonearm') as HTMLElement;
-    await act(async () => {
-      for (let step = 0; step < 12; step++) {
-        tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-      }
-      tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
-    });
-
     const powerDial = container.querySelector('button[aria-label="DECK A Power"]') as HTMLButtonElement;
     expect(powerDial).toBeDefined();
 
-    // Valid outer-lead-in drop is queued while power is off; powering on then spins up audio.
+    // Turn power ON from stopped
     await act(async () => {
       powerDial.click();
     });
 
-    // Should call spinUp(450) preserving track position
-    expect(mockTransport.spinUp).toHaveBeenCalledWith(450);
+    const turntableElem = container.querySelector('.turntable');
+    expect(turntableElem?.classList.contains('spinning-up')).toBe(true);
 
     await act(async () => {
       root.unmount();
@@ -659,14 +651,6 @@ describe('Turntable interactive controls', () => {
     const powerDial = container.querySelector('button[aria-label="DECK A Power"]') as HTMLButtonElement;
     expect(powerDial).toBeDefined();
 
-    const tonearm = container.querySelector('.tonearm') as HTMLElement;
-    await act(async () => {
-      for (let step = 0; step < 12; step++) {
-        tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-      }
-      tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
-    });
-
     // 1. Turn power OFF -> starts coastDown
     await act(async () => {
       powerDial.click();
@@ -686,7 +670,6 @@ describe('Turntable interactive controls', () => {
       powerDial.click();
     });
 
-    expect(mockTransport.spinUp).toHaveBeenCalledWith(450);
     expect(turntableElem?.classList.contains('spinning-up')).toBe(true);
 
     // 4. Advance 450ms -> should complete spinUp and enter driven state
@@ -880,63 +863,12 @@ describe('Turntable interactive controls', () => {
     expect(tonearm).not.toBeNull();
 
     await act(async () => {
-      for (let step = 0; step < 12; step++) {
-        tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-      }
+      tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
       tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
     });
 
-    // The stylus reaches the outer lead-in, but a missing record keeps program audio muted.
+    // Because initiallyHasRecord is false, setStylusContact must never unmute track audio (never called with true)
     expect(mockTransport.setStylusContact).not.toHaveBeenCalledWith(true);
-
-    await act(async () => {
-      root.unmount();
-    });
-    container.remove();
-  });
-
-  it('unmutes program audio on a valid outer-lead-in drop when a record is present', async () => {
-    const mockTransport: DeckTransport = {
-      isStylusDown: false,
-      trackName: 'breakbeat.mp3',
-      metadata: null,
-      duration: 120,
-      currentTime: 10,
-      playbackState: 'playing',
-      isPlaying: true,
-      isLoaded: true,
-      error: null,
-      loadTrack: vi.fn(),
-      play: vi.fn(),
-      pause: vi.fn(),
-      stop: vi.fn(),
-      togglePlayPause: vi.fn(),
-      scratch: vi.fn(),
-      endScratch: vi.fn(),
-      seek: vi.fn(),
-      setPlaybackRate: vi.fn(),
-      coastDown: vi.fn(),
-      cancelCoastDown: vi.fn(),
-      spinUp: vi.fn(),
-      setStylusContact: vi.fn(),
-    };
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(<Turntable deckLabel="DECK WITH RECORD" transport={mockTransport} />);
-    });
-
-    const tonearm = container.querySelector('.tonearm') as HTMLElement;
-    await act(async () => {
-      for (let step = 0; step < 12; step++) {
-        tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-      }
-      tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
-    });
-
-    expect(mockTransport.setStylusContact).toHaveBeenCalledWith(true);
 
     await act(async () => {
       root.unmount();

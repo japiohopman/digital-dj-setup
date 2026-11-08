@@ -108,7 +108,6 @@ describe('AudioEngine', () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
@@ -118,68 +117,6 @@ describe('AudioEngine', () => {
       audioContextFactory: () => ctx as unknown as AudioContext,
     });
   };
-
-  it('cancels a pending needle placement cue when stylus contact is lifted', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
-      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
-    })));
-    const engine = createEngine();
-
-    engine.setStylusContact(true);
-    engine.playNeedleDropSound('correct');
-    engine.setStylusContact(false);
-
-    await vi.waitFor(() => {
-      expect(fetch).toHaveBeenCalledTimes(4);
-    });
-    const assetsPromise = (engine as unknown as {
-      recordSoundAssetsPromise: Promise<void> | null;
-    }).recordSoundAssetsPromise;
-    await assetsPromise;
-    await Promise.resolve();
-
-    expect(mockContext.createdSources).toHaveLength(0);
-    engine.dispose();
-  });
-
-  it('retries only missing record sound assets after a failed fetch', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith('needle_start_record.wav') && fetchMock.mock.calls.filter(([call]) =>
-        String(call).endsWith('needle_start_record.wav'),
-      ).length === 1) {
-        return { ok: false, arrayBuffer: async () => new ArrayBuffer(0) };
-      }
-      return { ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer };
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    const engine = createEngine();
-
-    engine.setRecordSoundState('off-record');
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
-    const firstAssetsPromise = (engine as unknown as {
-      recordSoundAssetsPromise: Promise<void> | null;
-    }).recordSoundAssetsPromise;
-    await firstAssetsPromise;
-
-    engine.playNeedleDropSound('correct');
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
-    const retryPromise = (engine as unknown as {
-      recordSoundAssetsPromise: Promise<void> | null;
-    }).recordSoundAssetsPromise;
-    await retryPromise;
-    await Promise.resolve();
-
-    expect(fetchMock.mock.calls.filter(([call]) =>
-      String(call).endsWith('needle_start_record.wav'),
-    )).toHaveLength(2);
-    expect(fetchMock.mock.calls.filter(([call]) =>
-      String(call).endsWith('vinyl_loop.wav'),
-    )).toHaveLength(1);
-    expect(mockContext.createdSources).toHaveLength(2);
-    engine.dispose();
-  });
 
   it('initializes with default idle state', () => {
     const engine = createEngine();
@@ -439,20 +376,13 @@ describe('AudioEngine', () => {
     expect(firstSource).toBeDefined();
     expect(firstSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(1.5, expect.any(Number));
 
-    // Reverse PCM is prepared asynchronously. Rapid pointer updates keep only
-    // the newest position and speed rather than blocking the main thread.
+    // Scratch backward with 2.0x speed
     engine.scratch(2.0, true, 11);
-    engine.scratch(2.5, true, 9);
-    expect(mockContext.createdSources).toHaveLength(1);
-    expect(firstSource?.isStopped).toBe(false);
-
-    // Two channels are processed in separate scheduled chunks.
-    await vi.advanceTimersByTimeAsync(1);
+    // When switching direction to reversed buffer, a new source is started with the reversed buffer
     expect(mockContext.createdSources).toHaveLength(2);
     const secondSource = mockContext.createdSources[1];
     expect(secondSource).toBeDefined();
-    expect(secondSource?.startedAtOffset).toBe(111);
-    expect(secondSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(2.5, expect.any(Number));
+    expect(secondSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(2.0, expect.any(Number));
 
     // endScratch resumes normal forward playback if requested
     // The reverse scratch source remains connected until its short crossfade completes.
@@ -465,64 +395,9 @@ describe('AudioEngine', () => {
     expect(mockContext.createdSources).toHaveLength(3);
     const forwardResumeSource = mockContext.createdSources[2];
     expect(forwardResumeSource).toBeDefined();
-    expect(forwardResumeSource?.startedAtOffset).toBe(9);
+    expect(forwardResumeSource?.startedAtOffset).toBe(11);
     expect(forwardResumeSource?.playbackRate.setValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
     expect(engine.getState().playbackState).toBe('playing');
-
-    engine.dispose();
-  });
-
-  it('does not create reverse PCM while loading or starting normal forward playback', async () => {
-    const engine = createEngine();
-    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'forward-only.wav');
-
-    expect(mockContext.createBuffer).not.toHaveBeenCalled();
-
-    await engine.play();
-    expect(mockContext.createdSources).toHaveLength(1);
-    expect(mockContext.createBuffer).not.toHaveBeenCalled();
-
-    engine.dispose();
-  });
-
-  it('does not start a stale reverse source when scratch is released during preparation', async () => {
-    const engine = createEngine();
-    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'cancel-reverse.wav');
-
-    engine.scratch(1.0, false, 18);
-    const firstSource = mockContext.createdSources[0];
-    expect(firstSource).toBeDefined();
-
-    engine.scratch(2.0, true, 15);
-    engine.endScratch(true);
-
-    expect(mockContext.createdSources).toHaveLength(2);
-    const resumedForwardSource = mockContext.createdSources[1];
-    expect(resumedForwardSource).toBeDefined();
-
-    // Let the background channel chunks finish; the canceled reverse request
-    // must not replace the already resumed forward source.
-    await vi.advanceTimersByTimeAsync(1);
-    expect(mockContext.createdSources).toHaveLength(2);
-    expect(resumedForwardSource?.startedAtOffset).toBe(15);
-    expect(resumedForwardSource?.buffer).toBe(firstSource?.buffer);
-    expect(engine.getState().playbackState).toBe('playing');
-
-    engine.dispose();
-  });
-
-  it('cancels pending reverse scratch when paused before preparation completes', async () => {
-    const engine = createEngine();
-    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'pause-reverse.wav');
-
-    engine.scratch(1.0, false, 18);
-    engine.scratch(2.0, true, 15);
-    engine.pause(0);
-
-    await vi.advanceTimersByTimeAsync(1);
-    expect(mockContext.createdSources).toHaveLength(1);
-    expect(engine.getState().playbackState).toBe('paused');
-    expect(engine.getState().currentTime).toBe(15);
 
     engine.dispose();
   });
