@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { AudioEngine } from './AudioEngine';
-import type { DeckTransport, AudioEngineState, AudioEngineOptions } from './types';
+import type { DeckTransport, AudioEngineState, AudioEngineOptions, NeedleDropSound, RecordSoundState } from './types';
 
 /**
  * Custom React hook managing an independent AudioEngine instance for a deck.
@@ -113,6 +113,14 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     engineRef.current.setStylusContact(isContact);
   }, []);
 
+  const setRecordSoundState = useCallback((surfaceState: RecordSoundState) => {
+    engineRef.current?.setRecordSoundState(surfaceState);
+  }, []);
+
+  const playNeedleDropSound = useCallback((kind: NeedleDropSound) => {
+    engineRef.current?.playNeedleDropSound(kind);
+  }, []);
+
   return {
     trackName: state.trackName,
     metadata: state.metadata,
@@ -123,6 +131,8 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     isLoaded: state.playbackState !== 'idle' && state.playbackState !== 'loading',
     isStylusDown: state.isStylusDown,
     setStylusContact,
+    setRecordSoundState,
+    playNeedleDropSound,
     error: state.error,
     loadTrack,
     play,

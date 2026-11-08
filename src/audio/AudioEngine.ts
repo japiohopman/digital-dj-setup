@@ -4,6 +4,8 @@ import type {
   AudioEngineOptions,
   AudioEngineState,
   AudioPlaybackState,
+  NeedleDropSound,
+  RecordSoundState,
 } from './types';
 
 /**
@@ -23,6 +25,18 @@ export class AudioEngine {
   private gainNode: GainNode | null = null;
   private stylusGainNode: GainNode | null = null;
   private isStylusDown = false;
+  private recordSoundState: RecordSoundState = 'stopped';
+  private recordSoundAssetsPromise: Promise<void> | null = null;
+  private vinylLoopBuffer: AudioBuffer | null = null;
+  private offRecordLoopBuffer: AudioBuffer | null = null;
+  private correctDropBuffer: AudioBuffer | null = null;
+  private wrongDropBuffer: AudioBuffer | null = null;
+  private vinylLoopSource: AudioBufferSourceNode | null = null;
+  private vinylLoopGain: GainNode | null = null;
+  private vinylLoopStopTimer: ReturnType<typeof setTimeout> | null = null;
+  private offRecordLoopSource: AudioBufferSourceNode | null = null;
+  private offRecordLoopGain: GainNode | null = null;
+  private offRecordLoopStopTimer: ReturnType<typeof setTimeout> | null = null;
   private isReversed = false;
   private isScratching = false;
 
@@ -121,9 +135,15 @@ export class AudioEngine {
     if (this.audioContext && this.stylusGainNode) {
       const now = this.audioContext.currentTime;
       try {
-        this.stylusGainNode.gain.cancelScheduledValues(now);
-        this.stylusGainNode.gain.setValueAtTime(this.stylusGainNode.gain.value, now);
-        this.stylusGainNode.gain.linearRampToValueAtTime(isContact ? 1.0 : 0.0, now + 0.015);
+        const parameter = this.stylusGainNode.gain;
+        if (typeof parameter.cancelAndHoldAtTime === 'function') {
+          parameter.cancelAndHoldAtTime(now);
+        } else {
+          const currentValue = parameter.value;
+          parameter.cancelScheduledValues(now);
+          parameter.setValueAtTime(currentValue, now);
+        }
+        parameter.linearRampToValueAtTime(isContact ? 1.0 : 0.0, now + 0.015);
       } catch {
         // Fallback for mocked AudioParam in tests
         this.stylusGainNode.gain.value = isContact ? 1.0 : 0.0;
@@ -138,6 +158,164 @@ export class AudioEngine {
    */
   public getIsStylusDown(): boolean {
     return this.isStylusDown;
+  }
+
+  /** Selects the independent crackle/off-record layer for this deck. */
+  public setRecordSoundState(state: RecordSoundState): void {
+    this.recordSoundState = state;
+    if (state === 'stopped' || this.isDisposed) {
+      this.stopRecordLoop('vinyl');
+      this.stopRecordLoop('off-record');
+      return;
+    }
+    const context = this.getOrCreateContext();
+    void this.ensureRecordSoundAssets(context).then(() => this.syncRecordSoundLoops());
+  }
+
+  /** Plays a needle placement cue as a separate audio voice over the track. */
+  public playNeedleDropSound(kind: NeedleDropSound): void {
+    if (this.isDisposed) return;
+    const context = this.getOrCreateContext();
+    void this.ensureContextRunning()
+      .then(() => this.ensureRecordSoundAssets(context))
+      .then(() => {
+        if (this.isDisposed) return;
+        const buffer = kind === 'correct' ? this.correctDropBuffer : this.wrongDropBuffer;
+        if (!buffer) return;
+        const source = context.createBufferSource();
+        const voiceGain = context.createGain();
+        source.buffer = buffer;
+        voiceGain.gain.value = kind === 'correct' ? 0.62 : 0.7;
+        source.connect(voiceGain);
+        voiceGain.connect(context.destination);
+        source.onended = () => {
+          try {
+            source.disconnect();
+            voiceGain.disconnect();
+          } catch {
+            // One-shot nodes may already have been disconnected.
+          }
+        };
+        source.start(0);
+      })
+      .catch(() => {
+        // Placement cues must never break normal deck playback.
+      });
+  }
+
+  private ensureRecordSoundAssets(context: AudioContext): Promise<void> {
+    if (this.recordSoundAssetsPromise) return this.recordSoundAssetsPromise;
+    const baseUrl = import.meta.env.BASE_URL || '/';
+    const soundBase = baseUrl.endsWith('/') ? baseUrl + 'sounds/' : baseUrl + '/sounds/';
+    const decode = async (filename: string): Promise<AudioBuffer | null> => {
+      try {
+        const response = await fetch(soundBase + filename);
+        if (!response.ok) return null;
+        return await context.decodeAudioData((await response.arrayBuffer()).slice(0));
+      } catch {
+        return null;
+      }
+    };
+    this.recordSoundAssetsPromise = Promise.all([
+      decode('vinyl_loop.wav'),
+      decode('not_on_record_loop.wav'),
+      decode('needle_start_record.wav'),
+      decode('needle_placed_wrong.wav'),
+    ]).then(([vinyl, offRecord, correctDrop, wrongDrop]) => {
+      this.vinylLoopBuffer = vinyl;
+      this.offRecordLoopBuffer = offRecord;
+      this.correctDropBuffer = correctDrop;
+      this.wrongDropBuffer = wrongDrop;
+      this.syncRecordSoundLoops();
+    });
+    return this.recordSoundAssetsPromise;
+  }
+
+  private syncRecordSoundLoops(): void {
+    if (this.recordSoundState === 'on-record' && this.vinylLoopBuffer) {
+      this.startRecordLoop('vinyl', this.vinylLoopBuffer, 0.12);
+    } else {
+      this.stopRecordLoop('vinyl');
+    }
+    if (this.recordSoundState === 'off-record' && this.offRecordLoopBuffer) {
+      this.startRecordLoop('off-record', this.offRecordLoopBuffer, 0.15);
+    } else {
+      this.stopRecordLoop('off-record');
+    }
+  }
+
+  private startRecordLoop(kind: 'vinyl' | 'off-record', buffer: AudioBuffer, target: number): void {
+    const context = this.audioContext;
+    if (!context || context.state === 'closed') return;
+    let source = kind === 'vinyl' ? this.vinylLoopSource : this.offRecordLoopSource;
+    let gain = kind === 'vinyl' ? this.vinylLoopGain : this.offRecordLoopGain;
+    const timer = kind === 'vinyl' ? this.vinylLoopStopTimer : this.offRecordLoopStopTimer;
+    if (timer !== null) {
+      clearTimeout(timer);
+      if (kind === 'vinyl') this.vinylLoopStopTimer = null;
+      else this.offRecordLoopStopTimer = null;
+    }
+    if (!source || !gain) {
+      source = context.createBufferSource();
+      gain = context.createGain();
+      source.buffer = buffer;
+      source.loop = true;
+      gain.gain.value = 0;
+      source.connect(gain);
+      gain.connect(context.destination);
+      source.start(0);
+      if (kind === 'vinyl') {
+        this.vinylLoopSource = source;
+        this.vinylLoopGain = gain;
+      } else {
+        this.offRecordLoopSource = source;
+        this.offRecordLoopGain = gain;
+      }
+    }
+    const now = context.currentTime;
+    try {
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.linearRampToValueAtTime(target, now + 0.08);
+    } catch {
+      gain.gain.value = target;
+    }
+  }
+
+  private stopRecordLoop(kind: 'vinyl' | 'off-record'): void {
+    const source = kind === 'vinyl' ? this.vinylLoopSource : this.offRecordLoopSource;
+    const gain = kind === 'vinyl' ? this.vinylLoopGain : this.offRecordLoopGain;
+    if (!source || !gain || !this.audioContext) return;
+    const oldTimer = kind === 'vinyl' ? this.vinylLoopStopTimer : this.offRecordLoopStopTimer;
+    if (oldTimer !== null) clearTimeout(oldTimer);
+    const now = this.audioContext.currentTime;
+    try {
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.linearRampToValueAtTime(0, now + 0.08);
+    } catch {
+      gain.gain.value = 0;
+    }
+    const timer = setTimeout(() => {
+      try {
+        source.stop();
+        source.disconnect();
+        gain.disconnect();
+      } catch {
+        // The loop may already have been stopped during disposal.
+      }
+      if (kind === 'vinyl' && this.vinylLoopSource === source) {
+        this.vinylLoopSource = null;
+        this.vinylLoopGain = null;
+        this.vinylLoopStopTimer = null;
+      } else if (kind === 'off-record' && this.offRecordLoopSource === source) {
+        this.offRecordLoopSource = null;
+        this.offRecordLoopGain = null;
+        this.offRecordLoopStopTimer = null;
+      }
+    }, 100);
+    if (kind === 'vinyl') this.vinylLoopStopTimer = timer;
+    else this.offRecordLoopStopTimer = timer;
   }
 
   /**
@@ -310,6 +488,8 @@ export class AudioEngine {
       if (this.isDisposed || requestId !== this.loadCounter) return;
 
       const ctx = this.getOrCreateContext();
+      // Preload the four supplied record sounds while the selected track decodes.
+      void this.ensureRecordSoundAssets(ctx);
 
       // Web Audio decodeAudioData handles both Promise-based and callback-based APIs
       const decoded: AudioBuffer = await new Promise<AudioBuffer>((resolve, reject) => {
@@ -1086,6 +1266,11 @@ export class AudioEngine {
    */
   public dispose(): void {
     this.isDisposed = true;
+    this.recordSoundState = 'stopped';
+    this.stopRecordLoop('vinyl');
+    this.stopRecordLoop('off-record');
+    if (this.vinylLoopStopTimer !== null) clearTimeout(this.vinylLoopStopTimer);
+    if (this.offRecordLoopStopTimer !== null) clearTimeout(this.offRecordLoopStopTimer);
     this.stopCoastTimer();
     this.loadCounter++;
     this.playCounter++;

@@ -5,6 +5,9 @@ import type { AudioMetadata } from './metadata';
  */
 export type AudioPlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'stopped';
 
+export type RecordSoundState = 'stopped' | 'on-record' | 'off-record';
+export type NeedleDropSound = 'correct' | 'wrong';
+
 export type { AudioMetadata };
 
 /**
@@ -53,6 +56,8 @@ export interface DeckTransport {
   isLoaded: boolean;
   isStylusDown: boolean;
   setStylusContact: (isContact: boolean) => void;
+  setRecordSoundState?: (state: RecordSoundState) => void;
+  playNeedleDropSound?: (kind: NeedleDropSound) => void;
   error: string | null;
   loadTrack: (file: File) => Promise<void>;
   play: (offset?: number) => Promise<void>;
