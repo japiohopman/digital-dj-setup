@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { DeckEvent, ArmInteraction } from '../state/deckMachine';
+import type { ArmInteraction } from '../state/deckMachine';
 import type { TonearmState } from './tonearmGeometry';
 import { useTonearm } from './useTonearm';
 

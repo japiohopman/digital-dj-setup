@@ -154,6 +154,20 @@ describe('deck state machine', () => {
     expect(ended.transport).toBe('playing');
   });
 
+
+  it('ends scratch back into normal muted playback when the arm is lifted', () => {
+    let state = createInitialDeckState({ trackLoaded: true });
+    state = apply(state, {
+      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+    });
+    state = apply(state, { type: 'SCRATCH_STARTED' });
+    state = apply(state, { type: 'ARM_PICKED_UP' });
+    expect(state.transport).toBe('playing');
+    expect(state.tonearm).toBe('lifted');
+    expect(selectIsTrackAudible(state)).toBe(false);
+    expect(selectRecordSoundState(state)).toBe('off-record');
+  });
+
   it('keeps the two decks independent', () => {
     const deckA = createInitialDeckState();
     const deckB = createInitialDeckState({ initiallyPowered: false, initiallyMotorOn: false });

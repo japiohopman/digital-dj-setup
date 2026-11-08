@@ -373,7 +373,7 @@ export function Turntable({
             ) : (
               <div className="label">
                 <span className="label-text-brand">
-                  {transport?.trackName ? 'PLAYING TRACK' : 'TECHNICS'}
+                  {transport?.trackName ? machine.transport === 'playing' || machine.transport === 'scratching' ? 'PLAYING TRACK' : 'LOADED TRACK' : 'TECHNICS'}
                 </span>
                 <span
                   className="label-text-side"
