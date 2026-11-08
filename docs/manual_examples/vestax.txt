@@ -1,0 +1,34 @@
+○1 INPUT SELECTOR
+Used to select input (2 line or 1 phono) to be sent to each PGM channel.
+○2 TRIM CONTROL
+Adjusts the Input level of each channel. Set INPUT FADER to 7-8position. adjust
+TRIM so that the INPUT LEVEL METER shows about 0dB.
+○ 3 BALANCE CONTROL
+Adjusts the stereo balance for each PGM channel. Can be used for adjusting the
+unbalanced stereo image caused by a strong anti-skating setting. Clockwise rotation
+from center position increases the volume of R over L channel. A counter
+clockwise rotation increases the volume of L channel over R.
+○4 EQUALIZER(HI,MID,LOW)
+Adjusts the HI, MID, LOW frequencies for each PGM channel. Each band has
+following specifications.
+
+CF-PCV For
+PMC SERIES ( PMC05ProII, PMC06ProA, etc)
+This switch enables the signal from each programs to be sent to AUX send jack.
+Different signal routes can be selected this switch to different positions.
+P RE : The signal before the input fader (after the EQ) will be sent to AUX
+output.
+POST : The signal after the input and cross fader will be sent to AUX
+output.
+OFF : No signal will be sent to AUX output.
+○6 CUE SWITCH
+Used to send the signal from each program to monitor section for headphone
+monitoring.
+○7 INPUT FADER
+Used to adjust the Input level of each program. Usually set at the 7-8 position. This is
+a detachable fader for the ease of replacement. Replace with the IF-175 when it is worn out.
+○8 CROSS FADER
+When the Input level of PGM1 and PGM2 are properly set, PGM1 will be heard with
+the cross fader set to the left side. PGM2 will be heard with the cross fader set to the
+right side. When the cross fader is set in the center, both programs will be heard. This
+is detachable fader for the ease of replacement with "CF-PCV" when it is worn out.
