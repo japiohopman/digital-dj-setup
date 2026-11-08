@@ -72,6 +72,14 @@ export function getTonearmPivot(
  * exact headshell point that was touched (not to the stylus tip), preventing
  * the arm from jumping when the user moves it.
  */
+export function unwrapAngleNear(angle: number, reference: number): number {
+  if (!Number.isFinite(angle) || !Number.isFinite(reference)) return reference;
+  let unwrapped = angle;
+  while (unwrapped - reference > 180) unwrapped -= 360;
+  while (unwrapped - reference < -180) unwrapped += 360;
+  return unwrapped;
+}
+
 export function calculateArmPointerBearingFromPointer(
   pointerX: number,
   pointerY: number,
