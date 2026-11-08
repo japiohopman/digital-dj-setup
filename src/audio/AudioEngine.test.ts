@@ -522,6 +522,7 @@ describe('AudioEngine', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(mockContext.createdSources).toHaveLength(1);
     expect(engine.getState().playbackState).toBe('paused');
+    expect(engine.getState().currentTime).toBe(15);
 
     engine.dispose();
   });
