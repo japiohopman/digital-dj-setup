@@ -1235,6 +1235,8 @@ export class AudioEngine {
    * @param durationMs - Mechanical brake duration; use 0 after a completed motor coast.
    */
   public pause(durationMs = 250): void {
+    this.pendingReverseScratch = null;
+    this.isScratching = false;
     this.stopCoastTimer();
     this.stopSpinUpTimer();
     this.playCounter++;
