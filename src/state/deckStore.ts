@@ -41,8 +41,10 @@ export function createDeckStore(
 ): DeckStore {
   const initialMachine = createInitialDeckState({
     ...initial,
-    trackLoaded: transport?.isLoaded ?? initial.trackLoaded,
-    isPlaying: transport?.isPlaying ?? initial.isPlaying,
+    ...(transport ? {
+      trackLoaded: transport.isLoaded,
+      isPlaying: transport.isPlaying,
+    } : {}),
   });
   if (transport?.error) {
     initialMachine.track = 'error';
