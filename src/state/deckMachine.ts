@@ -303,10 +303,15 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       return accept(state, 'Playback rate updated');
 
     case 'SCRATCH_STARTED':
-      if (!canPlayTrack(state) || state.tonearm !== 'needle-down') {
-        return reject(state, 'Scratch ignored: requires power, running motor, loaded track and needle contact');
+      if (!canPlayTrack(state)) {
+        return reject(state, 'Scratch ignored: requires power, running motor, a loaded track and a record');
       }
-      return accept({ ...state, transport: 'scratching' }, 'Scratch gesture started');
+      return accept(
+        { ...state, transport: 'scratching' },
+        state.tonearm === 'needle-down'
+          ? 'Scratch gesture started with stylus contact'
+          : 'Physical scratch started with stylus lifted; program audio remains muted',
+      );
 
     case 'SCRATCH_MOVED':
       if (state.transport !== 'scratching') return reject(state, 'Scratch movement ignored without an active scratch');

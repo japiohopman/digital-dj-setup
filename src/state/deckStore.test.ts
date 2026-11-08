@@ -107,6 +107,24 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
+  it('routes physical scratch events to the audio engine without unmuting a lifted stylus', () => {
+    const transport = makeTransport({ isLoaded: true });
+    const store = createDeckStore(transport);
+
+    expect(store.getState().dispatch({ type: 'SCRATCH_STARTED' })).toBe(true);
+    expect(store.getState().dispatch({
+      type: 'SCRATCH_MOVED', speed: 1.25, reversed: true, position: 12,
+    })).toBe(true);
+
+    expect(transport.scratch).toHaveBeenCalledWith(1.25, true, 12);
+    expect(transport.setStylusContact).not.toHaveBeenCalledWith(true);
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('off-record');
+
+    store.getState().dispatch({ type: 'SCRATCH_ENDED' });
+    expect(transport.endScratch).toHaveBeenCalledWith(false);
+    store.getState().dispose();
+  });
+
   it('isolates controls and state for two deck stores', () => {
     const deckA = createDeckStore(makeTransport());
     const deckB = createDeckStore(makeTransport(), { initiallyPowered: false, initiallyMotorOn: false });

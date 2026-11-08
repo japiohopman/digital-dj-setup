@@ -5,7 +5,6 @@ import type { DeckEvent, MotorPhase } from '../state/deckMachine';
 export interface UseVinylMotionOptions {
   isPowered: boolean;
   isMotorOn: boolean;
-  isNeedleDown: boolean;
   speedRpm: 33 | 45;
   pitch: number;
   motorState: MotorPhase;
@@ -33,7 +32,6 @@ export function calculateScratchSpeedMagnitude(deltaAngle: number, expectedAngle
 export function useVinylMotion({
   isPowered,
   isMotorOn,
-  isNeedleDown,
   speedRpm,
   pitch,
   motorState,
@@ -175,7 +173,7 @@ export function useVinylMotion({
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (!isPowered || !isMotorOn || !isNeedleDown || !transport?.isLoaded) return;
+    if (!isPowered || !isMotorOn || !transport?.isLoaded) return;
     if (activePointerIdRef.current !== null) return;
     if (!dispatch({ type: 'SCRATCH_STARTED' })) return;
 
@@ -240,7 +238,7 @@ export function useVinylMotion({
     window.addEventListener('pointermove', onPointerMove, { passive: false });
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
-  }, [centerElementRef, dispatch, isMotorOn, isNeedleDown, isPowered, transport]);
+  }, [centerElementRef, dispatch, isMotorOn, isPowered, transport]);
 
   return { angle, isScratching, discRef, onPointerDown };
 }

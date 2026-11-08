@@ -140,14 +140,27 @@ describe('deck state machine', () => {
     expect(state.tonearm).toBe('parked');
   });
 
-  it('requires needle contact and a loaded track before scratching', () => {
+  it('allows physical scratching with the stylus lifted while keeping program audio muted', () => {
     const state = createInitialDeckState({ trackLoaded: true });
-    const result = transitionDeck(state, { type: 'SCRATCH_STARTED' });
-    expect(result.accepted).toBe(false);
-    const ready = apply(state, {
+    const scratching = apply(state, { type: 'SCRATCH_STARTED' });
+
+    expect(scratching.transport).toBe('scratching');
+    expect(scratching.tonearm).toBe('parked');
+    expect(selectIsTrackAudible(scratching)).toBe(false);
+    expect(selectRecordSoundState(scratching)).toBe('off-record');
+
+    const ended = apply(scratching, { type: 'SCRATCH_ENDED' });
+    expect(ended.transport).toBe('paused');
+    expect(selectIsTrackAudible(ended)).toBe(false);
+  });
+
+  it('keeps scratching audible through the stylus when the needle is down', () => {
+    let state = createInitialDeckState({ trackLoaded: true });
+    state = apply(state, {
       type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
     });
-    const scratching = apply(ready, { type: 'SCRATCH_STARTED' });
+    const scratching = apply(state, { type: 'SCRATCH_STARTED' });
+
     expect(scratching.transport).toBe('scratching');
     expect(selectIsTrackAudible(scratching)).toBe(true);
     const ended = apply(scratching, { type: 'SCRATCH_ENDED' });

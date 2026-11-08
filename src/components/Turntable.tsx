@@ -97,7 +97,6 @@ export function Turntable({
   } = useVinylMotion({
     isPowered,
     isMotorOn,
-    isNeedleDown,
     speedRpm: speed,
     pitch,
     motorState,
