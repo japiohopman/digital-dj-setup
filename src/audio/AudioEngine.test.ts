@@ -439,13 +439,19 @@ describe('AudioEngine', () => {
     expect(firstSource).toBeDefined();
     expect(firstSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(1.5, expect.any(Number));
 
-    // Scratch backward with 2.0x speed
+    // Reverse PCM is prepared asynchronously. Rapid pointer updates keep only
+    // the newest position and speed rather than blocking the main thread.
     engine.scratch(2.0, true, 11);
-    // When switching direction to reversed buffer, a new source is started with the reversed buffer
+    engine.scratch(2.5, true, 9);
+    expect(mockContext.createdSources).toHaveLength(1);
+    expect(firstSource?.isStopped).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(0);
     expect(mockContext.createdSources).toHaveLength(2);
     const secondSource = mockContext.createdSources[1];
     expect(secondSource).toBeDefined();
-    expect(secondSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(2.0, expect.any(Number));
+    expect(secondSource?.startedAtOffset).toBe(111);
+    expect(secondSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(2.5, expect.any(Number));
 
     // endScratch resumes normal forward playback if requested
     // The reverse scratch source remains connected until its short crossfade completes.
@@ -458,8 +464,45 @@ describe('AudioEngine', () => {
     expect(mockContext.createdSources).toHaveLength(3);
     const forwardResumeSource = mockContext.createdSources[2];
     expect(forwardResumeSource).toBeDefined();
-    expect(forwardResumeSource?.startedAtOffset).toBe(11);
+    expect(forwardResumeSource?.startedAtOffset).toBe(9);
     expect(forwardResumeSource?.playbackRate.setValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
+    expect(engine.getState().playbackState).toBe('playing');
+
+    engine.dispose();
+  });
+
+  it('does not create reverse PCM while loading or starting normal forward playback', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'forward-only.wav');
+
+    expect(mockContext.createBuffer).not.toHaveBeenCalled();
+
+    await engine.play();
+    expect(mockContext.createdSources).toHaveLength(1);
+    expect(mockContext.createBuffer).not.toHaveBeenCalled();
+
+    engine.dispose();
+  });
+
+  it('does not start a stale reverse source when scratch is released during preparation', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'cancel-reverse.wav');
+
+    engine.scratch(1.0, false, 18);
+    const firstSource = mockContext.createdSources[0];
+    expect(firstSource).toBeDefined();
+
+    engine.scratch(2.0, true, 15);
+    engine.endScratch(true);
+
+    expect(mockContext.createdSources).toHaveLength(2);
+    const resumedForwardSource = mockContext.createdSources[1];
+    expect(resumedForwardSource).toBeDefined();
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mockContext.createdSources).toHaveLength(2);
+    expect(resumedForwardSource?.startedAtOffset).toBe(15);
+    expect(resumedForwardSource?.buffer).toBe(firstSource?.buffer);
     expect(engine.getState().playbackState).toBe('playing');
 
     engine.dispose();
