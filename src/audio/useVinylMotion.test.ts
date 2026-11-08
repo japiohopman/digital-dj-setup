@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { act, renderHook } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { DeckTransport } from './types';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 
 import {
   calculateScratchSpeedMagnitude,
@@ -30,5 +33,59 @@ describe('vinyl scratch motion helpers', () => {
     expect(calculateScratchSpeedMagnitude(0.02, 0.01)).toBeCloseTo(2);
     expect(calculateScratchSpeedMagnitude(0, 0.01)).toBe(0);
     expect(calculateScratchSpeedMagnitude(0.02, 0)).toBe(0);
+  });
+});
+
+
+describe('useVinylMotion physical platter input', () => {
+  beforeEach(() => {
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('starts and ends a physical scratch gesture while the stylus is lifted', () => {
+    const dispatch = vi.fn(() => true);
+    const transport = { isLoaded: true } as unknown as DeckTransport;
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+    });
+
+    const { result, unmount } = renderHook(() => useVinylMotion({
+      isPowered: true,
+      isMotorOn: true,
+      speedRpm: 33,
+      pitch: 0,
+      motorState: 'running',
+      transport,
+      dispatch,
+    }));
+
+    const pointerDown = {
+      preventDefault: vi.fn(),
+      pointerId: 7,
+      clientX: 120,
+      clientY: 120,
+      currentTarget: target,
+    } as unknown as ReactPointerEvent<HTMLDivElement>;
+
+    act(() => result.current.onPointerDown(pointerDown));
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SCRATCH_STARTED' });
+    expect(result.current.isScratching).toBe(true);
+    expect(target.setPointerCapture).toHaveBeenCalledWith(7);
+
+    const pointerUp = new Event('pointerup') as Event & { pointerId: number };
+    Object.defineProperty(pointerUp, 'pointerId', { value: 7 });
+    act(() => window.dispatchEvent(pointerUp));
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SCRATCH_ENDED' });
+    expect(result.current.isScratching).toBe(false);
+    expect(target.releasePointerCapture).toHaveBeenCalledWith(7);
+    unmount();
   });
 });

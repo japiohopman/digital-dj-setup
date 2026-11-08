@@ -150,6 +150,7 @@ export function createDeckStore(
           break;
 
         case 'ARM_DROPPED':
+          if (previous.transport === 'scratching') break;
           if (next.tonearm === 'needle-down') {
             if (!event.wasAlreadyNeedleDown) transport?.playNeedleDropSound?.('correct');
             if (previous.transport === 'playing') {
@@ -166,6 +167,7 @@ export function createDeckStore(
           break;
 
         case 'ARM_CUE':
+          if (previous.transport === 'scratching') break;
           if (next.tonearm === 'needle-down') {
             if (previous.transport === 'playing') transport?.seek(event.position);
             else if (next.transport === 'playing') {
@@ -251,6 +253,7 @@ export function createDeckStore(
       dispose: () => {
         clearSpinTimer();
         clearCoastTimer();
+        if (get().machine.transport === 'scratching') transport?.endScratch(false);
         transport?.setStylusContact(false);
         transport?.setRecordSoundState?.('stopped');
       },

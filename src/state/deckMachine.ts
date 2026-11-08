@@ -11,6 +11,7 @@ export type MotorSwitchState = 'on' | 'off';
 export type MotorPhase = 'stopped' | 'spinning-up' | 'running' | 'coasting';
 export type TrackPhase = 'empty' | 'loading' | 'ready' | 'error';
 export type TransportPhase = 'idle' | 'paused' | 'playing' | 'scratching';
+export type ScratchResumePhase = Exclude<TransportPhase, 'scratching'>;
 export type ArmInteraction = 'idle' | 'dragging';
 
 export interface DeckMachineState {
@@ -19,6 +20,8 @@ export interface DeckMachineState {
   motorPhase: MotorPhase;
   track: TrackPhase;
   transport: TransportPhase;
+  /** Transport phase to restore after a physical scratch gesture ends. */
+  scratchResumeTransport: ScratchResumePhase | null;
   tonearm: TonearmState;
   armInteraction: ArmInteraction;
   hasRecord: boolean;
@@ -76,6 +79,7 @@ export function createInitialDeckState(options: InitialDeckState = {}): DeckMach
     motorPhase: powered && motorOn ? 'running' : 'stopped',
     track: trackLoaded ? 'ready' : 'empty',
     transport: options.isPlaying ? 'playing' : trackLoaded ? 'paused' : 'idle',
+    scratchResumeTransport: null,
     tonearm: 'parked',
     armInteraction: 'idle',
     hasRecord: options.hasRecord ?? true,
@@ -133,6 +137,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
           power: 'off',
           motorPhase: canCoast ? 'coasting' : 'stopped',
           transport: state.transport === 'scratching' ? 'paused' : state.transport,
+          scratchResumeTransport: null,
         }, canCoast ? 'Power off: motor coasts down; program output is muted' : 'Power off: motor already stopped');
       }
 
@@ -156,6 +161,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
           motorSwitch: 'off',
           motorPhase: 'stopped',
           transport: state.track === 'ready' ? 'paused' : 'idle',
+          scratchResumeTransport: null,
         }, 'Start/Stop off: motor stops and transport pauses');
       }
 
@@ -182,6 +188,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         ...state,
         motorPhase: 'stopped',
         transport: state.track === 'ready' ? 'paused' : 'idle',
+        scratchResumeTransport: null,
       }, 'Motor coast completed');
 
     case 'TRACK_LOAD_REQUESTED':
@@ -190,6 +197,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         track: 'loading',
         trackError: null,
         transport: 'paused',
+        scratchResumeTransport: null,
         tonearm: 'lifted',
         armInteraction: 'idle',
       }, 'Track loading: arm lifted and output muted; autoplay disabled');
@@ -210,6 +218,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         track: 'error',
         trackError: event.error,
         transport: 'idle',
+        scratchResumeTransport: null,
         tonearm: 'lifted',
         armInteraction: 'idle',
       }, 'Track load failed: deck remains muted');
@@ -257,7 +266,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         tonearm: 'needle-down',
         armInteraction: 'idle',
       };
-      if (canPlayTrack(next)) next.transport = 'playing';
+      if (canPlayTrack(next) && state.transport !== 'scratching') next.transport = 'playing';
       return accept(next, 'Valid needle drop: cue position accepted');
     }
 
@@ -287,11 +296,14 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       if (!isFiniteNonNegative(event.position)) return reject(state, 'Ignored invalid cue position');
       {
         const next = { ...state };
-        if (canPlayTrack(next)) next.transport = 'playing';
+        if (canPlayTrack(next) && state.transport !== 'scratching') next.transport = 'playing';
         return accept(next, 'Cue position updated from tonearm radius');
       }
 
     case 'SEEK':
+      if (state.transport === 'scratching') {
+        return reject(state, 'Seek ignored during an active scratch gesture');
+      }
       if (state.track !== 'ready' || !isFiniteNonNegative(event.position)) {
         return reject(state, 'Seek ignored: track is not ready or position is invalid');
       }
@@ -301,15 +313,26 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       if (!Number.isFinite(event.rate) || event.rate <= 0) return reject(state, 'Invalid playback rate');
       return accept(state, 'Playback rate updated');
 
-    case 'SCRATCH_STARTED':
-      if (!canPlayTrack(state) || state.tonearm !== 'needle-down') {
-        return reject(state, 'Scratch ignored: requires power, running motor, loaded track and needle contact');
+    case 'SCRATCH_STARTED': {
+      if (!canPlayTrack(state)) {
+        return reject(state, 'Scratch ignored: requires power, active motor, a loaded track and a record');
       }
-      return accept({ ...state, transport: 'scratching' }, 'Scratch gesture started');
+      if (state.transport === 'scratching') {
+        return reject(state, 'Scratch ignored: a scratch gesture is already active');
+      }
+      const resumeTransport: ScratchResumePhase = state.transport;
+      return accept({
+        ...state,
+        transport: 'scratching',
+        scratchResumeTransport: resumeTransport,
+      }, state.tonearm === 'needle-down'
+        ? 'Scratch gesture started with stylus contact'
+        : 'Physical scratch started with stylus lifted; program audio remains muted');
+    }
 
     case 'SCRATCH_MOVED':
       if (state.transport !== 'scratching') return reject(state, 'Scratch movement ignored without an active scratch');
-      if (!Number.isFinite(event.speed) || !isFiniteNonNegative(event.position)) {
+      if (!Number.isFinite(event.speed) || event.speed < 0 || !isFiniteNonNegative(event.position)) {
         return reject(state, 'Invalid scratch movement');
       }
       return accept(state, 'Scratch position updated');
@@ -317,8 +340,12 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
     case 'SCRATCH_ENDED': {
       if (state.transport !== 'scratching') return reject(state, 'No active scratch to end');
       const next = { ...state };
-      next.transport = canPlayTrack(next) && next.tonearm === 'needle-down' ? 'playing' : 'paused';
-      return accept(next, 'Scratch gesture ended');
+      const canResume = canPlayTrack(state);
+      next.transport = canResume
+        ? (state.scratchResumeTransport ?? 'paused')
+        : state.track === 'ready' ? 'paused' : 'idle';
+      next.scratchResumeTransport = null;
+      return accept(next, 'Scratch gesture ended; previous transport phase restored');
     }
 
     case 'ENGINE_PLAYBACK_SYNC': {

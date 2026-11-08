@@ -89,6 +89,59 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
+  it('routes lifted-stylus scratch through the store without opening program audio', () => {
+    const transport = makeTransport({ isLoaded: true, isPlaying: true, playbackState: 'playing' });
+    const store = createDeckStore(transport);
+
+    expect(store.getState().machine.transport).toBe('playing');
+    expect(store.getState().dispatch({ type: 'SCRATCH_STARTED' })).toBe(true);
+    expect(store.getState().machine.transport).toBe('scratching');
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(false);
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('off-record');
+
+    store.getState().dispatch({
+      type: 'SCRATCH_MOVED',
+      speed: 1.1,
+      reversed: true,
+      position: 18,
+    });
+    expect(transport.scratch).toHaveBeenCalledWith(1.1, true, 18);
+
+    store.getState().dispatch({ type: 'SCRATCH_ENDED' });
+    expect(transport.endScratch).toHaveBeenLastCalledWith(true);
+    expect(store.getState().machine.transport).toBe('playing');
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(false);
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('off-record');
+    store.getState().dispose();
+  });
+
+  it('routes needle-down scratch through the audible program path', () => {
+    const transport = makeTransport({ isLoaded: true });
+    const store = createDeckStore(transport);
+
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 25,
+      wasAlreadyNeedleDown: false,
+      position: 0,
+    });
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(true);
+    expect(store.getState().dispatch({ type: 'SCRATCH_STARTED' })).toBe(true);
+
+    store.getState().dispatch({
+      type: 'SCRATCH_MOVED',
+      speed: 0.9,
+      reversed: false,
+      position: 22,
+    });
+    expect(transport.scratch).toHaveBeenCalledWith(0.9, false, 22);
+
+    store.getState().dispatch({ type: 'SCRATCH_ENDED' });
+    expect(transport.endScratch).toHaveBeenLastCalledWith(true);
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(true);
+    store.getState().dispose();
+  });
+
   it('coasts and mutes on power-off, then restores torque when powered back during coast', () => {
     const transport = makeTransport({ isLoaded: true, isPlaying: true, playbackState: 'playing' });
     const store = createDeckStore(transport);

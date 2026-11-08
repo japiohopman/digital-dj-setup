@@ -140,18 +140,98 @@ describe('deck state machine', () => {
     expect(state.tonearm).toBe('parked');
   });
 
-  it('requires needle contact and a loaded track before scratching', () => {
-    const state = createInitialDeckState({ trackLoaded: true });
-    const result = transitionDeck(state, { type: 'SCRATCH_STARTED' });
-    expect(result.accepted).toBe(false);
-    const ready = apply(state, {
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+  it('allows silent physical scratching with the stylus lifted and restores prior playback', () => {
+    const initial = createInitialDeckState({ trackLoaded: true, isPlaying: true });
+    const scratching = apply(initial, { type: 'SCRATCH_STARTED' });
+
+    expect(scratching.transport).toBe('scratching');
+    expect(scratching.scratchResumeTransport).toBe('playing');
+    expect(selectIsTrackAudible(scratching)).toBe(false);
+    expect(selectRecordSoundState(scratching)).toBe('off-record');
+
+    const moved = apply(scratching, {
+      type: 'SCRATCH_MOVED',
+      speed: 1.25,
+      reversed: true,
+      position: 12,
     });
-    const scratching = apply(ready, { type: 'SCRATCH_STARTED' });
+    expect(moved.transport).toBe('scratching');
+    expect(selectIsTrackAudible(moved)).toBe(false);
+
+    const ended = apply(moved, { type: 'SCRATCH_ENDED' });
+    expect(ended.transport).toBe('playing');
+    expect(ended.scratchResumeTransport).toBeNull();
+    expect(selectIsTrackAudible(ended)).toBe(false);
+    expect(selectRecordSoundState(ended)).toBe('off-record');
+  });
+
+  it('keeps needle-down scratching audible and restores normal playback on release', () => {
+    let state = createInitialDeckState({ trackLoaded: true });
+    state = apply(state, {
+      type: 'ARM_DROPPED',
+      angle: 25,
+      wasAlreadyNeedleDown: false,
+      position: 0,
+    });
+
+    const scratching = apply(state, { type: 'SCRATCH_STARTED' });
     expect(scratching.transport).toBe('scratching');
     expect(selectIsTrackAudible(scratching)).toBe(true);
+    expect(selectRecordSoundState(scratching)).toBe('on-record');
+
     const ended = apply(scratching, { type: 'SCRATCH_ENDED' });
     expect(ended.transport).toBe('playing');
+    expect(selectIsTrackAudible(ended)).toBe(true);
+    expect(selectRecordSoundState(ended)).toBe('on-record');
+  });
+
+  it('keeps program audio muted when the arm is lifted during a scratch', () => {
+    let state = createInitialDeckState({ trackLoaded: true });
+    state = apply(state, {
+      type: 'ARM_DROPPED',
+      angle: 25,
+      wasAlreadyNeedleDown: false,
+      position: 0,
+    });
+    state = apply(state, { type: 'SCRATCH_STARTED' });
+    state = apply(state, { type: 'ARM_LIFTED' });
+
+    expect(state.transport).toBe('scratching');
+    expect(state.scratchResumeTransport).toBe('playing');
+    expect(selectIsTrackAudible(state)).toBe(false);
+    expect(selectRecordSoundState(state)).toBe('off-record');
+
+    const ended = apply(state, { type: 'SCRATCH_ENDED' });
+    expect(ended.transport).toBe('playing');
+    expect(selectIsTrackAudible(ended)).toBe(false);
+    expect(selectRecordSoundState(ended)).toBe('off-record');
+  });
+
+  it('rejects physical scratching without power, motor, track or record', () => {
+    const blockedStates = [
+      createInitialDeckState({ initiallyPowered: false, trackLoaded: true }),
+      createInitialDeckState({ initiallyMotorOn: false, trackLoaded: true }),
+      createInitialDeckState(),
+      createInitialDeckState({ hasRecord: false, trackLoaded: true }),
+    ];
+
+    for (const state of blockedStates) {
+      const result = transitionDeck(state, { type: 'SCRATCH_STARTED' });
+      expect(result.accepted).toBe(false);
+      expect(result.state).toEqual(state);
+    }
+  });
+
+  it('rejects direct seek while a physical scratch gesture is active', () => {
+    const state = apply(
+      createInitialDeckState({ trackLoaded: true, isPlaying: true }),
+      { type: 'SCRATCH_STARTED' },
+    );
+    const result = transitionDeck(state, { type: 'SEEK', position: 30 });
+
+    expect(result.accepted).toBe(false);
+    expect(result.state).toEqual(state);
+    expect(result.reason).toContain('active scratch');
   });
 
   it('keeps the two decks independent', () => {
