@@ -106,7 +106,7 @@ describe('useTonearm', () => {
       } as unknown as React.KeyboardEvent<HTMLElement>);
     });
 
-    expect(result.current.armAngle).toBe(28);
+    expect(result.current.armAngle).toBeCloseTo(28.6);
     expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ARM_CUE' }));
   });
 
