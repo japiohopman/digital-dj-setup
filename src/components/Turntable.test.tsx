@@ -117,6 +117,7 @@ describe('Turntable static markup', () => {
 
   it('renders track transport controls and metadata when transport is provided', () => {
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'ahhh-fresh.wav',
       metadata: {
         title: 'ahhh-fresh.wav',
@@ -142,6 +143,7 @@ describe('Turntable static markup', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -163,6 +165,7 @@ describe('Turntable static markup', () => {
 
   it('renders embedded cover artwork on the rotating record when available', () => {
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'champion-sound.flac',
       metadata: {
         title: 'Champion Sound',
@@ -188,6 +191,7 @@ describe('Turntable static markup', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -201,6 +205,7 @@ describe('Turntable static markup', () => {
 
   it('does not spin platter when track is paused even if motor button is active', () => {
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'breakbeat.mp3',
       metadata: {
         title: 'breakbeat.mp3',
@@ -226,6 +231,7 @@ describe('Turntable static markup', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -239,6 +245,7 @@ describe('Turntable static markup', () => {
 
   it('displays decoding error in the audio panel', () => {
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: null,
       metadata: null,
       duration: 0,
@@ -259,6 +266,7 @@ describe('Turntable static markup', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -283,6 +291,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: null,
       metadata: null,
       duration: 120,
@@ -303,6 +312,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     await act(async () => {
@@ -338,6 +348,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: null,
       metadata: null,
       duration: 120,
@@ -358,6 +369,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     await act(async () => {
@@ -393,6 +405,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'anthem.wav',
       metadata: null,
       duration: 180,
@@ -413,6 +426,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     await act(async () => {
@@ -445,6 +459,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'anthem.wav',
       metadata: null,
       duration: 180,
@@ -465,6 +480,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     await act(async () => {
@@ -497,6 +513,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'anthem.wav',
       metadata: null,
       duration: 180,
@@ -517,6 +534,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     await act(async () => {
@@ -546,6 +564,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'spinup-deck.wav',
       metadata: null,
       duration: 180,
@@ -566,6 +585,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn().mockResolvedValue(undefined),
+      setStylusContact: vi.fn(),
     };
 
     // Initially powered OFF, but motor active
@@ -604,6 +624,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'power-cycle.wav',
       metadata: null,
       duration: 200,
@@ -624,6 +645,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn().mockResolvedValue(undefined),
+      setStylusContact: vi.fn(),
     };
 
     // Deck initially powered ON and motor ON
@@ -683,6 +705,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'power-cycle-stopped.wav',
       metadata: null,
       duration: 200,
@@ -703,6 +726,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn().mockResolvedValue(undefined),
+      setStylusContact: vi.fn(),
     };
 
     // Deck initially powered ON but motor disengaged
@@ -751,6 +775,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: null,
       metadata: null,
       duration: 0,
@@ -771,6 +796,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     await act(async () => {

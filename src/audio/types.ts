@@ -21,6 +21,8 @@ export interface AudioEngineState {
   currentTime: number;
   /** Current lifecycle playback state. */
   playbackState: AudioPlaybackState;
+  /** Whether the stylus is down in contact with the record grooves (unmuted). */
+  isStylusDown: boolean;
   /** Human-readable error message, or null if healthy. */
   error: string | null;
 }
@@ -49,6 +51,8 @@ export interface DeckTransport {
   playbackState: AudioPlaybackState;
   isPlaying: boolean;
   isLoaded: boolean;
+  isStylusDown: boolean;
+  setStylusContact: (isContact: boolean) => void;
   error: string | null;
   loadTrack: (file: File) => Promise<void>;
   play: (offset?: number) => Promise<void>;

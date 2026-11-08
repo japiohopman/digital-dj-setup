@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, type CSSProperties, type PointerEvent, type KeyboardEvent, type ChangeEvent } from 'react';
 import type { DeckTransport } from '../audio/types';
 import { useVinylMotion, type TurntableMotorState } from '../audio/useVinylMotion';
+import { useTonearm } from '../audio/useTonearm';
 
 /**
  * Supported playback RPM speeds for the turntable deck.
@@ -101,6 +102,44 @@ export function Turntable({
     motorState,
     transport,
     centerElementRef: recordRef,
+  });
+
+  // Detect battle mode orientation (landscape viewport where deck is rotated -90deg)
+  const [isLandscape, setIsLandscape] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mql = window.matchMedia('(orientation: landscape)');
+    setIsLandscape(mql.matches);
+    const handler = (e: MediaQueryListEvent) => {
+      setIsLandscape(e.matches);
+    };
+    mql.addEventListener?.('change', handler);
+    return () => {
+      mql.removeEventListener?.('change', handler);
+    };
+  }, []);
+
+  const {
+    armAngle,
+    armState,
+    isDragging: isArmDragging,
+    isNeedleDown,
+    handlePointerDown: onArmPointerDown,
+    handlePointerMove: onArmPointerMove,
+    handlePointerUp: onArmPointerUp,
+    handlePointerCancel: onArmPointerCancel,
+    handleLostPointerCapture: onArmLostPointerCapture,
+    handleKeyDown: onArmKeyDown,
+  } = useTonearm({
+    duration: transport?.duration ?? 0,
+    currentTime: transport?.currentTime ?? 0,
+    isBattleMode: isLandscape,
+    onStylusContactChange: (isContact) => {
+      transport?.setStylusContact(isContact);
+    },
+    onSeek: (position) => {
+      transport?.seek(position);
+    },
   });
 
   const updatePitchFromPointer = (clientY: number, clientX: number) => {
@@ -523,8 +562,35 @@ export function Turntable({
           onClick={handleLightToggle}
         />
 
-        <div className="tonearm-holder">
-          <div className="tonearm" role="img" aria-label="Tonearm and cartridge" />
+        <div
+          className={`tonearm-holder ${isNeedleDown ? 'needle-down' : ''} ${isArmDragging ? 'is-dragging' : ''} arm-${armState}`}
+          style={{
+            transformOrigin: '54% 27%',
+            transform: `rotate(${armAngle}deg)`,
+          }}
+        >
+          <div
+            className="tonearm"
+            role="slider"
+            tabIndex={0}
+            aria-label={`${deckLabel} Tonearm and cartridge`}
+            aria-valuemin={0}
+            aria-valuemax={49}
+            aria-valuenow={Math.round(armAngle)}
+            aria-valuetext={`Tonearm ${armState}, ${Math.round(armAngle)} degrees`}
+            onPointerDown={onArmPointerDown}
+            onPointerMove={onArmPointerMove}
+            onPointerUp={onArmPointerUp}
+            onPointerCancel={onArmPointerCancel}
+            onLostPointerCapture={onArmLostPointerCapture}
+            onKeyDown={onArmKeyDown}
+          >
+            {/* Generous touch handle target over headshell and cartridge for mobile */}
+            <div
+              className="tonearm-headshell-target"
+              aria-hidden="true"
+            />
+          </div>
         </div>
 
         <div className="model-badge" aria-hidden="true">

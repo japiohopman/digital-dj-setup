@@ -108,6 +108,11 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     await engineRef.current.spinUp(durationMs);
   }, []);
 
+  const setStylusContact = useCallback((isContact: boolean) => {
+    if (!engineRef.current) return;
+    engineRef.current.setStylusContact(isContact);
+  }, []);
+
   return {
     trackName: state.trackName,
     metadata: state.metadata,
@@ -116,6 +121,8 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     playbackState: state.playbackState,
     isPlaying: state.playbackState === 'playing',
     isLoaded: state.playbackState !== 'idle' && state.playbackState !== 'loading',
+    isStylusDown: state.isStylusDown,
+    setStylusContact,
     error: state.error,
     loadTrack,
     play,

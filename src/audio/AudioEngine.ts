@@ -21,6 +21,8 @@ export class AudioEngine {
   private audioBufferReversed: AudioBuffer | null = null;
   private currentSource: AudioBufferSourceNode | null = null;
   private gainNode: GainNode | null = null;
+  private stylusGainNode: GainNode | null = null;
+  private isStylusDown = false;
   private isReversed = false;
   private isScratching = false;
 
@@ -83,7 +85,11 @@ export class AudioEngine {
     if (!this.audioContext) {
       this.audioContext = this.contextFactory();
       this.gainNode = this.audioContext.createGain();
-      this.gainNode.connect(this.audioContext.destination);
+      this.stylusGainNode = this.audioContext.createGain();
+      // Default to muted (stylus lifted/parked)
+      this.stylusGainNode.gain.value = this.isStylusDown ? 1.0 : 0.0;
+      this.gainNode.connect(this.stylusGainNode);
+      this.stylusGainNode.connect(this.audioContext.destination);
     }
     return this.audioContext;
   }
@@ -92,9 +98,46 @@ export class AudioEngine {
     const ctx = this.getOrCreateContext();
     if (!this.gainNode) {
       this.gainNode = ctx.createGain();
-      this.gainNode.connect(ctx.destination);
+      this.stylusGainNode = ctx.createGain();
+      this.stylusGainNode.gain.value = this.isStylusDown ? 1.0 : 0.0;
+      this.gainNode.connect(this.stylusGainNode);
+      this.stylusGainNode.connect(ctx.destination);
     }
     return this.gainNode;
+  }
+
+  /**
+   * Sets stylus contact with the record surface.
+   * Smoothly unmutes or mutes track audio through the dedicated stylus GainNode.
+   *
+   * @param isContact - True if needle is on the record; false if lifted or parked.
+   */
+  public setStylusContact(isContact: boolean): void {
+    if (this.isStylusDown === isContact) {
+      return;
+    }
+    this.isStylusDown = isContact;
+
+    if (this.audioContext && this.stylusGainNode) {
+      const now = this.audioContext.currentTime;
+      try {
+        this.stylusGainNode.gain.cancelScheduledValues(now);
+        this.stylusGainNode.gain.setValueAtTime(this.stylusGainNode.gain.value, now);
+        this.stylusGainNode.gain.linearRampToValueAtTime(isContact ? 1.0 : 0.0, now + 0.015);
+      } catch {
+        // Fallback for mocked AudioParam in tests
+        this.stylusGainNode.gain.value = isContact ? 1.0 : 0.0;
+      }
+    }
+
+    this.notify();
+  }
+
+  /**
+   * Returns whether the stylus is down in contact with the record.
+   */
+  public getIsStylusDown(): boolean {
+    return this.isStylusDown;
   }
 
   /**
@@ -183,6 +226,7 @@ export class AudioEngine {
       duration: this.duration,
       currentTime,
       playbackState: this.playbackState,
+      isStylusDown: this.isStylusDown,
       error: this.error,
     };
   }

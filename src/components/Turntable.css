@@ -707,6 +707,8 @@
   width: 28.55%;
   height: 99.75%;
   pointer-events: none;
+  z-index: 10;
+  will-change: transform;
 }
 
 .turntable .tonearm {
@@ -717,10 +719,50 @@
   height: 100%;
   background: transparent url(/turntable/landscape/tt_arm.png) no-repeat 0 0;
   background-size: contain;
-  transition: transform 0.1s;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.turntable.motor-on.has-record .tonearm-holder {
+.turntable .tonearm:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 4px;
+}
+
+.turntable .tonearm-holder.is-dragging .tonearm {
+  cursor: grabbing;
+}
+
+/* Subtle elevation shadow when arm is lifted */
+.turntable .tonearm-holder.arm-lifted .tonearm,
+.turntable .tonearm-holder.is-dragging .tonearm {
+  filter: drop-shadow(4px 8px 6px rgba(0, 0, 0, 0.5));
+}
+
+.turntable .tonearm-holder.needle-down .tonearm {
+  filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.4));
+}
+
+/* Generous mobile touch hit-area targeting the cartridge and headshell (bottom 25% of arm) */
+.turntable .tonearm-headshell-target {
+  position: absolute;
+  left: 15%;
+  bottom: 0%;
+  width: 65%;
+  height: 25%;
+  min-width: 44px;
+  min-height: 44px;
+  cursor: grab;
+}
+
+.turntable .tonearm-holder.is-dragging .tonearm-headshell-target {
+  cursor: grabbing;
+}
+
+/* Micro-wobble only when motor is spinning, needle is down on record, and arm is not being dragged */
+.turntable.motor-on.has-record .tonearm-holder.needle-down:not(.is-dragging) .tonearm {
   animation: wobble 1s ease-in-out alternate infinite;
 }
 
@@ -905,7 +947,7 @@
   .turntable.power-on.motor-on .record,
   .turntable.power-on.motor-on .slipmat,
   .turntable.power-on.motor-on .power-light,
-  .turntable.motor-on.has-record .tonearm-holder {
+  .turntable.motor-on.has-record .tonearm-holder.needle-down:not(.is-dragging) .tonearm {
     animation: none;
   }
 }
