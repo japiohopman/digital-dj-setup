@@ -3,6 +3,8 @@ import {
   DEFAULT_TONEARM_CONFIG,
   angleToPlaybackProgress,
   calculateArmAngleFromPointer,
+  calculateUnclampedArmAngleFromPointer,
+  isAngleAtOuterLeadIn,
   isAngleInPlayableRecord,
   playbackProgressToAngle,
 } from './tonearmGeometry';
@@ -66,6 +68,25 @@ describe('tonearmGeometry', () => {
     // Far left pointer should clamp to maxAngle (49 deg)
     const angleLeft = calculateArmAngleFromPointer(deckW * 0.1, deckH * 0.5, deckW, deckH, false);
     expect(angleLeft).toBe(DEFAULT_TONEARM_CONFIG.maxAngle);
+  });
+
+  it('recognizes only the outer lead-in as an initial drop position', () => {
+    expect(isAngleAtOuterLeadIn(24)).toBe(true);
+    expect(isAngleAtOuterLeadIn(26)).toBe(true);
+    expect(isAngleAtOuterLeadIn(27)).toBe(false);
+    expect(isAngleAtOuterLeadIn(35)).toBe(false);
+  });
+
+  it('converts the rotated -90 degree landscape box back to the same local angle', () => {
+    const width = 800;
+    const height = 600;
+    const localX = 625;
+    const localY = 390;
+    const screenX = localY;
+    const screenY = width - localX;
+    const portraitAngle = calculateUnclampedArmAngleFromPointer(localX, localY, width, height, false);
+    const landscapeAngle = calculateUnclampedArmAngleFromPointer(screenX, screenY, height, width, true);
+    expect(landscapeAngle).toBeCloseTo(portraitAngle, 5);
   });
 
   it('calculates angle within deck element bounds', () => {

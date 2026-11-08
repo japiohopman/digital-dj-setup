@@ -103,6 +103,30 @@ describe('useTonearm', () => {
     expect(onStylusContactChange).toHaveBeenLastCalledWith(false);
   });
 
+  it('rejects an initial needle drop away from the outer lead-in', () => {
+    const onStylusContactChange = vi.fn();
+    const onNeedleDropSound = vi.fn();
+    const onSeek = vi.fn();
+    const { result } = renderHook(() => useTonearm({
+      duration: 100, currentTime: 0, onStylusContactChange, onNeedleDropSound, onSeek,
+    }));
+
+    act(() => {
+      for (let i = 0; i < 15; i++) {
+        result.current.handleKeyDown({
+          key: 'ArrowRight', preventDefault: vi.fn(),
+        } as unknown as React.KeyboardEvent<HTMLElement>);
+      }
+      result.current.lowerArm();
+    });
+
+    expect(result.current.armAngle).toBe(30);
+    expect(result.current.armState).toBe('lifted');
+    expect(onStylusContactChange).toHaveBeenLastCalledWith(false);
+    expect(onNeedleDropSound).toHaveBeenLastCalledWith('wrong');
+    expect(onSeek).not.toHaveBeenCalled();
+  });
+
   it('handles pointer cancel and lostpointercapture gracefully without stuck state', () => {
     const onStylusContactChange = vi.fn();
     const onSeek = vi.fn();
@@ -138,5 +162,16 @@ describe('useTonearm', () => {
       result.current.handlePointerCancel(mockEvent);
     });
     expect(result.current.isDragging).toBe(false);
+    expect(result.current.armState).toBe('lifted');
+    expect(onStylusContactChange).toHaveBeenLastCalledWith(false);
+
+    const secondPointer = { ...mockEvent, pointerId: 43 } as React.PointerEvent<HTMLElement>;
+    act(() => {
+      result.current.handlePointerDown(secondPointer);
+      result.current.handleLostPointerCapture(secondPointer);
+    });
+    expect(result.current.isDragging).toBe(false);
+    expect(result.current.armState).toBe('lifted');
+    expect(onSeek).not.toHaveBeenCalled();
   });
 });
