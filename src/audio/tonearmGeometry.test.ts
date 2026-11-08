@@ -7,6 +7,7 @@ import {
   isAngleAtOuterLeadIn,
   isAngleInPlayableRecord,
   playbackProgressToAngle,
+  unwrapAngleNear,
 } from './tonearmGeometry';
 
 describe('tonearmGeometry', () => {
@@ -80,6 +81,12 @@ describe('tonearmGeometry', () => {
     expect(isAngleAtOuterLeadIn(27)).toBe(false);
     expect(isAngleAtOuterLeadIn(35)).toBe(false);
     expect(isAngleAtOuterLeadIn(DEFAULT_TONEARM_CONFIG.outerGrooveAngle - 1)).toBe(false);
+  });
+
+  it('unwraps pointer bearings continuously across the 180 degree boundary', () => {
+    expect(unwrapAngleNear(-179, 179)).toBe(181);
+    expect(unwrapAngleNear(179, -179)).toBe(-181);
+    expect(unwrapAngleNear(35, 34)).toBe(35);
   });
 
   it('returns a safe bearing for invalid dimensions', () => {
