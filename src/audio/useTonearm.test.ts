@@ -88,6 +88,62 @@ describe('useTonearm', () => {
     );
   });
 
+  it('does not move the arm with keyboard cues while the platter is scratching', () => {
+    const dispatch = vi.fn(() => true);
+    const { result } = renderHook(() => useTonearm({
+      duration: 100,
+      currentTime: 20,
+      armState: 'needle-down',
+      armInteraction: 'idle',
+      transportPhase: 'scratching',
+      dispatch,
+    }));
+
+    act(() => {
+      result.current.handleKeyDown({
+        key: 'ArrowRight',
+        preventDefault: vi.fn(),
+      } as unknown as React.KeyboardEvent<HTMLElement>);
+    });
+
+    expect(result.current.armAngle).toBe(28);
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ARM_CUE' }));
+  });
+
+  it('clears an active pointer when the machine resets arm interaction', () => {
+    const dispatch = vi.fn(() => true);
+    const board = document.createElement('div');
+    board.className = 'bd';
+    vi.spyOn(board, 'getBoundingClientRect').mockReturnValue({
+      left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600,
+      x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect);
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn().mockReturnValue(true),
+      releasePointerCapture: vi.fn(),
+      closest: vi.fn().mockReturnValue(board),
+    });
+    const { result, rerender } = renderHook(
+      ({ armInteraction }) => useTonearm({
+        duration: 100, currentTime: 0, armState: 'lifted',
+        armInteraction, dispatch,
+      }),
+      { initialProps: { armInteraction: 'idle' as const } },
+    );
+    const event = {
+      button: 0, pointerId: 5, isPrimary: true,
+      clientX: 200, clientY: 200,
+      stopPropagation: vi.fn(), currentTarget: target,
+    } as unknown as React.PointerEvent<HTMLElement>;
+
+    act(() => result.current.handlePointerDown(event));
+    rerender({ armInteraction: 'dragging' });
+    rerender({ armInteraction: 'idle' });
+    expect(target.releasePointerCapture).toHaveBeenCalledWith(5);
+    expect(dispatch).toHaveBeenCalledWith({ type: 'ARM_PICKED_UP' });
+  });
+
   it('handles pointer cancel and lostpointercapture gracefully by dispatching ARM_DRAG_CANCELLED', () => {
     const dispatch = vi.fn(() => true);
 
