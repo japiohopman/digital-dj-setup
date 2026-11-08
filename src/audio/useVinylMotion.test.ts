@@ -6,6 +6,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
   calculateScratchSpeedMagnitude,
   resolveScratchDirection,
+  useVinylMotion,
 } from './useVinylMotion';
 
 describe('vinyl scratch motion helpers', () => {
