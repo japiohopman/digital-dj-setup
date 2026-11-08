@@ -1,81 +1,80 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { DeckEvent, ArmInteraction } from '../state/deckMachine';
+import type { TonearmState } from './tonearmGeometry';
 import { useTonearm } from './useTonearm';
 
-describe('useTonearm', () => {
-  it('initializes in parked state at 0 degrees with stylus muted', () => {
-    const onStylusContactChange = vi.fn();
-    const onSeek = vi.fn();
+interface HookProps {
+  currentTime: number;
+  armState: TonearmState;
+  armInteraction: ArmInteraction;
+}
 
-    const { result } = renderHook(() =>
-      useTonearm({
-        duration: 100,
-        currentTime: 0,
-        onStylusContactChange,
-        onSeek,
-      })
-    );
+const createDispatch = () => vi.fn((_event: DeckEvent) => true);
 
-    expect(result.current.armState).toBe('parked');
+describe('useTonearm state-machine integration', () => {
+  it('starts parked and visually follows no playback until the machine reports needle contact', () => {
+    const dispatch = createDispatch();
+    const { result } = renderHook(() => useTonearm({
+      duration: 100,
+      currentTime: 0,
+      armState: 'parked',
+      armInteraction: 'idle',
+      dispatch,
+    }));
+
     expect(result.current.armAngle).toBe(0);
+    expect(result.current.isDragging).toBe(false);
     expect(result.current.isNeedleDown).toBe(false);
   });
 
-  it('updates angle when following playback progress while needle is down', () => {
-    const onStylusContactChange = vi.fn();
-    const onSeek = vi.fn();
-
+  it('follows playback position only while the machine says the needle is down', () => {
+    const dispatch = createDispatch();
     const { result, rerender } = renderHook(
-      ({ currentTime }) =>
-        useTonearm({
-          duration: 100,
-          currentTime,
-          onStylusContactChange,
-          onSeek,
-        }),
-      { initialProps: { currentTime: 0 } }
+      (props: HookProps) => useTonearm({
+        duration: 100,
+        ...props,
+        dispatch,
+      }),
+      { initialProps: { currentTime: 0, armState: 'needle-down', armInteraction: 'idle' } },
     );
 
-    // Step to outer groove (24 deg) via keyboard
-    act(() => {
-      for (let i = 0; i < 12; i++) {
-        result.current.handleKeyDown({
-          key: 'ArrowRight',
-          preventDefault: vi.fn(),
-        } as unknown as React.KeyboardEvent<HTMLElement>);
-      }
-    });
-
-    act(() => {
-      result.current.lowerArm();
-    });
-
-    expect(result.current.armState).toBe('needle-down');
-    expect(result.current.isNeedleDown).toBe(true);
-    expect(onStylusContactChange).toHaveBeenCalledWith(true);
-
-    // Advance playback time to 50s (50% progress)
-    rerender({ currentTime: 50 });
-    // outer: 24, inner: 47 -> 50% = 35.5
+    rerender({ currentTime: 50, armState: 'needle-down', armInteraction: 'idle' });
+    expect(result.current.armAngle).toBe(35.5);
+    rerender({ currentTime: 75, armState: 'lifted', armInteraction: 'idle' });
     expect(result.current.armAngle).toBe(35.5);
   });
 
-  it('allows lifting and parking the tonearm with smooth muting', () => {
-    const onStylusContactChange = vi.fn();
-    const onSeek = vi.fn();
+  it('routes keyboard lifting and parking through typed deck events', () => {
+    const dispatch = createDispatch();
+    const { result } = renderHook(() => useTonearm({
+      duration: 100,
+      currentTime: 0,
+      armState: 'needle-down',
+      armInteraction: 'idle',
+      dispatch,
+    }));
 
-    const { result } = renderHook(() =>
-      useTonearm({
-        duration: 100,
-        currentTime: 10,
-        onStylusContactChange,
-        onSeek,
-      })
-    );
+    act(() => result.current.liftArm());
+    expect(dispatch).toHaveBeenLastCalledWith({ type: 'ARM_LIFTED' });
 
-    // Move to 24 deg and drop needle
+    act(() => result.current.parkArm());
+    expect(dispatch).toHaveBeenLastCalledWith({ type: 'ARM_PARKED' });
+    expect(result.current.armAngle).toBe(0);
+  });
+
+  it('sends a typed initial-drop event with the outer-lead-in position', () => {
+    const dispatch = createDispatch();
+    const { result } = renderHook(() => useTonearm({
+      duration: 100,
+      currentTime: 12,
+      armState: 'lifted',
+      armInteraction: 'idle',
+      dispatch,
+    }));
+
     act(() => {
-      for (let i = 0; i < 12; i++) {
+      for (let index = 0; index < 12; index++) {
         result.current.handleKeyDown({
           key: 'ArrowRight',
           preventDefault: vi.fn(),
@@ -84,94 +83,56 @@ describe('useTonearm', () => {
       result.current.lowerArm();
     });
 
-    expect(result.current.isNeedleDown).toBe(true);
-
-    // Lift needle
-    act(() => {
-      result.current.liftArm();
+    expect(dispatch).toHaveBeenLastCalledWith({
+      type: 'ARM_DROPPED',
+      angle: 24,
+      wasAlreadyNeedleDown: false,
+      position: 0,
+      tooFast: false,
     });
-    expect(result.current.armState).toBe('lifted');
-    expect(result.current.isNeedleDown).toBe(false);
-    expect(onStylusContactChange).toHaveBeenLastCalledWith(false);
-
-    // Park arm
-    act(() => {
-      result.current.parkArm();
-    });
-    expect(result.current.armState).toBe('parked');
-    expect(result.current.armAngle).toBe(0);
-    expect(onStylusContactChange).toHaveBeenLastCalledWith(false);
   });
 
-  it('rejects an initial needle drop away from the outer lead-in', () => {
-    const onStylusContactChange = vi.fn();
-    const onNeedleDropSound = vi.fn();
-    const onSeek = vi.fn();
-    const { result } = renderHook(() => useTonearm({
-      duration: 100, currentTime: 0, onStylusContactChange, onNeedleDropSound, onSeek,
-    }));
-
-    act(() => {
-      for (let i = 0; i < 15; i++) {
-        result.current.handleKeyDown({
-          key: 'ArrowRight', preventDefault: vi.fn(),
-        } as unknown as React.KeyboardEvent<HTMLElement>);
-      }
-      result.current.lowerArm();
-    });
-
-    expect(result.current.armAngle).toBe(30);
-    expect(result.current.armState).toBe('lifted');
-    expect(onStylusContactChange).toHaveBeenLastCalledWith(false);
-    expect(onNeedleDropSound).toHaveBeenLastCalledWith('wrong');
-    expect(onSeek).not.toHaveBeenCalled();
-  });
-
-  it('handles pointer cancel and lostpointercapture gracefully without stuck state', () => {
-    const onStylusContactChange = vi.fn();
-    const onSeek = vi.fn();
-
-    const { result } = renderHook(() =>
-      useTonearm({
-        duration: 100,
-        currentTime: 0,
-        onStylusContactChange,
-        onSeek,
-      })
+  it('cancels pointer drags through the machine without leaving a pointer owner behind', () => {
+    const dispatch = createDispatch();
+    const props = {
+      duration: 100,
+      currentTime: 0,
+      armState: 'parked' as TonearmState,
+      armInteraction: 'idle' as ArmInteraction,
+      dispatch,
+    };
+    const { result, rerender } = renderHook(
+      (current: typeof props) => useTonearm(current),
+      { initialProps: props },
     );
 
-    const mockEvent = {
+    const target = {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn().mockReturnValue(true),
+      releasePointerCapture: vi.fn(),
+      closest: vi.fn().mockReturnValue(null),
+    };
+    const pointerEvent = {
       button: 0,
       pointerId: 42,
+      isPrimary: true,
+      clientX: 10,
+      clientY: 10,
       stopPropagation: vi.fn(),
-      currentTarget: {
-        setPointerCapture: vi.fn(),
-        hasPointerCapture: vi.fn().mockReturnValue(true),
-        releasePointerCapture: vi.fn(),
-        closest: vi.fn(),
-      },
+      currentTarget: target,
     } as unknown as React.PointerEvent<HTMLElement>;
 
-    act(() => {
-      result.current.handlePointerDown(mockEvent);
-    });
+    act(() => result.current.handlePointerDown(pointerEvent));
+    expect(dispatch).toHaveBeenLastCalledWith({ type: 'ARM_PICKED_UP' });
+    expect(target.setPointerCapture).toHaveBeenCalledWith(42);
+
+    rerender({ ...props, armState: 'lifted', armInteraction: 'dragging' });
     expect(result.current.isDragging).toBe(true);
-    expect(result.current.armState).toBe('lifted');
+    act(() => result.current.handlePointerCancel(pointerEvent));
+    expect(dispatch).toHaveBeenLastCalledWith({ type: 'ARM_DRAG_CANCELLED' });
 
-    act(() => {
-      result.current.handlePointerCancel(mockEvent);
-    });
+    rerender({ ...props, armState: 'lifted', armInteraction: 'idle' });
     expect(result.current.isDragging).toBe(false);
-    expect(result.current.armState).toBe('lifted');
-    expect(onStylusContactChange).toHaveBeenLastCalledWith(false);
-
-    const secondPointer = { ...mockEvent, pointerId: 43 } as React.PointerEvent<HTMLElement>;
-    act(() => {
-      result.current.handlePointerDown(secondPointer);
-      result.current.handleLostPointerCapture(secondPointer);
-    });
-    expect(result.current.isDragging).toBe(false);
-    expect(result.current.armState).toBe('lifted');
-    expect(onSeek).not.toHaveBeenCalled();
+    expect(target.releasePointerCapture).toHaveBeenCalledWith(42);
   });
 });
