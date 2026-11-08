@@ -163,6 +163,26 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
+  it('coasts the audio engine from machine state even when the initial transport snapshot was paused', () => {
+    const transport = makeTransport({ isLoaded: true, isPlaying: false, playbackState: 'paused' });
+    const store = createDeckStore(transport);
+
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 25,
+      wasAlreadyNeedleDown: false,
+      position: 0,
+    });
+    expect(store.getState().machine.transport).toBe('playing');
+    expect(transport.play).toHaveBeenCalledWith(0);
+
+    store.getState().dispatch({ type: 'POWER_TOGGLED' });
+
+    expect(store.getState().machine.motorPhase).toBe('coasting');
+    expect(transport.coastDown).toHaveBeenCalledWith(1200);
+    store.getState().dispose();
+  });
+
   it('coasts and mutes on power-off, then restores torque when powered back during coast', () => {
     const transport = makeTransport({ isLoaded: true, isPlaying: true, playbackState: 'playing' });
     const store = createDeckStore(transport);

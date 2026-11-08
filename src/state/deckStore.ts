@@ -78,7 +78,7 @@ export function createDeckStore(
   const store = createStore<DeckStoreState>((set, get) => {
     const startSpinUp = (state: DeckMachineState) => {
       clearSpinTimer();
-      if ((state.track === 'ready' || transport?.isLoaded) && canRunMotor(state)) {
+      if (state.track === 'ready' && canRunMotor(state)) {
         void transport?.spinUp(SPIN_UP_MS);
       }
       spinTimer = setTimeout(() => {
@@ -91,8 +91,9 @@ export function createDeckStore(
       clearCoastTimer();
       if (previous.transport === 'scratching') {
         transport?.endScratch(false);
-      } else if (previous.transport === 'playing' && transport?.isPlaying) {
-        transport.coastDown(COAST_DOWN_MS);
+      } else if (previous.transport === 'playing') {
+        // The state machine is authoritative; transport.isPlaying is only a render snapshot.
+        transport?.coastDown(COAST_DOWN_MS);
       }
       coastTimer = setTimeout(() => {
         get().dispatch({ type: 'MOTOR_COAST_COMPLETED' });
