@@ -511,6 +511,21 @@ describe('AudioEngine', () => {
     engine.dispose();
   });
 
+  it('cancels pending reverse scratch when paused before preparation completes', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'pause-reverse.wav');
+
+    engine.scratch(1.0, false, 18);
+    engine.scratch(2.0, true, 15);
+    engine.pause(0);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(mockContext.createdSources).toHaveLength(1);
+    expect(engine.getState().playbackState).toBe('paused');
+
+    engine.dispose();
+  });
+
   it('cancels older in-flight track loading when a newer track is loaded', async () => {
     const engine = createEngine();
     let resolveFirst: ((val: AudioBuffer) => void) | null = null;
