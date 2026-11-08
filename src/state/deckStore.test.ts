@@ -115,6 +115,27 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
+  it('keeps a paused track paused after a lifted-stylus scratch', () => {
+    const transport = makeTransport({ isLoaded: true });
+    const store = createDeckStore(transport);
+
+    expect(store.getState().machine.transport).toBe('paused');
+    store.getState().dispatch({ type: 'SCRATCH_STARTED' });
+    store.getState().dispatch({
+      type: 'SCRATCH_MOVED',
+      speed: 0.8,
+      reversed: false,
+      position: 9,
+    });
+    store.getState().dispatch({ type: 'SCRATCH_ENDED' });
+
+    expect(store.getState().machine.transport).toBe('paused');
+    expect(transport.endScratch).toHaveBeenLastCalledWith(false);
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(false);
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('stopped');
+    store.getState().dispose();
+  });
+
   it('routes needle-down scratch through the audible program path', () => {
     const transport = makeTransport({ isLoaded: true });
     const store = createDeckStore(transport);

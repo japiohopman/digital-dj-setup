@@ -207,6 +207,20 @@ describe('deck state machine', () => {
     expect(selectRecordSoundState(ended)).toBe('off-record');
   });
 
+  it('does not turn a paused track into playback when scratch ends', () => {
+    const initial = createInitialDeckState({ trackLoaded: true });
+    expect(initial.transport).toBe('paused');
+
+    const scratching = apply(initial, { type: 'SCRATCH_STARTED' });
+    expect(scratching.scratchResumeTransport).toBe('paused');
+
+    const ended = apply(scratching, { type: 'SCRATCH_ENDED' });
+    expect(ended.transport).toBe('paused');
+    expect(ended.scratchResumeTransport).toBeNull();
+    expect(selectIsTrackAudible(ended)).toBe(false);
+    expect(selectRecordSoundState(ended)).toBe('stopped');
+  });
+
   it('rejects physical scratching without power, motor, track or record', () => {
     const blockedStates = [
       createInitialDeckState({ initiallyPowered: false, trackLoaded: true }),
