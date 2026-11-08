@@ -199,6 +199,62 @@ describe('AudioEngine', () => {
     expect(mockContext.createdSources).toHaveLength(2);
   });
 
+  it('holds the interpolated stylus gain when contact reverses during the fallback ramp', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'stylus-ramp-fallback.mp3');
+    await engine.play();
+
+    const stylusGain = mockContext.createdGainParams[1];
+    expect(stylusGain).toBeDefined();
+
+    engine.setStylusContact(true);
+    expect(stylusGain?.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 0.015);
+
+    mockContext.currentTime = 0.0075;
+    engine.setStylusContact(false);
+    expect(stylusGain?.setValueAtTime).toHaveBeenLastCalledWith(0.5, 0.0075);
+    expect(stylusGain?.linearRampToValueAtTime).toHaveBeenLastCalledWith(0, 0.0225);
+
+    mockContext.currentTime = 0.01125;
+    engine.setStylusContact(true);
+    expect(stylusGain?.setValueAtTime).toHaveBeenLastCalledWith(0.375, 0.01125);
+    expect(stylusGain?.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 0.02625);
+
+    engine.dispose();
+  });
+
+  it('crossfades the outgoing source when seeking during playback', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'seek-crossfade.mp3');
+    await engine.play();
+
+    const outgoingSource = mockContext.createdSources[0];
+    const outgoingGain = mockContext.createdGainParams[2];
+    expect(outgoingSource).toBeDefined();
+    expect(outgoingGain).toBeDefined();
+
+    mockContext.currentTime = 4;
+    engine.seek(18);
+
+    const incomingSource = mockContext.createdSources[1];
+    const incomingGain = mockContext.createdGainParams[3];
+    expect(incomingSource).toBeDefined();
+    expect(incomingGain).toBeDefined();
+    expect(outgoingSource?.stop).not.toHaveBeenCalled();
+    expect(outgoingGain?.linearRampToValueAtTime).toHaveBeenCalledWith(0, 4.015);
+    expect(incomingSource?.start).toHaveBeenCalledWith(0, 18);
+    expect(incomingGain?.setValueAtTime).toHaveBeenCalledWith(0, 4);
+    expect(incomingGain?.linearRampToValueAtTime).toHaveBeenCalledWith(1, 4.015);
+
+    await vi.advanceTimersByTimeAsync(19);
+    expect(outgoingSource?.stop).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(outgoingSource?.stop).toHaveBeenCalledTimes(1);
+    expect(outgoingSource?.disconnect).toHaveBeenCalledTimes(1);
+
+    engine.dispose();
+  });
+
   it('tracks elapsed time while playing and maintains position on pause', async () => {
     const engine = createEngine();
     const buffer = new Uint8Array([1, 2, 3]).buffer;
