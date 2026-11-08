@@ -774,7 +774,6 @@
   cursor: grab;
   pointer-events: auto;
   touch-action: none;
-  touch-action: none;
 }
 
 .turntable .tonearm-holder.is-dragging .tonearm-headshell-target {
