@@ -133,7 +133,7 @@ describe('useVinylMotion physical platter input', () => {
   });
 
   it('cancels local pointer ownership when the machine ends scratching externally', () => {
-    const dispatch = vi.fn((_event: { type: string }) => true);
+    const dispatch = vi.fn((event: { type: string }) => event.type !== 'BLOCKED');
     const target = Object.assign(document.createElement('div'), {
       setPointerCapture: vi.fn(),
       hasPointerCapture: vi.fn().mockReturnValue(true),
