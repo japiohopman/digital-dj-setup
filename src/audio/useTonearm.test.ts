@@ -129,7 +129,7 @@ describe('useTonearm', () => {
         duration: 100, currentTime: 0, armState: 'lifted',
         armInteraction, dispatch,
       }),
-      { initialProps: { armInteraction: 'idle' as const } },
+      { initialProps: { armInteraction: 'idle' as 'idle' | 'dragging' } },
     );
     const event = {
       button: 0, pointerId: 5, isPrimary: true,
