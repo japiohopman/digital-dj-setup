@@ -132,7 +132,7 @@ export function useVinylMotion({
 
         if (shouldRotate && !prefersReducedMotionRef.current) {
           const speedMod = isCoasting ? coastFactor : isSpinningUp ? spinUpFactor : 1;
-          let newAngle = angleRef.current + radsPerMs * dt * speedMod;
+          const newAngle = angleRef.current + radsPerMs * dt * speedMod;
           angleRef.current = newAngle;
           setAngle(newAngle);
         }

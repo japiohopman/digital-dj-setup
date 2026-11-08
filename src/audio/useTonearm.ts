@@ -5,7 +5,6 @@ import {
   type TonearmState,
   angleToPlaybackProgress,
   calculateArmPointerBearingFromPointer,
-  isAngleInPlayableRecord,
   playbackProgressToAngle,
 } from './tonearmGeometry';
 import type { DeckEvent, ArmInteraction } from '../state/deckMachine';
@@ -16,7 +15,6 @@ export interface UseTonearmOptions {
   armState: TonearmState;
   armInteraction: ArmInteraction;
   dispatch: (event: DeckEvent) => boolean;
-  hasRecord?: boolean;
   isBattleMode?: boolean;
   config?: TonearmConfig;
 }
@@ -51,7 +49,6 @@ export function useTonearm({
   armState,
   armInteraction,
   dispatch,
-  hasRecord = true,
   isBattleMode = false,
   config = DEFAULT_TONEARM_CONFIG,
 }: UseTonearmOptions): UseTonearmReturn {

@@ -10,7 +10,7 @@ interface HookProps {
   armInteraction: ArmInteraction;
 }
 
-const createDispatch = () => vi.fn((_event: DeckEvent) => true);
+const createDispatch = () => vi.fn(() => true);
 
 describe('useTonearm state-machine integration', () => {
   it('starts parked and visually follows no playback until the machine reports needle contact', () => {

@@ -161,6 +161,14 @@ export function createDeckStore(
           }
           break;
 
+        case 'ARM_PICKED_UP':
+        case 'ARM_LIFTED':
+        case 'ARM_PARKED':
+          if (previous.transport === 'scratching') {
+            transport?.endScratch(next.transport === 'playing');
+          }
+          break;
+
         case 'ARM_CUE':
           if (next.tonearm === 'needle-down') {
             if (previous.transport === 'playing') transport?.seek(event.position);

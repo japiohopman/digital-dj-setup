@@ -136,7 +136,6 @@ export function Turntable({
     armInteraction: machine.armInteraction,
     dispatch,
     isBattleMode: isLandscape,
-    hasRecord,
   });
 
   const updatePitchFromPointer = (clientY: number, clientX: number) => {
