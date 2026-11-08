@@ -6,14 +6,16 @@ import {
   angleToPlaybackProgress,
   calculateArmPointerBearingFromPointer,
   playbackProgressToAngle,
+  unwrapAngleNear,
 } from './tonearmGeometry';
-import type { DeckEvent, ArmInteraction } from '../state/deckMachine';
+import type { DeckEvent, ArmInteraction, TransportPhase } from '../state/deckMachine';
 
 export interface UseTonearmOptions {
   duration: number;
   currentTime: number;
   armState: TonearmState;
   armInteraction: ArmInteraction;
+  transportPhase?: TransportPhase;
   dispatch: (event: DeckEvent) => boolean;
   hasRecord?: boolean;
   isBattleMode?: boolean;
@@ -41,6 +43,7 @@ interface PointerStart {
   y: number;
   time: number;
   grabOffset: number;
+  lastPointerBearing: number;
   wasAlreadyNeedleDown: boolean;
 }
 
@@ -49,6 +52,7 @@ export function useTonearm({
   currentTime,
   armState,
   armInteraction,
+  transportPhase = 'idle',
   dispatch,
   isBattleMode = false,
   config = DEFAULT_TONEARM_CONFIG,
@@ -57,6 +61,7 @@ export function useTonearm({
   const tonearmRef = useRef<HTMLDivElement | null>(null);
   const activePointerIdRef = useRef<number | null>(null);
   const pointerStartRef = useRef<PointerStart | null>(null);
+  const activePointerElementRef = useRef<HTMLElement | null>(null);
   const currentAngleRef = useRef(config.parkAngle);
 
   const isDragging = armInteraction === 'dragging';
@@ -68,6 +73,20 @@ export function useTonearm({
     setArmAngle(next);
     return next;
   }, [config.maxAngle, config.minAngle]);
+
+  useEffect(() => {
+    if (armInteraction === 'dragging' || activePointerIdRef.current === null) return;
+    const pointerId = activePointerIdRef.current;
+    const element = activePointerElementRef.current;
+    activePointerIdRef.current = null;
+    pointerStartRef.current = null;
+    activePointerElementRef.current = null;
+    try {
+      if (element?.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
+    } catch {
+      // The machine may reset the interaction during a track change or motor stop.
+    }
+  }, [armInteraction]);
 
   useEffect(() => {
     if (armState !== 'needle-down' || isDragging || duration <= 0) return;
@@ -139,6 +158,7 @@ export function useTonearm({
     // Clear pointer ownership before releasePointerCapture can emit lostpointercapture.
     activePointerIdRef.current = null;
     pointerStartRef.current = null;
+    activePointerElementRef.current = null;
     releaseCapture(e);
 
     if (isTap && wasAlreadyNeedleDown) {
@@ -161,6 +181,7 @@ export function useTonearm({
     if (activePointerIdRef.current !== e.pointerId) return;
     activePointerIdRef.current = null;
     pointerStartRef.current = null;
+    activePointerElementRef.current = null;
     releaseCapture(e);
     dispatch({ type: 'ARM_DRAG_CANCELLED' });
   }, [dispatch, releaseCapture]);
@@ -181,11 +202,16 @@ export function useTonearm({
     }
 
     activePointerIdRef.current = e.pointerId;
+    activePointerElementRef.current = e.currentTarget;
+    const initialPointerBearing = point
+      ? calculateArmPointerBearingFromPointer(point.x, point.y, point.width, point.height, isBattleMode)
+      : currentAngleRef.current + grabOffset;
     pointerStartRef.current = {
       x: e.clientX,
       y: e.clientY,
       time: Date.now(),
       grabOffset,
+      lastPointerBearing: initialPointerBearing,
       wasAlreadyNeedleDown: armState === 'needle-down',
     };
     try {
@@ -199,10 +225,14 @@ export function useTonearm({
     if (activePointerIdRef.current !== e.pointerId) return;
     const point = getBoardPoint(e);
     if (!point) return;
-    const pointerAngle = calculateArmPointerBearingFromPointer(
+    const start = pointerStartRef.current;
+    if (!start) return;
+    const rawPointerAngle = calculateArmPointerBearingFromPointer(
       point.x, point.y, point.width, point.height, isBattleMode,
     );
-    setArmPosition(pointerAngle - (pointerStartRef.current?.grabOffset ?? 0));
+    const pointerAngle = unwrapAngleNear(rawPointerAngle, start.lastPointerBearing);
+    start.lastPointerBearing = pointerAngle;
+    setArmPosition(pointerAngle - start.grabOffset);
   }, [getBoardPoint, isBattleMode, setArmPosition]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLElement>) => finalizeDrag(e), [finalizeDrag]);
@@ -210,6 +240,13 @@ export function useTonearm({
   const handleLostPointerCapture = useCallback((e: React.PointerEvent<HTMLElement>) => abortDrag(e), [abortDrag]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLElement>) => {
+    const isCueKey = e.key === 'ArrowRight' || e.key === 'ArrowDown' ||
+      e.key === 'ArrowLeft' || e.key === 'ArrowUp';
+    if (transportPhase === 'scratching' && isCueKey) {
+      e.preventDefault();
+      return;
+    }
+
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault();
       const target = setArmPosition(currentAngleRef.current + 2);
@@ -245,7 +282,7 @@ export function useTonearm({
       e.preventDefault();
       parkArm();
     }
-  }, [armState, config, dispatch, duration, liftArm, lowerArm, parkArm, setArmPosition]);
+  }, [armState, config, dispatch, duration, liftArm, lowerArm, parkArm, setArmPosition, transportPhase]);
 
   return {
     armAngle,
