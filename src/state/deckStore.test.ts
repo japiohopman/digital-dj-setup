@@ -67,8 +67,8 @@ describe('per-deck Zustand adapter', () => {
 
     expect(transport.seek).toHaveBeenCalledWith(42);
     expect(transport.spinUp).toHaveBeenCalledWith(450);
-    expect(transport.seek.mock.invocationCallOrder[0]).toBeLessThan(
-      transport.spinUp.mock.invocationCallOrder[0] ?? Infinity,
+    expect(vi.mocked(transport.seek).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(transport.spinUp).mock.invocationCallOrder[0] ?? Infinity,
     );
     store.getState().dispose();
   });
