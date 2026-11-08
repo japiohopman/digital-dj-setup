@@ -8,6 +8,13 @@ import type {
   RecordSoundState,
 } from './types';
 
+interface GainRampState {
+  from: number;
+  to: number;
+  startTime: number;
+  endTime: number;
+}
+
 /**
  * Isolated Web Audio API playback engine for a single turntable deck.
  *
@@ -22,8 +29,12 @@ export class AudioEngine {
   private audioBuffer: AudioBuffer | null = null;
   private audioBufferReversed: AudioBuffer | null = null;
   private currentSource: AudioBufferSourceNode | null = null;
+  private currentSourceGainNode: GainNode | null = null;
+  private readonly sourceGainNodes = new WeakMap<AudioBufferSourceNode, GainNode>();
+  private currentSourceGainRamp: GainRampState | null = null;
   private gainNode: GainNode | null = null;
   private stylusGainNode: GainNode | null = null;
+  private stylusGainRamp: GainRampState | null = null;
   private isStylusDown = false;
   private recordSoundState: RecordSoundState = 'stopped';
   private recordSoundAssetsPromise: Promise<void> | null = null;
@@ -126,6 +137,15 @@ export class AudioEngine {
    *
    * @param isContact - True if needle is on the record; false if lifted or parked.
    */
+  private getRampValue(ramp: GainRampState | null, time: number, fallback: number): number {
+    if (!ramp) return fallback;
+    const duration = ramp.endTime - ramp.startTime;
+    if (duration <= 0 || time >= ramp.endTime) return ramp.to;
+    if (time <= ramp.startTime) return ramp.from;
+    const progress = (time - ramp.startTime) / duration;
+    return ramp.from + (ramp.to - ramp.from) * progress;
+  }
+
   public setStylusContact(isContact: boolean): void {
     if (this.isStylusDown === isContact) {
       return;
@@ -134,19 +154,29 @@ export class AudioEngine {
 
     if (this.audioContext && this.stylusGainNode) {
       const now = this.audioContext.currentTime;
+      const target = isContact ? 1.0 : 0.0;
+      const parameter = this.stylusGainNode.gain;
+      const currentValue = this.getRampValue(this.stylusGainRamp, now, parameter.value);
       try {
-        const parameter = this.stylusGainNode.gain;
         if (typeof parameter.cancelAndHoldAtTime === 'function') {
           parameter.cancelAndHoldAtTime(now);
         } else {
-          const currentValue = parameter.value;
+          // AudioParam.value is not a reliable read of an in-flight automation
+          // ramp on every browser. Reconstruct our own 15ms ramp position.
           parameter.cancelScheduledValues(now);
           parameter.setValueAtTime(currentValue, now);
         }
-        parameter.linearRampToValueAtTime(isContact ? 1.0 : 0.0, now + 0.015);
+        parameter.linearRampToValueAtTime(target, now + 0.015);
+        this.stylusGainRamp = {
+          from: currentValue,
+          to: target,
+          startTime: now,
+          endTime: now + 0.015,
+        };
       } catch {
         // Fallback for mocked AudioParam in tests
-        this.stylusGainNode.gain.value = isContact ? 1.0 : 0.0;
+        parameter.value = target;
+        this.stylusGainRamp = null;
       }
     }
 
@@ -677,13 +707,18 @@ export class AudioEngine {
     const ctx = this.getOrCreateContext();
     const gain = this.getOrCreateGainNode();
 
+    const hasOutgoingSource = this.currentSource !== null;
     this.cancelPendingBrake();
-    this.stopCurrentSourceNode();
+    this.fadeOutCurrentSourceNode();
 
     const generation = ++this.sourceGeneration;
     const source = ctx.createBufferSource();
+    const sourceGainNode = ctx.createGain();
     source.buffer = reversed ? this.audioBufferReversed : this.audioBuffer;
-    source.connect(gain);
+    source.connect(sourceGainNode);
+    sourceGainNode.connect(gain);
+    this.sourceGainNodes.set(source, sourceGainNode);
+    this.currentSourceGainNode = sourceGainNode;
 
     source.onended = () => {
       if (this.currentSource === source && this.sourceGeneration === generation && !this.isScratching) {
@@ -702,15 +737,27 @@ export class AudioEngine {
     const now = ctx.currentTime;
     source.playbackRate.cancelScheduledValues(now);
     source.playbackRate.setValueAtTime(this.currentPlaybackRate, now);
+    sourceGainNode.gain.cancelScheduledValues(now);
+    sourceGainNode.gain.setValueAtTime(0, now);
+    sourceGainNode.gain.linearRampToValueAtTime(1, now + 0.015);
+    this.currentSourceGainRamp = {
+      from: 0,
+      to: 1,
+      startTime: now,
+      endTime: now + 0.015,
+    };
 
-    // De-click ramp on start
+    // Fade the deck master only when starting from silence. During a cue or
+    // scratch-direction change, the per-source gains provide a short crossfade.
     if (rampGain) {
-      try {
-        gain.gain.cancelScheduledValues(now);
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(1, now + 0.015);
-      } catch {
-        // mock
+      if (!hasOutgoingSource) {
+        try {
+          gain.gain.cancelScheduledValues(now);
+          gain.gain.setValueAtTime(0, now);
+          gain.gain.linearRampToValueAtTime(1, now + 0.015);
+        } catch {
+          // mock
+        }
       }
     } else {
       try {
@@ -807,7 +854,7 @@ export class AudioEngine {
 
     if (resumePlayback && this.audioBuffer) {
       // Replace the scratch source with clean forward playback at the exact hand position.
-      this.stopCurrentSourceNode();
+      // startSourceAt crossfades the scratch source into the normal transport source.
       this.isReversed = false;
       this.startSourceAt(this.logicalPosition, false);
       this.playbackState = 'playing';
@@ -1054,6 +1101,8 @@ export class AudioEngine {
     this.updateLogicalPositionBeforeStopping();
     const srcToStop = this.currentSource;
     this.currentSource = null;
+    this.currentSourceGainNode = null;
+    this.currentSourceGainRamp = null;
     this.playbackState = 'paused';
 
     if (!srcToStop || !this.gainNode || !this.audioContext) {
@@ -1143,6 +1192,17 @@ export class AudioEngine {
     }
   }
 
+  private disconnectSourceGain(source: AudioBufferSourceNode): void {
+    const sourceGainNode = this.sourceGainNodes.get(source);
+    if (!sourceGainNode) return;
+    try {
+      sourceGainNode.disconnect();
+    } catch {
+      // The gain node may already have been disconnected.
+    }
+    this.sourceGainNodes.delete(source);
+  }
+
   private stopSource(source: AudioBufferSourceNode): void {
     try {
       source.onended = null;
@@ -1150,6 +1210,8 @@ export class AudioEngine {
       source.disconnect();
     } catch {
       // The source may already have ended or been disconnected.
+    } finally {
+      this.disconnectSourceGain(source);
     }
   }
 
@@ -1164,6 +1226,8 @@ export class AudioEngine {
 
     const srcToStop = this.currentSource;
     this.currentSource = null;
+    this.currentSourceGainNode = null;
+    this.currentSourceGainRamp = null;
 
     if (this.gainNode && this.audioContext && srcToStop) {
       const now = this.audioContext.currentTime;
@@ -1211,6 +1275,8 @@ export class AudioEngine {
     }
 
     this.currentSource = null;
+    this.currentSourceGainNode = null;
+    this.currentSourceGainRamp = null;
     this.sourceGeneration++;
     this.stopTicker();
     this.stopCoastTimer();
@@ -1222,6 +1288,7 @@ export class AudioEngine {
     try {
       source.onended = null;
       source.disconnect();
+      this.disconnectSourceGain(source);
     } catch {
       // The source may already have been disconnected by the browser.
     }
@@ -1249,17 +1316,45 @@ export class AudioEngine {
     }
   }
 
-  private stopCurrentSourceNode(): void {
-    if (this.currentSource) {
-      try {
-        this.currentSource.onended = null;
-        this.currentSource.stop();
-        this.currentSource.disconnect();
-      } catch {
-        // Source may already have ended or been stopped
+  private fadeOutCurrentSourceNode(): void {
+    const source = this.currentSource;
+    const sourceGainNode = this.currentSourceGainNode;
+    const ramp = this.currentSourceGainRamp;
+    this.currentSource = null;
+    this.currentSourceGainNode = null;
+    this.currentSourceGainRamp = null;
+    if (!source) return;
+
+    try {
+      source.onended = null;
+      if (!sourceGainNode || !this.audioContext) {
+        this.stopSource(source);
+        return;
       }
-      this.currentSource = null;
+
+      const now = this.audioContext.currentTime;
+      const parameter = sourceGainNode.gain;
+      const currentValue = this.getRampValue(ramp, now, parameter.value);
+      if (typeof parameter.cancelAndHoldAtTime === 'function') {
+        parameter.cancelAndHoldAtTime(now);
+      } else {
+        parameter.cancelScheduledValues(now);
+        parameter.setValueAtTime(currentValue, now);
+      }
+      parameter.linearRampToValueAtTime(0, now + 0.015);
+      // Keep the outgoing source connected until its short fade has completed.
+      setTimeout(() => this.stopSource(source), 20);
+    } catch {
+      this.stopSource(source);
     }
+  }
+
+  private stopCurrentSourceNode(): void {
+    const source = this.currentSource;
+    this.currentSource = null;
+    this.currentSourceGainNode = null;
+    this.currentSourceGainRamp = null;
+    if (source) this.stopSource(source);
   }
 
   /**
