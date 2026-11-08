@@ -56,6 +56,7 @@ export function createDeckStore(
 
   let spinTimer: ReturnType<typeof setTimeout> | null = null;
   let coastTimer: ReturnType<typeof setTimeout> | null = null;
+  let trackLoadRequestId = 0;
   let lastSoundState: RecordSoundState | null = null;
 
   const clearSpinTimer = () => {
@@ -78,7 +79,7 @@ export function createDeckStore(
   const store = createStore<DeckStoreState>((set, get) => {
     const startSpinUp = (state: DeckMachineState) => {
       clearSpinTimer();
-      if (state.track === 'ready' && canRunMotor(state)) {
+      if (state.track === 'ready' && state.transport === 'playing' && canRunMotor(state)) {
         void transport?.spinUp(SPIN_UP_MS);
       }
       spinTimer = setTimeout(() => {
@@ -157,8 +158,10 @@ export function createDeckStore(
             if (previous.transport === 'playing') {
               transport?.seek(event.position);
             } else if (next.transport === 'playing') {
-              if (next.motorPhase === 'spinning-up') startSpinUp(next);
-              else void transport?.play(event.position);
+              if (next.motorPhase === 'spinning-up') {
+                transport?.seek(event.position);
+                startSpinUp(next);
+              } else void transport?.play(event.position);
             } else {
               transport?.seek(event.position);
             }
@@ -172,8 +175,10 @@ export function createDeckStore(
           if (next.tonearm === 'needle-down') {
             if (previous.transport === 'playing') transport?.seek(event.position);
             else if (next.transport === 'playing') {
-              if (next.motorPhase === 'spinning-up') startSpinUp(next);
-              else void transport?.play(event.position);
+              if (next.motorPhase === 'spinning-up') {
+                transport?.seek(event.position);
+                startSpinUp(next);
+              } else void transport?.play(event.position);
             } else transport?.seek(event.position);
           }
           break;
@@ -238,15 +243,20 @@ export function createDeckStore(
         return result.accepted;
       },
       loadTrack: async (file) => {
+        const requestId = ++trackLoadRequestId;
         get().dispatch({ type: 'TRACK_LOAD_REQUESTED' });
         if (!transport) {
-          get().dispatch({ type: 'TRACK_LOAD_FAILED', error: 'No audio transport is connected' });
+          if (requestId === trackLoadRequestId) {
+            get().dispatch({ type: 'TRACK_LOAD_FAILED', error: 'No audio transport is connected' });
+          }
           return;
         }
         try {
           await transport.loadTrack(file);
+          if (requestId !== trackLoadRequestId) return;
           get().dispatch({ type: 'TRACK_LOAD_SUCCEEDED' });
         } catch (error) {
+          if (requestId !== trackLoadRequestId) return;
           const message = error instanceof Error ? error.message : 'Unable to load audio track';
           get().dispatch({ type: 'TRACK_LOAD_FAILED', error: message });
         }
