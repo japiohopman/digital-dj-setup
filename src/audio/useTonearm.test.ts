@@ -144,6 +144,40 @@ describe('useTonearm', () => {
     expect(dispatch).toHaveBeenCalledWith({ type: 'ARM_PICKED_UP' });
   });
 
+  it('aborts an active drag on lostpointercapture without cueing', () => {
+    const dispatch = vi.fn(() => true);
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn().mockReturnValue(true),
+      releasePointerCapture: vi.fn(),
+      closest: vi.fn().mockReturnValue(null),
+    });
+    const { result } = renderHook(() => useTonearm({
+      duration: 100,
+      currentTime: 0,
+      armState: 'lifted',
+      armInteraction: 'idle',
+      dispatch,
+    }));
+    const event = {
+      button: 0,
+      pointerId: 77,
+      isPrimary: true,
+      clientX: 10,
+      clientY: 10,
+      stopPropagation: vi.fn(),
+      currentTarget: target,
+    } as unknown as React.PointerEvent<HTMLElement>;
+
+    act(() => result.current.handlePointerDown(event));
+    act(() => result.current.handleLostPointerCapture(event));
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'ARM_PICKED_UP' });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'ARM_DRAG_CANCELLED' });
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ARM_DROPPED' }));
+    expect(target.releasePointerCapture).toHaveBeenCalledWith(77);
+  });
+
   it('handles pointer cancel and lostpointercapture gracefully by dispatching ARM_DRAG_CANCELLED', () => {
     const dispatch = vi.fn(() => true);
 
