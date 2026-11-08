@@ -385,10 +385,12 @@ describe('AudioEngine', () => {
     expect(secondSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(2.0, expect.any(Number));
 
     // endScratch resumes normal forward playback if requested
-    // Ensure the reverse scratch source was stopped and a fresh forward source was started
+    // The reverse scratch source remains connected until its short crossfade completes.
     expect(secondSource?.isStopped).toBe(false);
     engine.endScratch(true);
 
+    expect(secondSource?.isStopped).toBe(false);
+    await vi.advanceTimersByTimeAsync(20);
     expect(secondSource?.isStopped).toBe(true);
     expect(mockContext.createdSources).toHaveLength(3);
     const forwardResumeSource = mockContext.createdSources[2];
