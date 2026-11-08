@@ -102,7 +102,7 @@ export function selectIsTrackAudible(state: DeckMachineState): boolean {
 }
 
 export function selectRecordSoundState(state: DeckMachineState): 'stopped' | 'on-record' | 'off-record' {
-  if (!canRunMotor(state) || state.track !== 'ready' ||
+  if (!canRunMotor(state) || !state.hasRecord || state.track !== 'ready' ||
     (state.transport !== 'playing' && state.transport !== 'scratching')) {
     return 'stopped';
   }
@@ -324,7 +324,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
     case 'ENGINE_PLAYBACK_SYNC': {
       if (state.track === 'loading') return reject(state, 'Playback sync ignored while a track is loading');
       if (event.playbackState === 'playing') {
-        if (!canRunMotor(state) || state.track !== 'ready') {
+        if (!canRunMotor(state) || !state.hasRecord || state.track !== 'ready') {
           return reject(state, 'Engine playback blocked: power, motor or track state is not ready');
         }
         if (state.transport === 'scratching') return accept(state, 'Scratch playback confirmed');

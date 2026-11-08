@@ -44,6 +44,11 @@ export function createDeckStore(
     trackLoaded: transport?.isLoaded ?? initial.trackLoaded,
     isPlaying: transport?.isPlaying ?? initial.isPlaying,
   });
+  if (transport?.error) {
+    initialMachine.track = 'error';
+    initialMachine.trackError = transport.error;
+    initialMachine.transport = 'idle';
+  }
 
   let spinTimer: ReturnType<typeof setTimeout> | null = null;
   let coastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -77,7 +82,7 @@ export function createDeckStore(
       }, SPIN_UP_MS);
     };
 
-    const startCoastDown = (state: DeckMachineState, previous: DeckMachineState) => {
+    const startCoastDown = (previous: DeckMachineState) => {
       clearSpinTimer();
       clearCoastTimer();
       if (previous.transport === 'scratching') {
@@ -95,13 +100,13 @@ export function createDeckStore(
       next: DeckMachineState,
       event: DeckEvent,
     ) => {
-      syncAudioGates(next);
+      if (!isHighFrequencyEvent(event)) syncAudioGates(next);
 
       switch (event.type) {
         case 'POWER_TOGGLED':
           if (previous.power === 'on' && next.power === 'off') {
             if (next.motorPhase === 'coasting') {
-              startCoastDown(next, previous);
+              startCoastDown(previous);
             } else {
               clearSpinTimer();
               clearCoastTimer();
@@ -146,7 +151,7 @@ export function createDeckStore(
             if (previous.transport === 'playing') {
               transport?.seek(event.position);
             } else if (next.transport === 'playing') {
-              if (next.motorPhase === 'spinning-up') transport?.spinUp(SPIN_UP_MS);
+              if (next.motorPhase === 'spinning-up') startSpinUp(next);
               else void transport?.play(event.position);
             } else {
               transport?.seek(event.position);
@@ -160,7 +165,7 @@ export function createDeckStore(
           if (next.tonearm === 'needle-down') {
             if (previous.transport === 'playing') transport?.seek(event.position);
             else if (next.transport === 'playing') {
-              if (next.motorPhase === 'spinning-up') transport?.spinUp(SPIN_UP_MS);
+              if (next.motorPhase === 'spinning-up') startSpinUp(next);
               else void transport?.play(event.position);
             } else transport?.seek(event.position);
           }

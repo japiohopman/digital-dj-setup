@@ -4,7 +4,7 @@ import type { DeckTransport } from '../audio/types';
 import { useVinylMotion } from '../audio/useVinylMotion';
 import { useTonearm } from '../audio/useTonearm';
 import { createDeckStore } from '../state/deckStore';
-import { selectIsSpinning } from '../state/deckMachine';
+import { selectIsSpinning, selectIsTrackAudible } from '../state/deckMachine';
 
 /**
  * Supported playback RPM speeds for the turntable deck.
@@ -553,7 +553,7 @@ export function Turntable({
             <dl>
               <div><dt>Track</dt><dd>{machine.track}</dd></div>
               <div><dt>Transport</dt><dd>{machine.transport}</dd></div>
-              <div><dt>Output</dt><dd>{selectIsSpinning(machine) && machine.power === 'on' && machine.tonearm === 'needle-down' && machine.transport === 'playing' ? 'AUDIBLE' : 'MUTED'}</dd></div>
+              <div><dt>Output</dt><dd>{selectIsTrackAudible(machine) ? 'AUDIBLE' : 'MUTED'}</dd></div>
             </dl>
             <ol>
               {trace.slice(-8).map((entry, index) => (

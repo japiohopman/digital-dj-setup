@@ -64,8 +64,7 @@ export function useVinylMotion({
     dispatch({ type: 'PLAYBACK_RATE_CHANGED', rate: effectivePlaybackRate });
   }, [dispatch, effectivePlaybackRate]);
 
-  const duration = transport?.duration || 0;
-  const maxAngle = duration > 0 ? duration * effectiveRps * TWO_PI : Infinity;
+  // A running platter keeps rotating even after the loaded track reaches its end.
 
   const prefersReducedMotionRef = useRef(false);
   useEffect(() => {
@@ -134,7 +133,6 @@ export function useVinylMotion({
         if (shouldRotate && !prefersReducedMotionRef.current) {
           const speedMod = isCoasting ? coastFactor : isSpinningUp ? spinUpFactor : 1;
           let newAngle = angleRef.current + radsPerMs * dt * speedMod;
-          if (maxAngle !== Infinity && newAngle > maxAngle) newAngle = maxAngle;
           angleRef.current = newAngle;
           setAngle(newAngle);
         }
@@ -173,9 +171,10 @@ export function useVinylMotion({
         rafIdRef.current = null;
       }
     };
-  }, [motorState, dispatch, radsPerMs, maxAngle, effectiveRps]);
+  }, [motorState, dispatch, radsPerMs, effectiveRps]);
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
     if (!isPowered || !isMotorOn || !isNeedleDown || !transport?.isLoaded) return;
     if (activePointerIdRef.current !== null) return;
     if (!dispatch({ type: 'SCRATCH_STARTED' })) return;
