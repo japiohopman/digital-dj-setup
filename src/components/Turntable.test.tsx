@@ -208,7 +208,8 @@ describe('Turntable controls and state machine integration', () => {
     expect(transport.loadTrack).toHaveBeenCalledWith(file);
     expect(transport.play).not.toHaveBeenCalled();
     expect(transport.spinUp).not.toHaveBeenCalled();
-    expect(view.container.textContent).toContain('fresh_cut.wav');
+    expect(view.container.textContent).toContain('Transportpaused');
+    expect(view.container.textContent).toContain('TRACK_LOAD_SUCCEEDED');
     view.unmount();
   });
 
