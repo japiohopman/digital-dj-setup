@@ -108,6 +108,7 @@ describe('AudioEngine', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
