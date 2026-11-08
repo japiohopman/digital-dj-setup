@@ -831,4 +831,61 @@ describe('Turntable interactive controls', () => {
     container.remove();
     vi.useRealTimers();
   });
+
+  it('prevents stylus contact unmute when deck has no record', async () => {
+    const mockTransport = {
+      trackName: 'breakbeat.mp3',
+      metadata: null,
+      duration: 120,
+      currentTime: 10,
+      playbackState: 'playing' as const,
+      isPlaying: true,
+      isLoaded: true,
+      isStylusDown: false,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
+    };
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <Turntable
+          deckLabel="DECK NO-RECORD"
+          initiallyHasRecord={false}
+          transport={mockTransport}
+        />,
+      );
+    });
+
+    const tonearm = container.querySelector('.tonearm') as HTMLElement;
+    expect(tonearm).not.toBeNull();
+
+    await act(async () => {
+      tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    });
+
+    // Because initiallyHasRecord is false, setStylusContact must never unmute track audio (never called with true)
+    expect(mockTransport.setStylusContact).not.toHaveBeenCalledWith(true);
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
 });

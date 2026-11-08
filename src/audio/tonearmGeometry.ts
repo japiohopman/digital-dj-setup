@@ -24,8 +24,8 @@
  *
  * Angular range of motion (in degrees, rotating counter-clockwise from arm rest towards record spindle):
  * - Parked / rest position: 0°
- * - Outer groove contact (lead-in): ~24.0° (distance to spindle ≈ 34% record radius in Y-units)
- * - Inner groove contact (run-out): ~47.0° (distance to spindle ≈ 13% record radius in Y-units)
+ * - Outer groove contact (lead-in): ~24.0° (stylus tip distance to spindle ≈ 86% of record radius, at outer groove)
+ * - Inner groove contact (run-out): ~47.0° (stylus tip distance to spindle ≈ 29% of record radius, at label lead-out)
  * - Maximum swing limit: 49.0°
  */
 

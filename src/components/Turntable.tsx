@@ -135,7 +135,9 @@ export function Turntable({
     currentTime: transport?.currentTime ?? 0,
     isBattleMode: isLandscape,
     onStylusContactChange: (isContact) => {
-      transport?.setStylusContact(isContact);
+      // Prevent track unmute if there is no record present on the deck
+      const effectiveContact = isContact && hasRecord;
+      transport?.setStylusContact(effectiveContact);
     },
     onSeek: (position) => {
       transport?.seek(position);
