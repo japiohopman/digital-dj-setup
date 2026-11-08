@@ -1236,6 +1236,7 @@ export class AudioEngine {
    */
   public pause(durationMs = 250): void {
     this.pendingReverseScratch = null;
+    const wasScratching = this.isScratching;
     this.isScratching = false;
     this.stopCoastTimer();
     this.stopSpinUpTimer();
@@ -1244,7 +1245,8 @@ export class AudioEngine {
       return;
     }
 
-    this.updateLogicalPositionBeforeStopping();
+    // Scratch position is driven by the platter gesture, not elapsed wall time.
+    if (!wasScratching) this.updateLogicalPositionBeforeStopping();
     const srcToStop = this.currentSource;
     this.currentSource = null;
     this.currentSourceGainNode = null;
