@@ -305,7 +305,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       if (!isFiniteNonNegative(event.position)) return reject(state, 'Ignored invalid cue position');
       {
         const next = { ...state };
-        if (canPlayTrack(next) && state.transport !== 'scratching') next.transport = 'playing';
+        if (canPlayTrack(next)) next.transport = 'playing';
         return accept(next, 'Cue position updated from tonearm radius');
       }
 
