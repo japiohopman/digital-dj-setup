@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from 'react';
 import type { DeckTransport } from './types';
-import type { DeckEvent, MotorPhase } from '../state/deckMachine';
+import type { DeckEvent, MotorPhase, TransportPhase } from '../state/deckMachine';
 
 export interface UseVinylMotionOptions {
   isPowered: boolean;
@@ -8,6 +8,7 @@ export interface UseVinylMotionOptions {
   speedRpm: 33 | 45;
   pitch: number;
   motorState: MotorPhase;
+  transportPhase: TransportPhase;
   transport?: DeckTransport | undefined;
   dispatch: (event: DeckEvent) => boolean;
   centerElementRef?: React.RefObject<HTMLElement | null> | undefined;
@@ -25,6 +26,20 @@ export function calculateScratchSpeedMagnitude(deltaAngle: number, expectedAngle
   return expectedAngleDelta > 0 ? Math.abs(deltaAngle / expectedAngleDelta) : 0;
 }
 
+export function calculateScratchTrackPosition(
+  startPosition: number,
+  accumulatedAngle: number,
+  effectiveRps: number,
+  duration: number,
+): number {
+  if (!Number.isFinite(startPosition) || !Number.isFinite(accumulatedAngle) ||
+    !Number.isFinite(effectiveRps) || effectiveRps <= 0 || !Number.isFinite(duration) || duration < 0) {
+    return 0;
+  }
+  const position = startPosition + accumulatedAngle / (TWO_PI * effectiveRps);
+  return Math.max(0, Math.min(duration, position));
+}
+
 /**
  * Platter rendering and pointer physics stay local to this hook.
  * Every playback-affecting action is emitted as a typed deck event.
@@ -35,6 +50,7 @@ export function useVinylMotion({
   speedRpm,
   pitch,
   motorState,
+  transportPhase,
   transport,
   dispatch,
   centerElementRef,
@@ -46,6 +62,9 @@ export function useVinylMotion({
   const isScratchingRef = useRef(false);
   const activePointerIdRef = useRef<number | null>(null);
   const draggingFromRef = useRef<{ x: number; y: number } | null>(null);
+  const scratchStartAngleRef = useRef(0);
+  const scratchStartPositionRef = useRef(0);
+  const cleanupScratchRef = useRef<((dispatchEnd: boolean, updateState?: boolean) => void) | null>(null);
   const centerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const rafIdRef = useRef<number | null>(null);
   const timestampPreviousRef = useRef(performance.now());
@@ -145,7 +164,13 @@ export function useVinylMotion({
           Math.max(1, draggingSpeedsRef.current.length);
         const reversed = resolveScratchDirection(deltaAngle, lastScratchDirectionRef.current);
         lastScratchDirectionRef.current = reversed;
-        const currentSeconds = effectiveRps > 0 ? angleRef.current / (TWO_PI * effectiveRps) : 0;
+        const scratchAngleDelta = angleRef.current - scratchStartAngleRef.current;
+        const currentSeconds = calculateScratchTrackPosition(
+          scratchStartPositionRef.current,
+          scratchAngleDelta,
+          effectiveRps,
+          transport?.duration ?? 0,
+        );
 
         dispatch({
           type: 'SCRATCH_MOVED',
@@ -172,8 +197,9 @@ export function useVinylMotion({
   }, [motorState, dispatch, radsPerMs, effectiveRps]);
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
+    if (e.button !== 0 || e.isPrimary === false) return;
     if (!isPowered || !isMotorOn || !transport?.isLoaded) return;
+    e.preventDefault();
     if (activePointerIdRef.current !== null) return;
     if (!dispatch({ type: 'SCRATCH_STARTED' })) return;
 
@@ -185,6 +211,12 @@ export function useVinylMotion({
 
     activePointerIdRef.current = e.pointerId;
     draggingFromRef.current = { x: e.clientX, y: e.clientY };
+    scratchStartAngleRef.current = angleRef.current;
+    const duration = transport.duration;
+    scratchStartPositionRef.current = Number.isFinite(duration)
+      ? Math.max(0, Math.min(duration, transport.currentTime))
+      : 0;
+    anglePreviousRef.current = angleRef.current;
     isScratchingRef.current = true;
     setIsScratching(true);
     draggingSpeedsRef.current = [];
@@ -218,27 +250,47 @@ export function useVinylMotion({
       draggingFromRef.current = current;
     };
 
-    const onPointerUp = (upEvent: PointerEvent) => {
-      if (upEvent.pointerId !== activePointerIdRef.current) return;
+    const upPointerId = e.pointerId;
+    const finishGesture = (dispatchEnd: boolean, updateState = true) => {
+      if (activePointerIdRef.current !== upPointerId) return;
       try {
-        e.currentTarget.releasePointerCapture(upEvent.pointerId);
+        if (e.currentTarget.hasPointerCapture(upPointerId)) {
+          e.currentTarget.releasePointerCapture(upPointerId);
+        }
       } catch {
-        // The pointer may already have been released.
+        // The pointer may already have been released or capture lost.
       }
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
       activePointerIdRef.current = null;
       isScratchingRef.current = false;
-      setIsScratching(false);
+      if (updateState) setIsScratching(false);
       draggingFromRef.current = null;
-      dispatch({ type: 'SCRATCH_ENDED' });
+      cleanupScratchRef.current = null;
+      if (dispatchEnd) dispatch({ type: 'SCRATCH_ENDED' });
     };
+
+    const onPointerUp = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== activePointerIdRef.current) return;
+      finishGesture(true);
+    };
+    cleanupScratchRef.current = finishGesture;
 
     window.addEventListener('pointermove', onPointerMove, { passive: false });
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
   }, [centerElementRef, dispatch, isMotorOn, isPowered, transport]);
+
+  useEffect(() => {
+    if (transportPhase !== 'scratching' && isScratchingRef.current) {
+      cleanupScratchRef.current?.(false);
+    }
+  }, [transportPhase]);
+
+  useEffect(() => () => {
+    cleanupScratchRef.current?.(false, false);
+  }, []);
 
   return { angle, isScratching, discRef, onPointerDown };
 }
