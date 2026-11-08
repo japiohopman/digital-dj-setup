@@ -593,6 +593,43 @@ describe('AudioEngine', () => {
     engine.dispose();
   });
 
+  it('layers supplied vinyl and needle sounds alongside the original track', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+    } as Response);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const engine = createEngine();
+    try {
+      await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'layering-test.mp3');
+      await engine.play();
+      engine.setRecordSoundState('on-record');
+      engine.playNeedleDropSound('correct');
+
+      // Let the four fetch/decode promises and the one-shot scheduling settle.
+      for (let i = 0; i < 10; i++) await Promise.resolve();
+
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+      expect(fetchMock).toHaveBeenCalledWith('/sounds/vinyl_loop.wav');
+      expect(fetchMock).toHaveBeenCalledWith('/sounds/not_on_record_loop.wav');
+      expect(fetchMock).toHaveBeenCalledWith('/sounds/needle_start_record.wav');
+      expect(fetchMock).toHaveBeenCalledWith('/sounds/needle_placed_wrong.wav');
+
+      // Original track + one vinyl loop + one independent needle-drop one-shot.
+      expect(mockContext.createdSources).toHaveLength(3);
+      expect((mockContext.createdSources[1] as unknown as { loop: boolean }).loop).toBe(true);
+      // Two track gain stages, a loop gain and a separate one-shot gain.
+      expect(mockContext.createdGainParams).toHaveLength(4);
+    } finally {
+      engine.setRecordSoundState('stopped');
+      await vi.advanceTimersByTimeAsync(100);
+      mockContext.createdSources[2]?.onended?.();
+      engine.dispose();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('routes audio through a GainNode with de-click ramps on play and pause', async () => {
     const engine = createEngine();
     await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'declick-test.mp3');
