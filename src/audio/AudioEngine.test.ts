@@ -118,6 +118,68 @@ describe('AudioEngine', () => {
     });
   };
 
+  it('cancels a pending needle placement cue when stylus contact is lifted', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    })));
+    const engine = createEngine();
+
+    engine.setStylusContact(true);
+    engine.playNeedleDropSound('correct');
+    engine.setStylusContact(false);
+
+    await vi.waitFor(() => {
+      expect(fetch).toHaveBeenCalledTimes(4);
+    });
+    const assetsPromise = (engine as unknown as {
+      recordSoundAssetsPromise: Promise<void> | null;
+    }).recordSoundAssetsPromise;
+    await assetsPromise;
+    await Promise.resolve();
+
+    expect(mockContext.createdSources).toHaveLength(0);
+    engine.dispose();
+  });
+
+  it('retries only missing record sound assets after a failed fetch', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('needle_start_record.wav') && fetchMock.mock.calls.filter(([call]) =>
+        String(call).endsWith('needle_start_record.wav'),
+      ).length === 1) {
+        return { ok: false, arrayBuffer: async () => new ArrayBuffer(0) };
+      }
+      return { ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const engine = createEngine();
+
+    engine.setRecordSoundState('off-record');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    const firstAssetsPromise = (engine as unknown as {
+      recordSoundAssetsPromise: Promise<void> | null;
+    }).recordSoundAssetsPromise;
+    await firstAssetsPromise;
+
+    engine.playNeedleDropSound('correct');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+    const retryPromise = (engine as unknown as {
+      recordSoundAssetsPromise: Promise<void> | null;
+    }).recordSoundAssetsPromise;
+    await retryPromise;
+    await Promise.resolve();
+
+    expect(fetchMock.mock.calls.filter(([call]) =>
+      String(call).endsWith('needle_start_record.wav'),
+    )).toHaveLength(2);
+    expect(fetchMock.mock.calls.filter(([call]) =>
+      String(call).endsWith('vinyl_loop.wav'),
+    )).toHaveLength(1);
+    expect(mockContext.createdSources).toHaveLength(2);
+    engine.dispose();
+  });
+
   it('initializes with default idle state', () => {
     const engine = createEngine();
     const state = engine.getState();
