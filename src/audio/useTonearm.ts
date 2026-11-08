@@ -4,7 +4,7 @@ import {
   type TonearmConfig,
   type TonearmState,
   angleToPlaybackProgress,
-  calculateUnclampedArmAngleFromPointer,
+  calculateArmPointerBearingFromPointer,
   isAngleAtOuterLeadIn,
   isAngleInPlayableRecord,
   playbackProgressToAngle,
@@ -189,7 +189,7 @@ export function useTonearm({
     const point = getBoardPoint(e);
     let grabOffset = 0;
     if (point) {
-      const pointerAngle = calculateUnclampedArmAngleFromPointer(
+      const pointerAngle = calculateArmPointerBearingFromPointer(
         point.x, point.y, point.width, point.height, isBattleMode, config,
       );
       // Keep the original touch point attached to the headshell during drag.
@@ -212,7 +212,7 @@ export function useTonearm({
     if (activePointerIdRef.current !== e.pointerId) return;
     const point = getBoardPoint(e);
     if (!point) return;
-    const pointerAngle = calculateUnclampedArmAngleFromPointer(
+    const pointerAngle = calculateArmPointerBearingFromPointer(
       point.x, point.y, point.width, point.height, isBattleMode, config,
     );
     setArmPosition(pointerAngle - (pointerStartRef.current?.grabOffset ?? 0));
