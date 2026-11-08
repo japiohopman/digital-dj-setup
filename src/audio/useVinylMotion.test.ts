@@ -88,7 +88,7 @@ describe('useVinylMotion physical platter input', () => {
     } as unknown as ReactPointerEvent<HTMLDivElement>;
 
     act(() => result.current.onPointerDown(pointerDown));
-    (pointerDown as unknown as { currentTarget: HTMLDivElement }).currentTarget = null;
+    (pointerDown as unknown as { currentTarget: HTMLDivElement | null }).currentTarget = null;
 
     expect(dispatch).toHaveBeenCalledWith({ type: 'SCRATCH_STARTED' });
     expect(result.current.isScratching).toBe(true);
@@ -133,7 +133,7 @@ describe('useVinylMotion physical platter input', () => {
   });
 
   it('cancels local pointer ownership when the machine ends scratching externally', () => {
-    const dispatch = vi.fn(() => true);
+    const dispatch = vi.fn((_event: { type: string }) => true);
     const target = Object.assign(document.createElement('div'), {
       setPointerCapture: vi.fn(),
       hasPointerCapture: vi.fn().mockReturnValue(true),
@@ -150,7 +150,7 @@ describe('useVinylMotion physical platter input', () => {
         transport: { isLoaded: true, currentTime: 12, duration: 100 } as unknown as DeckTransport,
         dispatch,
       }),
-      { initialProps: { transportPhase: 'playing' as const } },
+      { initialProps: { transportPhase: 'playing' as 'playing' | 'paused' } },
     );
     const event = {
       button: 0,
