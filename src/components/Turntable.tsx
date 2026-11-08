@@ -134,10 +134,12 @@ export function Turntable({
     duration: transport?.duration ?? 0,
     currentTime: transport?.currentTime ?? 0,
     isBattleMode: isLandscape,
+    hasRecord,
     onStylusContactChange: (isContact) => {
-      // Prevent track unmute if there is no record present on the deck
-      const effectiveContact = isContact && hasRecord;
-      transport?.setStylusContact(effectiveContact);
+      transport?.setStylusContact(isContact && hasRecord);
+    },
+    onNeedleDropSound: (kind) => {
+      transport?.playNeedleDropSound?.(kind);
     },
     onSeek: (position) => {
       transport?.seek(position);
@@ -386,6 +388,22 @@ export function Turntable({
     motorState === 'coasting' ||
     motorState === 'spinning-up' ||
     (isPowered && isMotorOn && (!transport?.isLoaded || transport.isPlaying));
+
+  useEffect(() => {
+    if (!transport) return;
+    const surfaceState = !hasRecord || !transport.isPlaying
+      ? 'stopped'
+      : isNeedleDown && transport.isStylusDown
+        ? 'on-record'
+        : 'off-record';
+    transport.setRecordSoundState?.(surfaceState);
+  }, [
+    hasRecord,
+    isNeedleDown,
+    transport?.isPlaying,
+    transport?.isStylusDown,
+    transport?.setRecordSoundState,
+  ]);
 
   const classes = [
     'turntable',

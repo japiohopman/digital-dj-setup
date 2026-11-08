@@ -724,9 +724,8 @@
   height: 100%;
   background: transparent url(/turntable/landscape/tt_arm.png) no-repeat 0 0;
   background-size: contain;
-  pointer-events: auto;
-  cursor: grab;
-  touch-action: none;
+  pointer-events: none;
+  cursor: default;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -741,9 +740,21 @@
 }
 
 /* Subtle elevation shadow when arm is lifted */
-.turntable .tonearm-holder.arm-lifted .tonearm,
+.turntable .tonearm-holder.arm-lifted:not(.is-dragging) .tonearm {
+  transform: perspective(700px) rotateX(-7deg) translateY(-2px) scale(1.005);
+  filter: drop-shadow(4px 8px 6px rgba(0, 0, 0, 0.5));
+}
+
 .turntable .tonearm-holder.is-dragging .tonearm {
   filter: drop-shadow(4px 8px 6px rgba(0, 0, 0, 0.5));
+}
+
+.turntable .tonearm-holder .tonearm {
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+.turntable .tonearm-holder.is-dragging .tonearm {
+  transition: none;
 }
 
 .turntable .tonearm-holder.needle-down .tonearm {
@@ -753,13 +764,16 @@
 /* Generous mobile touch hit-area targeting the cartridge and headshell (bottom 25% of arm) */
 .turntable .tonearm-headshell-target {
   position: absolute;
-  left: 15%;
-  bottom: 0%;
-  width: 65%;
-  height: 25%;
+  left: 16%;
+  bottom: 2%;
+  width: 58%;
+  height: 20%;
   min-width: 44px;
   min-height: 44px;
+  border-radius: 14px;
   cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
   touch-action: none;
 }
 
