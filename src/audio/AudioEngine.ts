@@ -15,6 +15,12 @@ interface GainRampState {
   endTime: number;
 }
 
+interface PendingReverseScratch {
+  speed: number;
+  position: number;
+  loadId: number;
+}
+
 /**
  * Isolated Web Audio API playback engine for a single turntable deck.
  *
@@ -28,6 +34,8 @@ export class AudioEngine {
 
   private audioBuffer: AudioBuffer | null = null;
   private audioBufferReversed: AudioBuffer | null = null;
+  private reversedAudioBufferPromise: Promise<AudioBuffer | null> | null = null;
+  private pendingReverseScratch: PendingReverseScratch | null = null;
   private currentSource: AudioBufferSourceNode | null = null;
   private currentSourceGainNode: GainNode | null = null;
   private readonly sourceGainNodes = new WeakMap<AudioBufferSourceNode, GainNode>();
@@ -580,7 +588,11 @@ export class AudioEngine {
 
       this.applyTerminalEdgeFade(decoded);
       this.audioBuffer = decoded;
-      this.audioBufferReversed = this.createReversedAudioBuffer(decoded, ctx);
+      // Reverse PCM is generated lazily in short background tasks. Loading and
+      // normal forward playback must never synchronously copy an entire track.
+      this.audioBufferReversed = null;
+      this.reversedAudioBufferPromise = null;
+      this.pendingReverseScratch = null;
       this.duration = decoded.duration;
       this.logicalPosition = 0;
       this.playbackState = 'stopped';
@@ -589,6 +601,9 @@ export class AudioEngine {
     } catch (err) {
       if (this.isDisposed || requestId !== this.loadCounter) return;
       this.audioBuffer = null;
+      this.audioBufferReversed = null;
+      this.reversedAudioBufferPromise = null;
+      this.pendingReverseScratch = null;
       this.duration = 0;
       this.logicalPosition = 0;
       this.playbackState = 'idle';
@@ -646,23 +661,117 @@ export class AudioEngine {
    * @param ctx - AudioContext for buffer allocation.
    * @returns Newly allocated reversed AudioBuffer.
    */
-  private createReversedAudioBuffer(buffer: AudioBuffer, ctx: AudioContext): AudioBuffer {
-    const reversed = ctx.createBuffer(
-      buffer.numberOfChannels,
-      buffer.length,
-      buffer.sampleRate,
-    );
-    for (let c = 0; c < buffer.numberOfChannels; c++) {
-      const forwardData = buffer.getChannelData(c);
-      const reversedData = reversed.getChannelData(c);
-      for (let i = 0, j = buffer.length - 1; i < buffer.length; i++, j--) {
-        const sample = forwardData[j];
-        if (sample !== undefined) {
-          reversedData[i] = sample;
-        }
-      }
+  /**
+   * Builds a reversed PCM buffer without monopolizing the main thread.
+   *
+   * Work is split into small native TypedArray copy/reverse operations and
+   * yielded between chunks. This keeps long tracks from blocking rendering,
+   * pointer input, or transport controls. The result is cached per loaded track.
+   */
+  private ensureReversedAudioBuffer(): Promise<AudioBuffer | null> {
+    if (this.audioBufferReversed) {
+      return Promise.resolve(this.audioBufferReversed);
     }
-    return reversed;
+    if (this.reversedAudioBufferPromise) {
+      return this.reversedAudioBufferPromise;
+    }
+
+    const buffer = this.audioBuffer;
+    const context = this.audioContext;
+    const loadId = this.loadCounter;
+    if (!buffer || !context || this.isDisposed) {
+      return Promise.resolve(null);
+    }
+
+    const chunkSamples = 262_144;
+    let reversed: AudioBuffer | null = null;
+    let channel = 0;
+    let sampleOffset = 0;
+
+    const promise = new Promise<AudioBuffer | null>((resolve) => {
+      const finish = (result: AudioBuffer | null): void => {
+        if (this.reversedAudioBufferPromise === promise) {
+          this.reversedAudioBufferPromise = null;
+        }
+        resolve(result);
+      };
+
+      const processChunk = (): void => {
+        // A newer track load or disposal invalidates this background task.
+        if (
+          this.isDisposed ||
+          loadId !== this.loadCounter ||
+          this.audioBuffer !== buffer ||
+          context.state === 'closed'
+        ) {
+          finish(null);
+          return;
+        }
+
+        try {
+          reversed ??= context.createBuffer(
+            buffer.numberOfChannels,
+            buffer.length,
+            buffer.sampleRate,
+          );
+
+          if (buffer.length === 0) {
+            channel = buffer.numberOfChannels;
+          } else {
+            const count = Math.min(chunkSamples, buffer.length - sampleOffset);
+            const sourceData = buffer.getChannelData(channel);
+            const reversedData = reversed.getChannelData(channel);
+            const sourceStart = buffer.length - sampleOffset - count;
+            const targetEnd = sampleOffset + count;
+
+            // Copy a reversed source slice into the corresponding destination
+            // slice. TypedArray operations run natively and avoid per-sample JS.
+            reversedData.set(sourceData.subarray(sourceStart, sourceStart + count), sampleOffset);
+            reversedData.subarray(sampleOffset, targetEnd).reverse();
+            sampleOffset = targetEnd;
+
+            if (sampleOffset >= buffer.length) {
+              channel++;
+              sampleOffset = 0;
+            }
+          }
+
+          if (channel >= buffer.numberOfChannels) {
+            this.audioBufferReversed = reversed;
+            finish(reversed);
+            return;
+          }
+
+          // Yield to the browser between chunks so input and painting can run.
+          setTimeout(processChunk, 0);
+        } catch {
+          // Reverse scratching is optional; a failure must not invalidate the
+          // successfully decoded forward track.
+          finish(null);
+        }
+      };
+
+      setTimeout(processChunk, 0);
+    });
+
+    this.reversedAudioBufferPromise = promise;
+    void promise.then((reversedBuffer) => {
+      const pending = this.pendingReverseScratch;
+      if (!pending || pending.loadId !== loadId) return;
+
+      this.pendingReverseScratch = null;
+      if (reversedBuffer && this.isScratching && !this.isDisposed && this.loadCounter === loadId) {
+        // Use the most recent pointer position, not the stale first request.
+        this.scratch(pending.speed, true, pending.position);
+      } else if (!reversedBuffer && this.isScratching && !this.isDisposed && this.loadCounter === loadId) {
+        this.isScratching = false;
+        this.playbackState = 'paused';
+        this.error = 'Reverse scratch audio could not be prepared for this track.';
+        this.notify();
+      }
+    });
+
+    return promise;
   }
 
   /**
@@ -714,7 +823,10 @@ export class AudioEngine {
   }
 
   private startSourceAt(position: number, reversed: boolean, rampGain = true): void {
-    if (!this.audioBuffer || !this.audioBufferReversed || this.isDisposed) return;
+    if (!this.audioBuffer || this.isDisposed) return;
+    const sourceBuffer = reversed ? this.audioBufferReversed : this.audioBuffer;
+    if (!sourceBuffer) return;
+    if (!reversed) this.pendingReverseScratch = null;
     const ctx = this.getOrCreateContext();
     const gain = this.getOrCreateGainNode();
 
@@ -725,7 +837,7 @@ export class AudioEngine {
     const generation = ++this.sourceGeneration;
     const source = ctx.createBufferSource();
     const sourceGainNode = ctx.createGain();
-    source.buffer = reversed ? this.audioBufferReversed : this.audioBuffer;
+    source.buffer = sourceBuffer;
     source.connect(sourceGainNode);
     sourceGainNode.connect(gain);
     this.sourceGainNodes.set(source, sourceGainNode);
@@ -781,6 +893,10 @@ export class AudioEngine {
 
     source.start(0, startOffset);
     this.currentSource = source;
+
+    // Forward playback gives the browser time to prepare reverse PCM in the
+    // background before the user asks for a backward scratch.
+    if (!reversed) void this.ensureReversedAudioBuffer();
   }
 
   /**
@@ -835,6 +951,22 @@ export class AudioEngine {
     const clampedPos = Math.max(0, Math.min(this.duration, position));
     this.logicalPosition = clampedPos;
 
+    if (reversed && !this.audioBufferReversed) {
+      // Keep only the latest pointer sample while reverse PCM is prepared.
+      // Fade out the forward source rather than letting it play in the wrong
+      // direction, then resume immediately when the cached reverse is ready.
+      this.pendingReverseScratch = {
+        speed,
+        position: clampedPos,
+        loadId: this.loadCounter,
+      };
+      this.fadeOutCurrentSourceNode();
+      this.playbackState = 'playing';
+      void this.ensureReversedAudioBuffer();
+      return;
+    }
+
+    this.pendingReverseScratch = null;
     if (!this.currentSource || reversed !== this.isReversed) {
       this.startSourceAt(clampedPos, reversed);
     }
@@ -861,6 +993,7 @@ export class AudioEngine {
    * @param resumePlayback - Whether to return to forward playback (true if platter motor is running).
    */
   public endScratch(resumePlayback: boolean): void {
+    this.pendingReverseScratch = null;
     this.isScratching = false;
 
     if (resumePlayback && this.audioBuffer) {
@@ -1230,6 +1363,8 @@ export class AudioEngine {
    * Stops playback and resets logical position to 0.
    */
   public stop(): void {
+    this.pendingReverseScratch = null;
+    this.isScratching = false;
     this.stopCoastTimer();
     this.stopSpinUpTimer();
     this.cancelPendingBrake();
@@ -1385,6 +1520,8 @@ export class AudioEngine {
     this.listeners.clear();
     this.audioBuffer = null;
     this.audioBufferReversed = null;
+    this.reversedAudioBufferPromise = null;
+    this.pendingReverseScratch = null;
 
     if (this.metadata?.artworkUrl) {
       try {
