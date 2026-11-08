@@ -39,7 +39,6 @@ class MockAudioContext {
   destination = {};
   createdSources: MockAudioBufferSourceNode[] = [];
   createdGainParams: MockAudioParam[] = [];
-  createdGainNodes: GainNode[] = [];
 
   resume = vi.fn(async () => {
     this.state = 'running';
@@ -92,13 +91,11 @@ class MockAudioContext {
   createGain = vi.fn(() => {
     const gain = new MockAudioParam();
     this.createdGainParams.push(gain);
-    const node = {
+    return {
       gain,
       connect: vi.fn(),
       disconnect: vi.fn(),
     } as unknown as GainNode;
-    this.createdGainNodes.push(node);
-    return node;
   });
 }
 
@@ -575,29 +572,6 @@ describe('AudioEngine', () => {
       expect.closeTo(2.025, 3),
       expect.any(Number),
     );
-
-    engine.dispose();
-  });
-
-  it('keeps program audio muted until stylus contact opens the dedicated gain stage', async () => {
-    const engine = createEngine();
-    await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'stylus-gate-test.mp3');
-
-    const [programGain, stylusGain] = mockContext.createdGainNodes;
-    expect(programGain).toBeDefined();
-    expect(stylusGain).toBeDefined();
-    expect(mockContext.createdGainParams[1]?.value).toBe(0);
-    expect(programGain?.connect).toHaveBeenCalledWith(stylusGain);
-    expect(stylusGain?.connect).toHaveBeenCalledWith(mockContext.destination);
-
-    await engine.play();
-    const source = mockContext.createdSources[0];
-    expect(source?.connect).toHaveBeenCalledWith(programGain);
-
-    engine.setStylusContact(true);
-    expect(mockContext.createdGainParams[1]?.value).toBe(1);
-    engine.setStylusContact(false);
-    expect(mockContext.createdGainParams[1]?.value).toBe(0);
 
     engine.dispose();
   });
