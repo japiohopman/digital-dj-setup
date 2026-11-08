@@ -879,6 +879,7 @@ export class AudioEngine {
       return;
     }
 
+    this.stopSpinUpTimer();
     this.stopCoastTimer();
 
     const ctx = this.getOrCreateContext();

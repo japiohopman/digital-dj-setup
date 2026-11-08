@@ -40,12 +40,8 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
   }, []);
 
   const loadTrack = useCallback(async (file: File) => {
-    if (!engineRef.current) return;
-    try {
-      await engineRef.current.loadTrack(file);
-    } catch {
-      // Error is set in engine state and propagated via subscriber
-    }
+    if (!engineRef.current) throw new Error('Audio engine is not available');
+    await engineRef.current.loadTrack(file);
   }, []);
 
   const play = useCallback(async (offset?: number) => {

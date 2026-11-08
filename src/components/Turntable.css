@@ -970,3 +970,49 @@
     animation: none;
   }
 }
+
+
+/* Collapsible machine trace: kept quiet until a deck needs inspection. */
+.deck-state-trace {
+  margin-top: 0.45rem;
+  font: 0.62rem/1.35 var(--font-mono, monospace);
+  color: rgba(235, 235, 235, 0.72);
+}
+
+.deck-state-trace summary {
+  cursor: pointer;
+  user-select: none;
+  letter-spacing: 0.04em;
+}
+
+.deck-state-trace dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+  margin: 0.35rem 0;
+}
+
+.deck-state-trace dl div {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.deck-state-trace dt {
+  opacity: 0.6;
+}
+
+.deck-state-trace dd {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.deck-state-trace ol {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.deck-state-trace li[data-accepted="false"] {
+  color: #f0a27b;
+}

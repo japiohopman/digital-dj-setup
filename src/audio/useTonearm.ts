@@ -5,17 +5,17 @@ import {
   type TonearmState,
   angleToPlaybackProgress,
   calculateArmPointerBearingFromPointer,
-  isAngleAtOuterLeadIn,
   isAngleInPlayableRecord,
   playbackProgressToAngle,
 } from './tonearmGeometry';
+import type { DeckEvent, ArmInteraction } from '../state/deckMachine';
 
 export interface UseTonearmOptions {
   duration: number;
   currentTime: number;
-  onStylusContactChange: (isContact: boolean) => void;
-  onSeek: (timestamp: number) => void;
-  onNeedleDropSound?: (kind: 'correct' | 'wrong') => void;
+  armState: TonearmState;
+  armInteraction: ArmInteraction;
+  dispatch: (event: DeckEvent) => boolean;
   hasRecord?: boolean;
   isBattleMode?: boolean;
   config?: TonearmConfig;
@@ -23,7 +23,6 @@ export interface UseTonearmOptions {
 
 export interface UseTonearmReturn {
   armAngle: number;
-  armState: TonearmState;
   isDragging: boolean;
   isNeedleDown: boolean;
   tonearmRef: React.RefObject<HTMLDivElement | null>;
@@ -43,31 +42,27 @@ interface PointerStart {
   y: number;
   time: number;
   grabOffset: number;
+  wasAlreadyNeedleDown: boolean;
 }
 
 export function useTonearm({
   duration,
   currentTime,
-  onStylusContactChange,
-  onSeek,
-  onNeedleDropSound,
+  armState,
+  armInteraction,
+  dispatch,
   hasRecord = true,
   isBattleMode = false,
   config = DEFAULT_TONEARM_CONFIG,
 }: UseTonearmOptions): UseTonearmReturn {
   const [armAngle, setArmAngle] = useState(config.parkAngle);
-  const [armState, setArmState] = useState<TonearmState>('parked');
-  const [isDragging, setIsDragging] = useState(false);
   const tonearmRef = useRef<HTMLDivElement | null>(null);
   const activePointerIdRef = useRef<number | null>(null);
   const pointerStartRef = useRef<PointerStart | null>(null);
-  const initialArmStateRef = useRef<TonearmState>('parked');
   const currentAngleRef = useRef(config.parkAngle);
-  const armStateRef = useRef<TonearmState>('parked');
 
-  const setContactState = useCallback((down: boolean) => {
-    onStylusContactChange(down && hasRecord);
-  }, [hasRecord, onStylusContactChange]);
+  const isDragging = armInteraction === 'dragging';
+  const isNeedleDown = armState === 'needle-down';
 
   const setArmPosition = useCallback((angle: number) => {
     const next = Math.max(config.minAngle, Math.min(config.maxAngle, angle));
@@ -82,46 +77,41 @@ export function useTonearm({
     setArmPosition(playbackProgressToAngle(progress, config));
   }, [armState, isDragging, currentTime, duration, config, setArmPosition]);
 
+  const getCuePosition = useCallback((angle: number) => {
+    const progress = angleToPlaybackProgress(angle, config);
+    return progress !== null && duration > 0
+      ? progress * duration
+      : Math.max(0, Math.min(duration, currentTime));
+  }, [config, currentTime, duration]);
+
   const liftArm = useCallback(() => {
-    setContactState(false);
-    armStateRef.current = 'lifted';
-    setArmState('lifted');
-  }, [setContactState]);
+    dispatch({ type: 'ARM_LIFTED' });
+  }, [dispatch]);
 
   const parkArm = useCallback(() => {
-    setContactState(false);
-    armStateRef.current = 'parked';
-    setArmState('parked');
     setArmPosition(config.parkAngle);
-  }, [config.parkAngle, setContactState, setArmPosition]);
+    dispatch({ type: 'ARM_PARKED' });
+  }, [config.parkAngle, dispatch, setArmPosition]);
 
-  const landAtCurrentPosition = useCallback((wasAlreadyOnRecord: boolean) => {
+  const landAtCurrentPosition = useCallback((
+    wasAlreadyNeedleDown: boolean,
+    tooFast = false,
+  ) => {
     const angle = currentAngleRef.current;
-    const inGroove = hasRecord && isAngleInPlayableRecord(angle, config);
-    const validInitialDrop = isAngleAtOuterLeadIn(angle, config);
-
-    if (inGroove && (wasAlreadyOnRecord || validInitialDrop)) {
-      armStateRef.current = 'needle-down';
-      setArmState('needle-down');
-      setContactState(true);
-      if (!wasAlreadyOnRecord) onNeedleDropSound?.('correct');
-      const progress = angleToPlaybackProgress(angle, config);
-      if (progress !== null && duration > 0) onSeek(progress * duration);
-      return true;
-    }
-
-    setContactState(false);
-    armStateRef.current = angle <= config.parkAngle + 2 ? 'parked' : 'lifted';
-    setArmState(armStateRef.current);
-    if (armStateRef.current === 'parked') setArmPosition(config.parkAngle);
-    else if (hasRecord) onNeedleDropSound?.('wrong');
-    return false;
-  }, [config, duration, hasRecord, onNeedleDropSound, onSeek, setContactState, setArmPosition]);
+    const acceptedGroovePosition = getCuePosition(angle);
+    dispatch({
+      type: 'ARM_DROPPED',
+      angle,
+      wasAlreadyNeedleDown,
+      position: acceptedGroovePosition,
+      tooFast,
+    });
+  }, [dispatch, getCuePosition]);
 
   const lowerArm = useCallback(() => {
-    if (armStateRef.current === 'needle-down') return;
+    if (armState === 'needle-down' || isDragging) return;
     landAtCurrentPosition(false);
-  }, [landAtCurrentPosition]);
+  }, [armState, isDragging, landAtCurrentPosition]);
 
   const getBoardPoint = useCallback((e: React.PointerEvent<HTMLElement>) => {
     const board = e.currentTarget.closest('.bd');
@@ -142,50 +132,46 @@ export function useTonearm({
   const finalizeDrag = useCallback((e: React.PointerEvent<HTMLElement>) => {
     if (activePointerIdRef.current !== e.pointerId) return;
     const start = pointerStartRef.current;
-    const wasAlreadyOnRecord = initialArmStateRef.current === 'needle-down';
+    const wasAlreadyNeedleDown = start?.wasAlreadyNeedleDown ?? false;
     const distance = start ? Math.hypot(e.clientX - start.x, e.clientY - start.y) : Infinity;
     const elapsed = start ? Math.max(1, Date.now() - start.time) : 1;
     const speed = distance / elapsed;
     const isTap = start !== null && distance < 5 && elapsed < 350;
 
-    // Clear ownership before releasePointerCapture can emit lostpointercapture.
+    // Clear pointer ownership before releasePointerCapture can emit lostpointercapture.
     activePointerIdRef.current = null;
     pointerStartRef.current = null;
-    setIsDragging(false);
     releaseCapture(e);
 
-    if (isTap && wasAlreadyOnRecord) {
-      liftArm();
+    if (isTap && wasAlreadyNeedleDown) {
+      dispatch({ type: 'ARM_LIFTED' });
       return;
     }
-    if (!wasAlreadyOnRecord && speed > 1.8 && currentAngleRef.current > config.parkAngle + 2) {
-      setContactState(false);
-      armStateRef.current = 'lifted';
-      setArmState('lifted');
-      onNeedleDropSound?.('wrong');
-      return;
-    }
+
+    const tooFast = !wasAlreadyNeedleDown &&
+      speed > 1.8 &&
+      currentAngleRef.current > config.parkAngle + 2;
+
     if (currentAngleRef.current <= config.parkAngle + 2) {
       parkArm();
       return;
     }
-    landAtCurrentPosition(wasAlreadyOnRecord);
-  }, [config.parkAngle, landAtCurrentPosition, liftArm, onNeedleDropSound, parkArm, releaseCapture, setContactState]);
+    landAtCurrentPosition(wasAlreadyNeedleDown, tooFast);
+  }, [config.parkAngle, dispatch, landAtCurrentPosition, parkArm, releaseCapture]);
 
   const abortDrag = useCallback((e: React.PointerEvent<HTMLElement>) => {
     if (activePointerIdRef.current !== e.pointerId) return;
     activePointerIdRef.current = null;
     pointerStartRef.current = null;
-    setIsDragging(false);
     releaseCapture(e);
-    setContactState(false);
-    armStateRef.current = 'lifted';
-    setArmState('lifted');
-  }, [releaseCapture, setContactState]);
+    dispatch({ type: 'ARM_DRAG_CANCELLED' });
+  }, [dispatch, releaseCapture]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
     if (e.button !== 0 || activePointerIdRef.current !== null || e.isPrimary === false) return;
     e.stopPropagation();
+    if (!dispatch({ type: 'ARM_PICKED_UP' })) return;
+
     const point = getBoardPoint(e);
     let grabOffset = 0;
     if (point) {
@@ -197,16 +183,19 @@ export function useTonearm({
     }
 
     activePointerIdRef.current = e.pointerId;
-    pointerStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now(), grabOffset };
-    initialArmStateRef.current = armStateRef.current;
+    pointerStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      time: Date.now(),
+      grabOffset,
+      wasAlreadyNeedleDown: armState === 'needle-down',
+    };
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
       // Continue tracking the active pointer if capture is unavailable.
     }
-    setIsDragging(true);
-    liftArm();
-  }, [config, getBoardPoint, isBattleMode, liftArm]);
+  }, [armState, dispatch, getBoardPoint, isBattleMode]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLElement>) => {
     if (activePointerIdRef.current !== e.pointerId) return;
@@ -216,7 +205,7 @@ export function useTonearm({
       point.x, point.y, point.width, point.height, isBattleMode,
     );
     setArmPosition(pointerAngle - (pointerStartRef.current?.grabOffset ?? 0));
-  }, [config, getBoardPoint, isBattleMode, setArmPosition]);
+  }, [getBoardPoint, isBattleMode, setArmPosition]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLElement>) => finalizeDrag(e), [finalizeDrag]);
   const handlePointerCancel = useCallback((e: React.PointerEvent<HTMLElement>) => abortDrag(e), [abortDrag]);
@@ -226,40 +215,53 @@ export function useTonearm({
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault();
       const target = setArmPosition(currentAngleRef.current + 2);
-      if (armStateRef.current !== 'needle-down' && target > config.parkAngle + 2) {
-        armStateRef.current = 'lifted';
-        setArmState('lifted');
-      }
-      if (armStateRef.current === 'needle-down') {
+      if (armState === 'needle-down') {
         const progress = angleToPlaybackProgress(target, config);
-        if (progress !== null && duration > 0) onSeek(progress * duration);
-        else liftArm();
+        if (progress !== null && duration > 0) {
+          dispatch({ type: 'ARM_CUE', angle: target, position: progress * duration });
+        } else {
+          liftArm();
+        }
+      } else if (target > config.parkAngle + 2) {
+        dispatch({ type: 'ARM_LIFTED' });
       }
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       e.preventDefault();
       const target = setArmPosition(currentAngleRef.current - 2);
       if (target <= config.parkAngle + 1) parkArm();
-      else if (armStateRef.current === 'needle-down') {
+      else if (armState === 'needle-down') {
         const progress = angleToPlaybackProgress(target, config);
-        if (progress !== null && duration > 0) onSeek(progress * duration);
-        else liftArm();
+        if (progress !== null && duration > 0) {
+          dispatch({ type: 'ARM_CUE', angle: target, position: progress * duration });
+        } else {
+          liftArm();
+        }
       } else {
-        armStateRef.current = 'lifted';
-        setArmState('lifted');
+        dispatch({ type: 'ARM_LIFTED' });
       }
     } else if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
-      if (armStateRef.current === 'needle-down') liftArm();
+      if (armState === 'needle-down') liftArm();
       else lowerArm();
     } else if (e.key === 'p' || e.key === 'P') {
       e.preventDefault();
       parkArm();
     }
-  }, [config, duration, liftArm, lowerArm, onSeek, parkArm, setArmPosition]);
+  }, [armState, config, dispatch, duration, liftArm, lowerArm, parkArm, setArmPosition]);
 
   return {
-    armAngle, armState, isDragging, isNeedleDown: armState === 'needle-down',
-    tonearmRef, handlePointerDown, handlePointerMove, handlePointerUp,
-    handlePointerCancel, handleLostPointerCapture, handleKeyDown, liftArm, lowerArm, parkArm,
+    armAngle,
+    isDragging,
+    isNeedleDown,
+    tonearmRef,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    handlePointerCancel,
+    handleLostPointerCapture,
+    handleKeyDown,
+    liftArm,
+    lowerArm,
+    parkArm,
   };
 }
