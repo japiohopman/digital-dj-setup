@@ -446,7 +446,8 @@ describe('AudioEngine', () => {
     expect(mockContext.createdSources).toHaveLength(1);
     expect(firstSource?.isStopped).toBe(false);
 
-    await vi.advanceTimersByTimeAsync(0);
+    // Two channels are processed in separate scheduled chunks.
+    await vi.advanceTimersByTimeAsync(1);
     expect(mockContext.createdSources).toHaveLength(2);
     const secondSource = mockContext.createdSources[1];
     expect(secondSource).toBeDefined();
@@ -499,7 +500,9 @@ describe('AudioEngine', () => {
     const resumedForwardSource = mockContext.createdSources[1];
     expect(resumedForwardSource).toBeDefined();
 
-    await vi.advanceTimersByTimeAsync(0);
+    // Let the background channel chunks finish; the canceled reverse request
+    // must not replace the already resumed forward source.
+    await vi.advanceTimersByTimeAsync(1);
     expect(mockContext.createdSources).toHaveLength(2);
     expect(resumedForwardSource?.startedAtOffset).toBe(15);
     expect(resumedForwardSource?.buffer).toBe(firstSource?.buffer);
