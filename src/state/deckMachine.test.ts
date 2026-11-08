@@ -93,6 +93,58 @@ describe('deck state machine', () => {
     expect(selectIsTrackAudible(state)).toBe(true);
   });
 
+  it('allows a valid re-drop after an explicit lift, including away from the outer lead-in', () => {
+    let state = createInitialDeckState({ trackLoaded: true });
+    state = apply(state, {
+      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+    });
+    state = apply(state, { type: 'ARM_LIFTED' });
+    state = apply(state, {
+      type: 'ARM_DROPPED', angle: 36, wasAlreadyNeedleDown: false, position: 52,
+    });
+    expect(state.hasValidNeedleDrop).toBe(true);
+    expect(state.tonearm).toBe('needle-down');
+    expect(state.transport).toBe('playing');
+  });
+
+  it('resets re-drop eligibility when a new track is loaded', () => {
+    let state = createInitialDeckState({ trackLoaded: true });
+    state = apply(state, {
+      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+    });
+    expect(state.hasValidNeedleDrop).toBe(true);
+    state = apply(state, { type: 'TRACK_LOAD_REQUESTED' });
+    expect(state.hasValidNeedleDrop).toBe(false);
+    state = apply(state, { type: 'TRACK_LOAD_SUCCEEDED' });
+    const invalidDrop = transitionDeck(state, {
+      type: 'ARM_DROPPED', angle: 36, wasAlreadyNeedleDown: false, position: 52,
+    });
+    expect(invalidDrop.state.tonearm).toBe('lifted');
+    expect(invalidDrop.state.transport).toBe('paused');
+  });
+
+  it('rejects invalid needle-drop positions without opening the stylus gate', () => {
+    const state = createInitialDeckState({ trackLoaded: true });
+    const result = transitionDeck(state, {
+      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: Number.NaN,
+    });
+    expect(result.accepted).toBe(true);
+    expect(result.state.tonearm).toBe('lifted');
+    expect(result.state.transport).toBe('paused');
+    expect(selectIsTrackAudible(result.state)).toBe(false);
+  });
+
+  it('rejects keyboard cue events during a physical scratch', () => {
+    let state = createInitialDeckState({ trackLoaded: true });
+    state = apply(state, {
+      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+    });
+    state = apply(state, { type: 'SCRATCH_STARTED' });
+    const result = transitionDeck(state, { type: 'ARM_CUE', angle: 35, position: 50 });
+    expect(result.accepted).toBe(false);
+    expect(result.state).toEqual(state);
+  });
+
   it('keeps the motor running when the tonearm is lifted', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
