@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, type CSSProperties, type PointerEvent, type KeyboardEvent, type ChangeEvent } from 'react';
+import { useState, useRef, useEffect, type CSSProperties, type PointerEvent, type KeyboardEvent, type ChangeEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from 'zustand';
 import type { DeckTransport } from '../audio/types';
 import { useVinylMotion } from '../audio/useVinylMotion';
@@ -35,6 +36,8 @@ export interface TurntableProps {
   initiallyHasSlipmat?: boolean;
   /** Optional DeckTransport instance connected to the deck's audio engine. */
   transport?: DeckTransport;
+  /** Whether this deck currently owns the floating tonearm calibration dev widget. */
+  showTonearmMeter?: boolean;
 }
 
 /**
@@ -43,9 +46,20 @@ export interface TurntableProps {
  * Provides realistic visual styling, spinning animations, speed selection,
  * power dial, target light toggle, and an interactive draggable pitch slider.
  */
+function TonearmMeterPortal({ children }: { children: ReactNode }) {
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
+
+  return portalTarget ? createPortal(children, portalTarget) : null;
+}
+
 export function Turntable({
   id,
   transport,
+  showTonearmMeter = true,
   deckLabel = 'DECK 01',
   modelName = 'SL-1200 MK2',
   initialSpeed = 33,
@@ -690,106 +704,113 @@ export function Turntable({
         </div>
       </div>
 
-      <section className="tonearm-meter-panel" aria-label={`${deckLabel} tonearm measurement`}>
-        <div className="tonearm-meter-heading">
-          <div>
-            <span className="tonearm-meter-title">TONEARM MEASUREMENT</span>
-            <span className="tonearm-meter-subtitle">Nulpunt = arm in de rusthouder</span>
-          </div>
-          <output
-            className="tonearm-meter-live"
-            data-testid="tonearm-angle-readout"
-            aria-label="Current tonearm angle"
-            aria-live="polite"
+      {showTonearmMeter && (
+        <TonearmMeterPortal>
+          <section
+            className="tonearm-meter-panel"
+            data-dev-widget="tonearm-angle-meter"
+            aria-label={`${deckLabel} tonearm measurement`}
           >
-            {armAngle.toFixed(2)}°
-          </output>
-        </div>
+            <div className="tonearm-meter-heading">
+              <div>
+                <span className="tonearm-meter-title">TONEARM DEV</span>
+                <span className="tonearm-meter-subtitle">Nulpunt = arm in de rusthouder</span>
+              </div>
+              <output
+                className="tonearm-meter-live"
+                data-testid="tonearm-angle-readout"
+                aria-label="Current tonearm angle"
+                aria-live="polite"
+              >
+                {armAngle.toFixed(2)}°
+              </output>
+            </div>
 
-        <div
-          className="tonearm-meter-scale"
-          role="img"
-          aria-label={`Armhoek ${armAngle.toFixed(2)} graden op een schaal van 0 tot 49 graden`}
-        >
-          <div className="tonearm-meter-track" />
-          {measuredGrooveStart !== null && (
-            <span
-              className="tonearm-meter-marker start"
-              style={{ left: `${armMeterPercent(measuredGrooveStart)}%` }}
-              title={`Beginpunt: ${measuredGrooveStart.toFixed(2)}°`}
-            />
-          )}
-          {measuredGrooveEnd !== null && (
-            <span
-              className="tonearm-meter-marker end"
-              style={{ left: `${armMeterPercent(measuredGrooveEnd)}%` }}
-              title={`Eindpunt: ${measuredGrooveEnd.toFixed(2)}°`}
-            />
-          )}
-          <span
-            className="tonearm-meter-marker current"
-            style={{ left: `${armMeterPercent(armAngle)}%` }}
-          />
-        </div>
+            <div
+              className="tonearm-meter-scale"
+              role="img"
+              aria-label={`Armhoek ${armAngle.toFixed(2)} graden op een schaal van 0 tot 49 graden`}
+            >
+              <div className="tonearm-meter-track" />
+              {measuredGrooveStart !== null && (
+                <span
+                  className="tonearm-meter-marker start"
+                  style={{ left: `${armMeterPercent(measuredGrooveStart)}%` }}
+                  title={`Beginpunt: ${measuredGrooveStart.toFixed(2)}°`}
+                />
+              )}
+              {measuredGrooveEnd !== null && (
+                <span
+                  className="tonearm-meter-marker end"
+                  style={{ left: `${armMeterPercent(measuredGrooveEnd)}%` }}
+                  title={`Eindpunt: ${measuredGrooveEnd.toFixed(2)}°`}
+                />
+              )}
+              <span
+                className="tonearm-meter-marker current"
+                style={{ left: `${armMeterPercent(armAngle)}%` }}
+              />
+            </div>
 
-        <div className="tonearm-meter-ticks" aria-hidden="true">
-          {[0, 10, 20, 30, 40, 49].map((degree) => (
-            <span key={degree} style={{ left: `${armMeterPercent(degree)}%` }}>{degree}°</span>
-          ))}
-        </div>
+            <div className="tonearm-meter-ticks" aria-hidden="true">
+              {[0, 10, 20, 30, 40, 49].map((degree) => (
+                <span key={degree} style={{ left: `${armMeterPercent(degree)}%` }}>{degree}°</span>
+              ))}
+            </div>
 
-        <div className="tonearm-meter-readings">
-          <div>
-            <span>Begin groef</span>
-            <output data-testid="tonearm-start-readout">
-              {measuredGrooveStart === null ? '—' : `${measuredGrooveStart.toFixed(2)}°`}
-            </output>
-          </div>
-          <div>
-            <span>Einde groef</span>
-            <output data-testid="tonearm-end-readout">
-              {measuredGrooveEnd === null ? '—' : `${measuredGrooveEnd.toFixed(2)}°`}
-            </output>
-          </div>
-          <div className="tonearm-meter-reach">
-            <span>Armreach</span>
-            <output data-testid="tonearm-reach-readout">
-              {measuredGrooveReach === null ? '—' : `${measuredGrooveReach.toFixed(2)}°`}
-            </output>
-          </div>
-        </div>
+            <div className="tonearm-meter-readings">
+              <div>
+                <span>Begin groef</span>
+                <output data-testid="tonearm-start-readout">
+                  {measuredGrooveStart === null ? '—' : `${measuredGrooveStart.toFixed(2)}°`}
+                </output>
+              </div>
+              <div>
+                <span>Einde groef</span>
+                <output data-testid="tonearm-end-readout">
+                  {measuredGrooveEnd === null ? '—' : `${measuredGrooveEnd.toFixed(2)}°`}
+                </output>
+              </div>
+              <div className="tonearm-meter-reach">
+                <span>Armreach</span>
+                <output data-testid="tonearm-reach-readout">
+                  {measuredGrooveReach === null ? '—' : `${measuredGrooveReach.toFixed(2)}°`}
+                </output>
+              </div>
+            </div>
 
-        <div className="tonearm-meter-actions">
-          <button
-            type="button"
-            className="tonearm-meter-button"
-            onClick={handleCaptureGrooveStart}
-            aria-label={`${deckLabel} Capture groove start angle`}
-          >
-            Leg beginpunt vast
-          </button>
-          <button
-            type="button"
-            className="tonearm-meter-button"
-            onClick={handleCaptureGrooveEnd}
-            aria-label={`${deckLabel} Capture groove end angle`}
-          >
-            Leg eindpunt vast
-          </button>
-          <button
-            type="button"
-            className="tonearm-meter-clear"
-            onClick={handleClearArmMeasurement}
-            disabled={measuredGrooveStart === null && measuredGrooveEnd === null}
-          >
-            Wis meting
-          </button>
-        </div>
-        <p className="tonearm-meter-hint">
-          Sleep de arm naar het gewenste punt en leg het vast. Armreach = eindpunt min beginpunt.
-          Dit meetpaneel verandert de afspeelinstellingen niet.
-        </p>
-      </section>
+            <div className="tonearm-meter-actions">
+              <button
+                type="button"
+                className="tonearm-meter-button"
+                onClick={handleCaptureGrooveStart}
+                aria-label={`${deckLabel} Capture groove start angle`}
+              >
+                Leg beginpunt vast
+              </button>
+              <button
+                type="button"
+                className="tonearm-meter-button"
+                onClick={handleCaptureGrooveEnd}
+                aria-label={`${deckLabel} Capture groove end angle`}
+              >
+                Leg eindpunt vast
+              </button>
+              <button
+                type="button"
+                className="tonearm-meter-clear"
+                onClick={handleClearArmMeasurement}
+                disabled={measuredGrooveStart === null && measuredGrooveEnd === null}
+              >
+                Wis meting
+              </button>
+            </div>
+            <p className="tonearm-meter-hint">
+              Sleep de arm naar het gewenste punt en leg het vast.
+            </p>
+          </section>
+        </TonearmMeterPortal>
+      )}
     </div>
   );
 }
