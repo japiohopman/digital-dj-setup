@@ -260,9 +260,10 @@ export function transitionDeck(
       if (state.armInteraction === 'dragging') return reject(state, 'Tonearm already has an active pointer');
       return accept({
         ...state,
+        hasValidNeedleDrop: false,
         tonearm: 'lifted',
         armInteraction: 'dragging',
-      }, 'Tonearm picked up: stylus gate closes; motor state is unchanged');
+      }, 'Tonearm picked up: initial-drop eligibility reset and stylus gate closes');
 
     case 'ARM_DRAG_CANCELLED':
       if (state.armInteraction !== 'dragging') return reject(state, 'No active tonearm drag to cancel');
@@ -307,7 +308,7 @@ export function transitionDeck(
         return accept(next, 'Incorrect cartridge/fast drop on vinyl: use wrong-drop cue and offset start');
       }
 
-      const validStart = state.hasValidNeedleDrop || event.wasAlreadyNeedleDown ||
+      const validStart = state.hasValidNeedleDrop ||
         (isAngleAtOuterLeadIn(event.angle, tonearmConfig) && !event.tooFast && !isPhysicalCartridgeDrop);
       const validDrop = state.hasRecord && inGroove &&
         isFiniteNonNegative(event.position) && validStart && !event.tooFast && !isPhysicalCartridgeDrop;
