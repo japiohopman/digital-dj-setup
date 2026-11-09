@@ -114,7 +114,7 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
   }, []);
 
   const playNeedleDropSound = useCallback((kind: NeedleDropSound) => {
-    engineRef.current?.playNeedleDropSound(kind);
+    return engineRef.current?.playNeedleDropSound(kind) ?? Promise.resolve();
   }, []);
 
   return {
