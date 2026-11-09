@@ -74,7 +74,7 @@ describe('deck state machine', () => {
     expect(selectIsTrackAudible(state)).toBe(true);
   });
 
-  it('rejects an initial drop outside the outer lead-in but accepts a valid re-drop', () => {
+  it('requires the correct LP lead-in again after picking up an already-playing tonearm', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
       type: 'ARM_DROPPED', angle: 35, wasAlreadyNeedleDown: false, position: 50,
@@ -85,11 +85,23 @@ describe('deck state machine', () => {
     state = apply(state, {
       type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 0,
     });
+    expect(state.hasValidNeedleDrop).toBe(true);
+
     state = apply(state, { type: 'ARM_PICKED_UP' });
+    expect(state.hasValidNeedleDrop).toBe(false);
+
     state = apply(state, {
       type: 'ARM_DROPPED', angle: 35, wasAlreadyNeedleDown: true, position: 50,
     });
+    expect(state.hasValidNeedleDrop).toBe(false);
+    expect(state.tonearm).toBe('lifted');
+    expect(selectIsTrackAudible(state)).toBe(false);
+
+    state = apply(state, {
+      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: true, position: 0,
+    });
     expect(state.tonearm).toBe('needle-down');
+    expect(state.hasValidNeedleDrop).toBe(true);
     expect(state.transport).toBe('playing');
     expect(selectIsTrackAudible(state)).toBe(true);
   });
