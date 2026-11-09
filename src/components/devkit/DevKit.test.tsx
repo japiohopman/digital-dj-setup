@@ -52,5 +52,9 @@ describe('DevKit', () => {
 
     fireEvent.click(screen.getByLabelText('Arm angle meter'));
     expect(screen.queryByTestId('tonearm-angle-readout')).toBeNull();
+
+    fireEvent.click(screen.getByLabelText('Arm angle meter'));
+    expect(screen.getByTestId('tonearm-start-readout').textContent).toBe('12.00°');
+    expect(screen.getByTestId('tonearm-end-readout').textContent).toBe('22.00°');
   });
 });
