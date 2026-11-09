@@ -104,6 +104,52 @@ describe('useVinylMotion physical platter input', () => {
     unmount();
   });
 
+  it('anchors the physical platter angle to the live audio playhead on pointer down', () => {
+    const dispatch = vi.fn(() => true);
+    const transport = {
+      isLoaded: true,
+      duration: 100,
+      currentTime: 0,
+      getCurrentTime: vi.fn(() => 42),
+    } as unknown as DeckTransport;
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+    });
+
+    const { result, unmount } = renderHook(() => useVinylMotion({
+      isPowered: true,
+      isMotorOn: true,
+      speedRpm: 33,
+      pitch: 0,
+      motorState: 'running',
+      transportPhase: 'playing',
+      transport,
+      dispatch,
+    }));
+
+    const event = {
+      button: 0,
+      isPrimary: true,
+      preventDefault: vi.fn(),
+      pointerId: 10,
+      clientX: 120,
+      clientY: 120,
+      currentTarget: target,
+    } as unknown as ReactPointerEvent<HTMLDivElement>;
+
+    act(() => result.current.onPointerDown(event));
+
+    const expectedAngle = 42 * (33.3333 / 60) * Math.PI * 2;
+    expect(transport.getCurrentTime).toHaveBeenCalledTimes(1);
+    expect(result.current.angle).toBeCloseTo(expectedAngle, 6);
+
+    const pointerUp = new Event('pointerup') as Event & { pointerId: number };
+    Object.defineProperty(pointerUp, 'pointerId', { value: 10 });
+    act(() => window.dispatchEvent(pointerUp));
+    unmount();
+  });
+
   it('ignores secondary-button platter presses before preventing the browser default', () => {
     const dispatch = vi.fn(() => true);
     const { result } = renderHook(() => useVinylMotion({
