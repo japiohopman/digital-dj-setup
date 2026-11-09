@@ -62,7 +62,7 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
-  it('seeks to the needle drop position before starting motor spin-up', () => {
+  it('seeks to the needle drop position before starting motor spin-up', async () => {
     const transport = makeTransport({ isLoaded: true });
     const store = createDeckStore(transport, { initiallyMotorOn: false, trackLoaded: true });
     store.getState().dispatch({ type: 'START_STOP_TOGGLED' });
@@ -159,9 +159,9 @@ describe('per-deck Zustand adapter', () => {
     expect(transport.seek).toHaveBeenCalledWith(0);
     expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('on-record');
     expect(transport.play).toHaveBeenCalledWith(0);
-    expect(vi.mocked(transport.setRecordSoundState).mock.invocationCallOrder.at(-1)).toBeLessThan(
-      vi.mocked(transport.play).mock.invocationCallOrder.at(-1) ?? Infinity,
-    );
+    const loopStartOrder = vi.mocked(transport.setRecordSoundState).mock.invocationCallOrder.at(-1) ?? Infinity;
+    const trackStartOrder = vi.mocked(transport.play).mock.invocationCallOrder.at(-1) ?? Infinity;
+    expect(loopStartOrder).toBeLessThan(trackStartOrder);
     store.getState().dispose();
   });
 
