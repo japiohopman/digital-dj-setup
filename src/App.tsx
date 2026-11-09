@@ -1,13 +1,21 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { useDeckTransport } from './audio/useDeckTransport';
 import { Turntable } from './components/Turntable';
+import { DevKit } from './components/devkit/DevKit';
 import './components/Turntable.css';
 
 type ActiveDeck = 'a' | 'b';
 
 export function App() {
   const [activeDeck, setActiveDeck] = useState<ActiveDeck>('a');
+  const [armAngles, setArmAngles] = useState<{ a: number; b: number }>({ a: 0, b: 0 });
+  const updateDeckAAngle = useCallback((angle: number) => {
+    setArmAngles((current) => ({ ...current, a: angle }));
+  }, []);
+  const updateDeckBAngle = useCallback((angle: number) => {
+    setArmAngles((current) => ({ ...current, b: angle }));
+  }, []);
   const transportA = useDeckTransport();
   const transportB = useDeckTransport();
 
@@ -53,7 +61,7 @@ export function App() {
             id="deck-a-panel"
           >
             <div className="dual-deck__turntable">
-              <Turntable deckLabel="DECK A" modelName="SL-1200 MK2" transport={transportA} showTonearmMeter={activeDeck === 'a'} />
+              <Turntable deckLabel="DECK A" modelName="SL-1200 MK2" transport={transportA} onArmAngleChange={updateDeckAAngle} />
             </div>
           </div>
 
@@ -64,11 +72,18 @@ export function App() {
             id="deck-b-panel"
           >
             <div className="dual-deck__turntable">
-              <Turntable deckLabel="DECK B" modelName="SL-1200 MK2" transport={transportB} showTonearmMeter={activeDeck === 'b'} />
+              <Turntable deckLabel="DECK B" modelName="SL-1200 MK2" transport={transportB} onArmAngleChange={updateDeckBAngle} />
             </div>
           </div>
         </div>
       </section>
+
+      {import.meta.env.DEV && (
+        <DevKit
+          activeDeckLabel={activeDeck === 'a' ? 'DECK A' : 'DECK B'}
+          activeArmAngle={armAngles[activeDeck]}
+        />
+      )}
 
       <footer className="app-footer">
         <span className={`app-footer__status${isAudioActive ? ' is-active' : ''}`} />
