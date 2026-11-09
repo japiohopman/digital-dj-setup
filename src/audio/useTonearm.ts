@@ -68,6 +68,7 @@ export function useTonearm({
   const currentAngleRef = useRef(config.parkAngle);
   const lastPlaybackTimeRef = useRef<number | null>(null);
   const pendingPlaybackPositionRef = useRef<number | null>(null);
+  const pendingPlaybackAngleRef = useRef<number | null>(null);
   const previousTransportPhaseRef = useRef(transportPhase);
   const wasDraggingRef = useRef(false);
 
@@ -123,6 +124,7 @@ export function useTonearm({
     if (wasScratching) {
       lastPlaybackTimeRef.current = currentTime;
       pendingPlaybackPositionRef.current = null;
+      pendingPlaybackAngleRef.current = null;
       wasDraggingRef.current = false;
       return;
     }
@@ -130,6 +132,7 @@ export function useTonearm({
     if (armState === 'parked') {
       lastPlaybackTimeRef.current = currentTime;
       pendingPlaybackPositionRef.current = null;
+      pendingPlaybackAngleRef.current = null;
       wasDraggingRef.current = false;
       setArmPosition(config.parkAngle);
       return;
@@ -138,6 +141,7 @@ export function useTonearm({
     if (armState !== 'needle-down' || duration <= 0) {
       lastPlaybackTimeRef.current = currentTime;
       pendingPlaybackPositionRef.current = null;
+      pendingPlaybackAngleRef.current = null;
       wasDraggingRef.current = false;
       return;
     }
@@ -145,6 +149,7 @@ export function useTonearm({
     if (transportPhase === 'ended') {
       lastPlaybackTimeRef.current = currentTime;
       pendingPlaybackPositionRef.current = null;
+      pendingPlaybackAngleRef.current = null;
       wasDraggingRef.current = false;
       setArmPosition(config.runoutAngle);
       return;
@@ -154,10 +159,19 @@ export function useTonearm({
     // Wait for the engine to publish that exact destination, then establish
     // the baseline. Do not mistake the seek itself for groove-following motion.
     const pendingPosition = pendingPlaybackPositionRef.current;
+    const pendingAngle = pendingPlaybackAngleRef.current;
     if (pendingPosition !== null) {
-      if (Math.abs(currentTime - pendingPosition) <= 0.25) {
+      const transportReachedCue = Math.abs(currentTime - pendingPosition) <= 0.25;
+      // Preserve the physical drop angle if the engine's first frame is just
+      // after the requested offset instead of exactly on the seek position.
+      const transportAdvancedPastCue = transportPhase === 'playing' &&
+        currentTime > pendingPosition &&
+        currentTime - pendingPosition <= 1.5;
+      if (transportReachedCue || transportAdvancedPastCue) {
         lastPlaybackTimeRef.current = currentTime;
         pendingPlaybackPositionRef.current = null;
+        pendingPlaybackAngleRef.current = null;
+        if (pendingAngle !== null) setArmPosition(pendingAngle);
         wasDraggingRef.current = false;
       }
       return;
@@ -232,6 +246,7 @@ export function useTonearm({
       ? Math.min(30, duration)
       : groovePosition;
     pendingPlaybackPositionRef.current = surface === 'record' ? position : null;
+    pendingPlaybackAngleRef.current = surface === 'record' ? angle : null;
     const accepted = dispatch({
       type: 'ARM_DROPPED',
       angle,
@@ -241,7 +256,10 @@ export function useTonearm({
       grip,
       surface,
     });
-    if (!accepted) pendingPlaybackPositionRef.current = null;
+    if (!accepted) {
+      pendingPlaybackPositionRef.current = null;
+      pendingPlaybackAngleRef.current = null;
+    }
   }, [config, dispatch, duration, getCuePosition]);
 
   const lowerArm = useCallback(() => {
@@ -382,6 +400,7 @@ export function useTonearm({
           pendingPlaybackPositionRef.current = progress * duration;
           if (!dispatch({ type: 'ARM_CUE', angle: target, position: progress * duration })) {
             pendingPlaybackPositionRef.current = null;
+            pendingPlaybackAngleRef.current = null;
           }
         } else {
           liftArm();
@@ -399,6 +418,7 @@ export function useTonearm({
           pendingPlaybackPositionRef.current = progress * duration;
           if (!dispatch({ type: 'ARM_CUE', angle: target, position: progress * duration })) {
             pendingPlaybackPositionRef.current = null;
+            pendingPlaybackAngleRef.current = null;
           }
         } else {
           liftArm();

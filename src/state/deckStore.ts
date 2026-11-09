@@ -60,6 +60,7 @@ export function createDeckStore(
   let lastSoundState: RecordSoundState | null = null;
   let needleDropSequence = 0;
   let isNeedleCuePending = false;
+  let isNeedleSeekPending = false;
 
   const clearSpinTimer = () => {
     if (spinTimer !== null) clearTimeout(spinTimer);
@@ -69,11 +70,21 @@ export function createDeckStore(
     if (coastTimer !== null) clearTimeout(coastTimer);
     coastTimer = null;
   };
-  const syncAudioGates = (state: DeckMachineState, deferRecordLoop = false) => {
-    transport?.setStylusContact(selectIsTrackAudible(state));
-    // The needle impact plays before the music and vinyl crackle. Keep both
-    // record layers stopped until the one-shot cue reports that it has ended.
-    const soundState = deferRecordLoop || isNeedleCuePending ? 'stopped' : selectRecordSoundState(state);
+  /** Synchronizes programme audibility and surface layers from machine state. */
+  const syncAudioGates = (
+    state: DeckMachineState,
+    deferRecordLoop = false,
+    deferProgrammeAudio = false,
+  ) => {
+    const programmeAudioAllowed = selectIsTrackAudible(state) &&
+      !deferProgrammeAudio &&
+      !isNeedleCuePending &&
+      !isNeedleSeekPending;
+    transport?.setStylusContact(programmeAudioAllowed);
+    // Keep record layers stopped until both the impact cue and transport seek complete.
+    const soundState = deferRecordLoop || isNeedleCuePending || isNeedleSeekPending
+      ? 'stopped'
+      : selectRecordSoundState(state);
     if (soundState !== lastSoundState) {
       transport?.setRecordSoundState?.(soundState);
       lastSoundState = soundState;
@@ -81,14 +92,16 @@ export function createDeckStore(
   };
 
   const store = createStore<DeckStoreState>((set, get) => {
-    const startSpinUp = (state: DeckMachineState) => {
+    /** Starts the motor ramp and resolves when the audio engine finishes it. */
+    const startSpinUp = (state: DeckMachineState): Promise<void> => {
       clearSpinTimer();
-      if (state.track === 'ready' && state.transport === 'playing' && canRunMotor(state)) {
-        void transport?.spinUp(SPIN_UP_MS);
-      }
+      const spinUp = state.track === 'ready' && state.transport === 'playing' && canRunMotor(state)
+        ? transport?.spinUp(SPIN_UP_MS)
+        : undefined;
       spinTimer = setTimeout(() => {
         get().dispatch({ type: 'MOTOR_SPIN_UP_COMPLETED' });
       }, SPIN_UP_MS);
+      return spinUp ?? Promise.resolve();
     };
 
     const startCoastDown = (previous: DeckMachineState) => {
@@ -105,21 +118,27 @@ export function createDeckStore(
       }, COAST_DOWN_MS);
     };
 
+    /** Runs the impact cue, vinyl loop, seek and programme start for one accepted drop. */
     const sequenceNeedleDrop = (kind: 'correct' | 'wrong', position: number) => {
       const sequence = ++needleDropSequence;
       isNeedleCuePending = true;
+      isNeedleSeekPending = true;
       void (async () => {
-        // The one-shot must finish before the vinyl loop or program track starts.
         await transport?.playNeedleDropSound?.(kind);
         if (sequence !== needleDropSequence) return;
         isNeedleCuePending = false;
 
         let current = get().machine;
-        if (current.track !== 'ready' || current.tonearm !== 'needle-down') return;
+        if (current.track !== 'ready' || current.tonearm !== 'needle-down') {
+          isNeedleSeekPending = false;
+          syncAudioGates(current);
+          return;
+        }
 
         if (current.transport !== 'scratching' && canRunMotor(current)) {
-          // Wait until the vinyl loop is actually scheduled, not merely requested.
-          // This makes the loop and program audio enter together after the impact.
+          // Record the request before awaiting scheduling so a concurrent arm
+          // lift can issue a later stop even when the vinyl asset is retrying.
+          lastSoundState = 'on-record';
           await transport?.setRecordSoundState?.('on-record');
           if (sequence !== needleDropSequence) return;
 
@@ -130,23 +149,29 @@ export function createDeckStore(
             !canRunMotor(current) ||
             (current.transport !== 'playing' && current.transport !== 'scratching')
           ) {
+            await transport?.setRecordSoundState?.('stopped');
+            lastSoundState = 'stopped';
+            isNeedleSeekPending = false;
+            syncAudioGates(current);
             return;
           }
-          lastSoundState = 'on-record';
 
-          // Always restore the chosen timecode first. seek() restarts an
-          // already-running source; play() starts it when the engine snapshot
-          // was stopped/paused. AudioEngine safely treats the second call as
-          // a no-op when seek() has already restarted live playback.
+          // Keep programme audio muted until both the selected seek and source
+          // start have completed.
           transport?.seek(position);
           if (current.motorPhase === 'spinning-up') {
-            startSpinUp(current);
+            await startSpinUp(current);
           } else {
-            void transport?.play(position);
+            await transport?.play(position);
           }
         } else {
           transport?.seek(position);
         }
+
+        if (sequence !== needleDropSequence) return;
+        current = get().machine;
+        isNeedleSeekPending = false;
+        syncAudioGates(current);
       })();
     };
 
@@ -165,7 +190,11 @@ export function createDeckStore(
         next.tonearm === 'needle-down' &&
         (event.grip === 'cartridge' || event.tooFast === true);
       if (!isHighFrequencyEvent(event)) {
-        syncAudioGates(next, isFirstCorrectDrop || isWrongNeedleDrop);
+        syncAudioGates(
+          next,
+          isFirstCorrectDrop || isWrongNeedleDrop,
+          isFirstCorrectDrop || isWrongNeedleDrop,
+        );
       }
 
       switch (event.type) {
@@ -291,6 +320,7 @@ export function createDeckStore(
           ) {
             needleDropSequence++;
             isNeedleCuePending = false;
+            isNeedleSeekPending = false;
           }
           set({ machine: result.state });
           if (!isHighFrequencyEvent(event)) {
@@ -343,6 +373,7 @@ export function createDeckStore(
       dispose: () => {
         needleDropSequence++;
         isNeedleCuePending = false;
+        isNeedleSeekPending = false;
         clearSpinTimer();
         clearCoastTimer();
         if (get().machine.transport === 'scratching') transport?.endScratch(false);

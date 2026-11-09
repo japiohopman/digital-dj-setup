@@ -542,7 +542,7 @@ export function Turntable({
         <div className="model-badge" aria-hidden="true">
           <span className="model-badge-brand">Technics</span>
           <span className="model-badge-subtitle">
-            direct drive turntable system {modelName === 'SL-1200 MK2' ? 'SL-1200SP' : modelName}
+            direct drive turntable system {modelName}
           </span>
         </div>
 
@@ -707,7 +707,7 @@ export function Turntable({
           </details>
         </div>
 
-      {showTonearmMeter && (
+      {import.meta.env.DEV && showTonearmMeter && (
         <TonearmMeterPortal>
           <section
             className="tonearm-meter-panel"
@@ -717,7 +717,7 @@ export function Turntable({
             <div className="tonearm-meter-heading">
               <div>
                 <span className="tonearm-meter-title">{deckLabel} · TONEARM DEV</span>
-                <span className="tonearm-meter-subtitle">0° = arm in de rusthouder</span>
+                <span className="tonearm-meter-subtitle">0° = arm in the rest cradle</span>
               </div>
               <output
                 className="tonearm-meter-live"
@@ -732,7 +732,7 @@ export function Turntable({
             <div
               className="tonearm-meter-scale"
               role="img"
-              aria-label={`Armhoek ${armAngle.toFixed(2)} graden op een schaal van 0 tot 49 graden`}
+              aria-label={`Arm angle ${armAngle.toFixed(2)} degrees on a scale from 0 to 49 degrees`
             >
               <div className="tonearm-meter-track" />
               {measuredGrooveStart !== null && (
@@ -763,19 +763,19 @@ export function Turntable({
 
             <div className="tonearm-meter-readings">
               <div>
-                <span>Begin groef</span>
+                <span>Groove start</span>
                 <output data-testid="tonearm-start-readout">
                   {measuredGrooveStart === null ? '—' : `${measuredGrooveStart.toFixed(2)}°`}
                 </output>
               </div>
               <div>
-                <span>Einde groef</span>
+                <span>Groove end</span>
                 <output data-testid="tonearm-end-readout">
                   {measuredGrooveEnd === null ? '—' : `${measuredGrooveEnd.toFixed(2)}°`}
                 </output>
               </div>
               <div className="tonearm-meter-reach">
-                <span>Armreach</span>
+                <span>Arm reach</span>
                 <output data-testid="tonearm-reach-readout">
                   {measuredGrooveReach === null ? '—' : `${measuredGrooveReach.toFixed(2)}°`}
                 </output>
@@ -787,25 +787,26 @@ export function Turntable({
                 type="button"
                 className="tonearm-meter-button"
                 onClick={handleCaptureGrooveStart}
-                aria-label={`${deckLabel} Capture groove start angle`}
+                aria-label="Capture groove start angle"
               >
-                Leg beginpunt vast
+                Capture groove start angle
               </button>
               <button
                 type="button"
                 className="tonearm-meter-button"
                 onClick={handleCaptureGrooveEnd}
-                aria-label={`${deckLabel} Capture groove end angle`}
+                aria-label="Capture groove end angle"
               >
-                Leg eindpunt vast
+                Capture groove end angle
               </button>
               <button
                 type="button"
                 className="tonearm-meter-clear"
                 onClick={handleClearArmMeasurement}
+                aria-label="Clear measurement"
                 disabled={measuredGrooveStart === null && measuredGrooveEnd === null}
               >
-                Wis meting
+                Clear measurement
               </button>
             </div>
           </section>

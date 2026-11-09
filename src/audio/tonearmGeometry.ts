@@ -144,7 +144,8 @@ export function classifyTonearmLandingSurface(
 ): TonearmLandingSurface {
   if (!Number.isFinite(angleDeg) || angleDeg <= config.parkAngle + 2) return 'air';
   if (angleDeg < config.recordEdgeAngle) return 'plinth';
-  if (angleDeg >= config.labelStartAngle) return 'label';
+  // The shared 38° boundary belongs to run-out; the centre label begins beyond it.
+  if (angleDeg > config.labelStartAngle) return 'label';
   return 'record';
 }
 

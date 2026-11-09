@@ -43,6 +43,29 @@ export function calculateScratchTrackPosition(
 }
 
 /**
+ * Derives scratch timecode from the live transport position at pointer-down
+ * plus the visible platter's angular movement during this gesture.
+ */
+export function calculateScratchTrackPositionFromGesture(
+  startPosition: number,
+  currentVisualAngle: number,
+  startVisualAngle: number,
+  effectiveRps: number,
+  duration: number,
+): number {
+  if (
+    ![startPosition, currentVisualAngle, startVisualAngle, effectiveRps, duration].every(Number.isFinite) ||
+    effectiveRps <= 0 ||
+    duration < 0
+  ) {
+    return 0;
+  }
+  const angularDelta = currentVisualAngle - startVisualAngle;
+  return Math.max(0, Math.min(duration,
+    startPosition + angularDelta / (TWO_PI * effectiveRps)));
+}
+
+/**
  * Platter rendering and pointer physics stay local to this hook.
  * Every playback-affecting action is emitted as a typed deck event.
  */
@@ -71,6 +94,8 @@ export function useVinylMotion({
   const discRef = useRef<HTMLDivElement | null>(null);
   const draggingSpeedsRef = useRef<number[]>([]);
   const lastScratchDirectionRef = useRef(false);
+  const scratchStartPositionRef = useRef(0);
+  const scratchStartVisualAngleRef = useRef(0);
 
   const baseRps = speedRpm === 33 ? 33.3333 / 60 : 45 / 60;
   const effectiveRps = baseRps * (1 + pitch / 100);
@@ -164,8 +189,10 @@ export function useVinylMotion({
           Math.max(1, draggingSpeedsRef.current.length);
         const reversed = resolveScratchDirection(deltaAngle, lastScratchDirectionRef.current);
         lastScratchDirectionRef.current = reversed;
-        const currentSeconds = calculateScratchTrackPosition(
+        const currentSeconds = calculateScratchTrackPositionFromGesture(
+          scratchStartPositionRef.current,
           angleRef.current,
+          scratchStartVisualAngleRef.current,
           effectiveRps,
           transport?.duration ?? 0,
         );
@@ -192,7 +219,7 @@ export function useVinylMotion({
         rafIdRef.current = null;
       }
     };
-  }, [motorState, dispatch, radsPerMs, effectiveRps]);
+  }, [motorState, dispatch, radsPerMs, effectiveRps, transport?.duration]);
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0 || e.isPrimary === false) return;
@@ -201,16 +228,17 @@ export function useVinylMotion({
     if (activePointerIdRef.current !== null) return;
     if (!dispatch({ type: 'SCRATCH_STARTED' })) return;
 
-    // Like the reference CodePen, the platter angle is the one authoritative
-    // timecode. Re-anchor it to the live audio position at the start of a drag.
+    // Anchor timecode independently from the visible platter transform. A
+    // paused record may have rotated visually; pointer-down must not snap it
+    // back to the transport angle before the user actually moves the record.
     const duration = transport.duration;
     const livePosition = transport.getCurrentTime?.() ?? transport.currentTime;
     const startPosition = Number.isFinite(duration)
       ? Math.max(0, Math.min(duration, livePosition))
       : 0;
-    angleRef.current = startPosition * effectiveRps * TWO_PI;
+    scratchStartPositionRef.current = startPosition;
+    scratchStartVisualAngleRef.current = angleRef.current;
     anglePreviousRef.current = angleRef.current;
-    setAngle(angleRef.current);
 
     const centerTarget = centerElementRef?.current ?? discRef.current;
     if (centerTarget) {
@@ -291,8 +319,10 @@ export function useVinylMotion({
           type: 'SCRATCH_MOVED',
           speed: 0,
           reversed: lastScratchDirectionRef.current,
-          position: calculateScratchTrackPosition(
+          position: calculateScratchTrackPositionFromGesture(
+            scratchStartPositionRef.current,
             angleRef.current,
+            scratchStartVisualAngleRef.current,
             effectiveRps,
             transport?.duration ?? 0,
           ),

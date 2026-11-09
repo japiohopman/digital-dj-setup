@@ -334,8 +334,19 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         tonearm: 'needle-down',
         armInteraction: 'idle',
       };
-      if (canPlayTrack(next) && state.transport !== 'scratching') next.transport = 'playing';
-      return accept(next, 'Valid needle drop: cue position accepted');
+      const isReDroppingIntoRunout = state.transport === 'ended' &&
+        event.angle >= DEFAULT_TONEARM_CONFIG.innerGrooveAngle &&
+        event.angle <= DEFAULT_TONEARM_CONFIG.runoutAngle;
+      if (
+        canPlayTrack(next) &&
+        state.transport !== 'scratching' &&
+        !isReDroppingIntoRunout
+      ) {
+        next.transport = 'playing';
+      }
+      return accept(next, isReDroppingIntoRunout
+        ? 'Stylus returned to the run-out groove: run-out loop continues without restarting the programme'
+        : 'Valid needle drop: cue position accepted');
     }
 
     case 'ARM_LIFTED':

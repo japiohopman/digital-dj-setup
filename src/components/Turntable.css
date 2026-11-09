@@ -1,10 +1,5 @@
-@font-face {
-  font-family: 'Humanist Slabserif 712';
-  src: url('/font/Humanist Slabserif 712 Black Regular.otf') format('opentype');
-  font-style: normal;
-  font-weight: 900;
-  font-display: swap;
-}
+/* Humanist Slabserif 712 is a commercial typeface. Use the system-serif
+ * fallback until a licensed font asset is supplied for this repository. */
 
 /**
  * SoundManager 2: "Turntable UI" - CSS
@@ -72,7 +67,7 @@
 
 .turntable .model-badge-brand {
   color: #f0eee9;
-  font-family: 'Humanist Slabserif 712', Georgia, serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: clamp(14px, 1.6vw, 21px);
   font-weight: 900;
   line-height: 0.95;
@@ -81,7 +76,7 @@
 
 .turntable .model-badge-subtitle {
   color: rgba(238, 235, 228, 0.86);
-  font-family: 'Humanist Slabserif 712', Georgia, serif;
+  font-family: Georgia, 'Times New Roman', serif;
   font-size: clamp(6px, 0.58vw, 8px);
   font-weight: 700;
   line-height: 1.1;
@@ -794,8 +789,9 @@
   height: 100%;
   background: transparent url(/turntable/landscape/tt_arm.png) no-repeat 0 0;
   background-size: contain;
-  pointer-events: auto;
-  touch-action: none;
+  /* Let platter gestures pass through transparent areas of the arm image. */
+  pointer-events: none;
+  touch-action: auto;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
