@@ -59,6 +59,7 @@ export function createDeckStore(
   let trackLoadRequestId = 0;
   let lastSoundState: RecordSoundState | null = null;
   let needleDropSequence = 0;
+  let isNeedleCuePending = false;
 
   const clearSpinTimer = () => {
     if (spinTimer !== null) clearTimeout(spinTimer);
@@ -72,7 +73,7 @@ export function createDeckStore(
     transport?.setStylusContact(selectIsTrackAudible(state));
     // The needle impact plays before the music and vinyl crackle. Keep both
     // record layers stopped until the one-shot cue reports that it has ended.
-    const soundState = deferRecordLoop ? 'stopped' : selectRecordSoundState(state);
+    const soundState = deferRecordLoop || isNeedleCuePending ? 'stopped' : selectRecordSoundState(state);
     if (soundState !== lastSoundState) {
       transport?.setRecordSoundState?.(soundState);
       lastSoundState = soundState;
@@ -106,9 +107,11 @@ export function createDeckStore(
 
     const sequenceNeedleDrop = (kind: 'correct' | 'wrong', position: number) => {
       const sequence = ++needleDropSequence;
+      isNeedleCuePending = true;
       void (async () => {
         await transport?.playNeedleDropSound?.(kind);
         if (sequence !== needleDropSequence) return;
+        isNeedleCuePending = false;
 
         const current = get().machine;
         if (current.track !== 'ready' || current.tonearm !== 'needle-down') return;
@@ -274,6 +277,7 @@ export function createDeckStore(
             (previous.tonearm === 'needle-down' && result.state.tonearm !== 'needle-down')
           ) {
             needleDropSequence++;
+            isNeedleCuePending = false;
           }
           set({ machine: result.state });
           if (!isHighFrequencyEvent(event)) {
