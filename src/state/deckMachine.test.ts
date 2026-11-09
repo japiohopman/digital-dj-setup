@@ -35,7 +35,7 @@ describe('deck state machine', () => {
     expect(result.reason).toContain('power is off');
   });
 
-  it('coasts silently on power-off and can restore torque before coast completes', () => {
+  it('keeps program audio audible during power-off coast and can restore torque before coast completes', () => {
     const playing = createInitialDeckState({ trackLoaded: true, isPlaying: true });
     const needleDown = apply(playing, {
       type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
@@ -45,8 +45,8 @@ describe('deck state machine', () => {
     const coasting = apply(needleDown, { type: 'POWER_TOGGLED' });
     expect(coasting.power).toBe('off');
     expect(coasting.motorPhase).toBe('coasting');
-    expect(selectIsTrackAudible(coasting)).toBe(false);
-    expect(selectRecordSoundState(coasting)).toBe('stopped');
+    expect(selectIsTrackAudible(coasting)).toBe(true);
+    expect(selectRecordSoundState(coasting)).toBe('on-record');
 
     const restored = apply(coasting, { type: 'POWER_TOGGLED' });
     expect(restored.power).toBe('on');
@@ -155,7 +155,53 @@ describe('deck state machine', () => {
     expect(state.motorSwitch).toBe('on');
     expect(state.transport).toBe('playing');
     expect(selectIsTrackAudible(state)).toBe(false);
+    expect(selectRecordSoundState(state)).toBe('stopped');
+  });
+
+  it('selects the off-record loop only when the stylus lands on the Technics plinth', () => {
+    let state = createInitialDeckState({ trackLoaded: true });
+    state = apply(state, {
+      type: 'ARM_DROPPED',
+      angle: 16,
+      wasAlreadyNeedleDown: false,
+      position: 0,
+      surface: 'plinth',
+    });
+    expect(state.tonearm).toBe('off-record');
+    expect(selectIsTrackAudible(state)).toBe(false);
     expect(selectRecordSoundState(state)).toBe('off-record');
+
+    state = apply(state, { type: 'ARM_LIFTED' });
+    expect(selectRecordSoundState(state)).toBe('stopped');
+  });
+
+  it('keeps the run-out loop playing after the track ends until the needle lifts', () => {
+    let state = createInitialDeckState({ trackLoaded: true });
+    state = apply(state, {
+      type: 'ARM_DROPPED',
+      angle: 25,
+      wasAlreadyNeedleDown: false,
+      position: 0,
+    });
+    state = apply(state, {
+      type: 'ENGINE_PLAYBACK_SYNC',
+      playbackState: 'stopped',
+      endedNaturally: true,
+    });
+    expect(state.transport).toBe('ended');
+    expect(selectIsTrackAudible(state)).toBe(false);
+    expect(selectRecordSoundState(state)).toBe('runout');
+
+    state = apply(state, { type: 'ARM_LIFTED' });
+    expect(selectRecordSoundState(state)).toBe('stopped');
+  });
+
+  it('keeps a parked arm parked while the track is loading', () => {
+    let state = createInitialDeckState();
+    state = apply(state, { type: 'TRACK_LOAD_REQUESTED' });
+    expect(state.tonearm).toBe('parked');
+    expect(state.hasRecord).toBe(false);
+    expect(selectRecordSoundState(state)).toBe('stopped');
   });
 
   it('loading never autoplays and forces the stylus gate closed', () => {
@@ -199,7 +245,7 @@ describe('deck state machine', () => {
     expect(scratching.transport).toBe('scratching');
     expect(scratching.scratchResumeTransport).toBe('playing');
     expect(selectIsTrackAudible(scratching)).toBe(false);
-    expect(selectRecordSoundState(scratching)).toBe('off-record');
+    expect(selectRecordSoundState(scratching)).toBe('stopped');
 
     const moved = apply(scratching, {
       type: 'SCRATCH_MOVED',
@@ -214,7 +260,7 @@ describe('deck state machine', () => {
     expect(ended.transport).toBe('playing');
     expect(ended.scratchResumeTransport).toBeNull();
     expect(selectIsTrackAudible(ended)).toBe(false);
-    expect(selectRecordSoundState(ended)).toBe('off-record');
+    expect(selectRecordSoundState(ended)).toBe('stopped');
   });
 
   it('keeps needle-down scratching audible and restores normal playback on release', () => {
