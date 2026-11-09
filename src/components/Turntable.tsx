@@ -518,11 +518,6 @@ export function Turntable({
             aria-valuemax={49}
             aria-valuenow={Math.round(armAngle)}
             aria-valuetext={`Tonearm ${armState}, ${Math.round(armAngle)} degrees`}
-            onPointerDown={onArmPointerDown}
-            onPointerMove={onArmPointerMove}
-            onPointerUp={onArmPointerUp}
-            onPointerCancel={onArmPointerCancel}
-            onLostPointerCapture={onArmLostPointerCapture}
             onKeyDown={onArmKeyDown}
           >
             {/* Separate touch targets preserve the difference between the arm tube and cartridge. */}
@@ -530,94 +525,30 @@ export function Turntable({
               className="tonearm-tube-target"
               data-tonearm-grip="arm"
               aria-hidden="true"
+              onPointerDown={onArmPointerDown}
+              onPointerMove={onArmPointerMove}
+              onPointerUp={onArmPointerUp}
+              onPointerCancel={onArmPointerCancel}
+              onLostPointerCapture={onArmLostPointerCapture}
             />
             <div
               className="tonearm-headshell-target"
               data-tonearm-grip="cartridge"
               aria-hidden="true"
+              onPointerDown={onArmPointerDown}
+              onPointerMove={onArmPointerMove}
+              onPointerUp={onArmPointerUp}
+              onPointerCancel={onArmPointerCancel}
+              onLostPointerCapture={onArmLostPointerCapture}
             />
           </div>
         </div>
 
         <div className="model-badge" aria-hidden="true">
-          <span>{modelName}</span>
-        </div>
-
-        {/* Track Loading and Audio Transport Info Bar */}
-        <div className="deck-audio-panel" role="region" aria-label={`${deckLabel} audio transport`}>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept="audio/*,.mp3,.wav,.ogg,.flac,.aac,.m4a"
-            className="deck-file-input"
-            aria-label={`${deckLabel} Select audio file`}
-            tabIndex={-1}
-          />
-
-          <div className="deck-audio-controls">
-            <button
-              type="button"
-              className="deck-load-btn"
-              onClick={handleOpenFileDialog}
-              disabled={!isPowered || !transport}
-              aria-label={`${deckLabel} Load audio track`}
-            >
-              <span className="deck-load-icon" aria-hidden="true">▲</span>
-              LOAD TRACK
-            </button>
-
-            {machine.track === 'loading' && (
-              <span className="deck-transport-state">LOADING TRACK</span>
-            )}
-          </div>
-
-          <div className="deck-audio-readout">
-            {machine.track === 'loading' ? (
-              <span className="deck-audio-status loading">DECODING AUDIO...</span>
-            ) : machine.track === 'error' ? (
-              <span className="deck-audio-status error" role="alert">{machine.trackError || transport?.error || 'Unable to load track'}</span>
-            ) : transport?.error ? (
-              <span className="deck-audio-status error" role="alert">{transport.error}</span>
-            ) : transport?.trackName ? (
-              <div className="deck-track-meta">
-                <span
-                  className="deck-track-name"
-                  title={
-                    transport.metadata?.artist
-                      ? `${transport.metadata.artist} — ${transport.metadata.title}`
-                      : transport.trackName
-                  }
-                >
-                  {transport.metadata?.artist
-                    ? `${transport.metadata.artist} — ${transport.metadata.title}`
-                    : transport.trackName}
-                </span>
-                <span className="deck-track-time">
-                  {formatTime(transport.currentTime)} / {formatTime(transport.duration)}
-                </span>
-              </div>
-            ) : (
-              <span className="deck-audio-status idle">NO TRACK LOADED</span>
-            )}
-          </div>
-          <details className="deck-state-trace">
-            <summary>
-              DECK STATE · {machine.power.toUpperCase()} / {machine.motorPhase.toUpperCase()} / {machine.tonearm.toUpperCase()}
-            </summary>
-            <dl>
-              <div><dt>Track</dt><dd>{machine.track}</dd></div>
-              <div><dt>Transport</dt><dd>{machine.transport}</dd></div>
-              <div><dt>Output</dt><dd>{selectIsTrackAudible(machine) ? 'AUDIBLE' : 'MUTED'}</dd></div>
-            </dl>
-            <ol>
-              {trace.slice(-8).map((entry, index) => (
-                <li key={`${entry.at}-${index}`} data-accepted={entry.accepted}>
-                  <span>{entry.event}</span> — {entry.reason}
-                </li>
-              ))}
-            </ol>
-          </details>
+          <span className="model-badge-brand">Technics</span>
+          <span className="model-badge-subtitle">
+            direct drive turntable system · {modelName === 'SL-1200 MK2' ? 'SL-1200SP' : modelName}
+          </span>
         </div>
 
         {/* Authentic Technics Pitch Control Assembly */}
@@ -703,6 +634,83 @@ export function Turntable({
           </div>
         </div>
       </div>
+
+        {/* Track Loading and Audio Transport Info Bar */}
+        <div className="deck-audio-panel" role="region" aria-label={`${deckLabel} audio transport`}>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="audio/*,.mp3,.wav,.ogg,.flac,.aac,.m4a"
+            className="deck-file-input"
+            aria-label={`${deckLabel} Select audio file`}
+            tabIndex={-1}
+          />
+
+          <div className="deck-audio-controls">
+            <button
+              type="button"
+              className="deck-load-btn"
+              onClick={handleOpenFileDialog}
+              disabled={!isPowered || !transport}
+              aria-label={`${deckLabel} Load audio track`}
+            >
+              <span className="deck-load-icon" aria-hidden="true">▲</span>
+              LOAD TRACK
+            </button>
+
+            {machine.track === 'loading' && (
+              <span className="deck-transport-state">LOADING TRACK</span>
+            )}
+          </div>
+
+          <div className="deck-audio-readout">
+            {machine.track === 'loading' ? (
+              <span className="deck-audio-status loading">DECODING AUDIO...</span>
+            ) : machine.track === 'error' ? (
+              <span className="deck-audio-status error" role="alert">{machine.trackError || transport?.error || 'Unable to load track'}</span>
+            ) : transport?.error ? (
+              <span className="deck-audio-status error" role="alert">{transport.error}</span>
+            ) : transport?.trackName ? (
+              <div className="deck-track-meta">
+                <span
+                  className="deck-track-name"
+                  title={
+                    transport.metadata?.artist
+                      ? `${transport.metadata.artist} — ${transport.metadata.title}`
+                      : transport.trackName
+                  }
+                >
+                  {transport.metadata?.artist
+                    ? `${transport.metadata.artist} — ${transport.metadata.title}`
+                    : transport.trackName}
+                </span>
+                <span className="deck-track-time">
+                  {formatTime(transport.currentTime)} / {formatTime(transport.duration)}
+                </span>
+              </div>
+            ) : (
+              <span className="deck-audio-status idle">NO TRACK LOADED</span>
+            )}
+          </div>
+          <details className="deck-state-trace">
+            <summary>
+              DECK STATE · {machine.power.toUpperCase()} / {machine.motorPhase.toUpperCase()} / {machine.tonearm.toUpperCase()}
+            </summary>
+            <dl>
+              <div><dt>Track</dt><dd>{machine.track}</dd></div>
+              <div><dt>Transport</dt><dd>{machine.transport}</dd></div>
+              <div><dt>Output</dt><dd>{selectIsTrackAudible(machine) ? 'AUDIBLE' : 'MUTED'}</dd></div>
+            </dl>
+            <ol>
+              {trace.slice(-8).map((entry, index) => (
+                <li key={`${entry.at}-${index}`} data-accepted={entry.accepted}>
+                  <span>{entry.event}</span> — {entry.reason}
+                </li>
+              ))}
+            </ol>
+          </details>
+        </div>
 
       {showTonearmMeter && (
         <TonearmMeterPortal>

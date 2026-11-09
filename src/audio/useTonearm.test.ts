@@ -131,6 +131,64 @@ describe('useTonearm', () => {
     }));
   });
 
+  it('starts a drag from either the arm-tube grip or the cartridge grip', () => {
+    const dispatch = vi.fn(() => true);
+    const { result } = renderHook(() => useTonearm({
+      duration: 100,
+      currentTime: 0,
+      armState: 'lifted',
+      armInteraction: 'idle',
+      dispatch,
+    }));
+
+    act(() => {
+      for (let step = 0; step < 8; step++) {
+        result.current.handleKeyDown({
+          key: 'ArrowRight',
+          preventDefault: vi.fn(),
+        } as unknown as React.KeyboardEvent<HTMLElement>);
+      }
+    });
+    expect(result.current.armAngle).toBe(16);
+
+    for (const grip of ['arm', 'cartridge'] as const) {
+      const board = document.createElement('div');
+      board.className = 'bd';
+      vi.spyOn(board, 'getBoundingClientRect').mockReturnValue({
+        left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600,
+        x: 0, y: 0, toJSON: () => ({}),
+      } as DOMRect);
+      const target = Object.assign(document.createElement('div'), {
+        setPointerCapture: vi.fn(),
+        hasPointerCapture: vi.fn().mockReturnValue(true),
+        releasePointerCapture: vi.fn(),
+      });
+      target.dataset.tonearmGrip = grip;
+      board.append(target);
+      const event = {
+        button: 0,
+        pointerId: grip === 'arm' ? 11 : 12,
+        isPrimary: true,
+        clientX: 400,
+        clientY: 200,
+        stopPropagation: vi.fn(),
+        currentTarget: target,
+        target,
+      } as unknown as React.PointerEvent<HTMLElement>;
+
+      act(() => {
+        result.current.handlePointerDown(event);
+        result.current.handlePointerUp(event);
+      });
+
+      expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'ARM_DROPPED',
+        grip,
+        position: grip === 'cartridge' ? 30 : 5,
+      }));
+    }
+  });
+
   it('dispatches ARM_LIFTED and ARM_PARKED on lift and park', () => {
     const dispatch = vi.fn(() => true);
 

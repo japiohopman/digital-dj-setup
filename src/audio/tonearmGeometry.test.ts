@@ -22,8 +22,8 @@ import {
 describe('tonearmGeometry', () => {
   it('identifies the measured LP groove, run-out and label boundaries', () => {
     expect(isAngleInPlayableRecord(0)).toBe(false);
-    expect(isAngleInPlayableRecord(14.69)).toBe(false);
-    expect(isAngleInPlayableRecord(14.7)).toBe(true);
+    expect(isAngleInPlayableRecord(13.29)).toBe(false);
+    expect(isAngleInPlayableRecord(13.3)).toBe(true);
     expect(isAngleInPlayableRecord(15)).toBe(true);
     expect(isAngleInPlayableRecord(22)).toBe(true);
     expect(isAngleInPlayableRecord(35)).toBe(true);
@@ -41,7 +41,7 @@ describe('tonearmGeometry', () => {
     expect(angleToPlaybackProgress(25)).toBeCloseTo(0.5, 5);
     expect(angleToPlaybackProgress(35)).toBeCloseTo(1, 5);
     expect(angleToPlaybackProgress(38)).toBeCloseTo(1, 5);
-    expect(angleToPlaybackProgress(14.7)).toBeCloseTo(0, 5);
+    expect(angleToPlaybackProgress(13.3)).toBeCloseTo(0, 5);
     expect(angleToPlaybackProgress(16.5)).toBeCloseTo(0.075, 5);
     expect(angleToPlaybackProgress(38.01)).toBeNull();
   });
@@ -52,13 +52,13 @@ describe('tonearmGeometry', () => {
     expect(playbackProgressToAngle(Number.NaN)).toBe(15);
   });
 
-  it('uses the measured 14.70°–16.50° lead-in band', () => {
+  it('uses the measured 13.30°–16.50° lead-in band', () => {
     expect(SEVEN_INCH_OUTER_GROOVE_ANGLE).toBe(24);
-    expect(LP_RECORD_EDGE_ANGLE).toBe(14.7);
-    expect(LP_NEEDLE_DROP_MIN_ANGLE).toBe(14.7);
+    expect(LP_RECORD_EDGE_ANGLE).toBe(13.3);
+    expect(LP_NEEDLE_DROP_MIN_ANGLE).toBe(13.3);
     expect(LP_NEEDLE_DROP_MAX_ANGLE).toBe(16.5);
     expect(LP_OUTER_GROOVE_ANGLE).toBe(15);
-    expect(isAngleAtOuterLeadIn(14.7)).toBe(true);
+    expect(isAngleAtOuterLeadIn(13.3)).toBe(true);
     expect(isAngleAtOuterLeadIn(16.5)).toBe(true);
     expect(isAngleAtOuterLeadIn(16.51)).toBe(false);
     expect(isAngleAtOuterLeadIn(22)).toBe(false);
@@ -75,8 +75,8 @@ describe('tonearmGeometry', () => {
 
   it('distinguishes plinth, vinyl, run-out and centre label', () => {
     expect(classifyTonearmLandingSurface(0)).toBe('air');
-    expect(classifyTonearmLandingSurface(14)).toBe('plinth');
-    expect(classifyTonearmLandingSurface(14.7)).toBe('record');
+    expect(classifyTonearmLandingSurface(13.2)).toBe('plinth');
+    expect(classifyTonearmLandingSurface(13.3)).toBe('record');
     expect(classifyTonearmLandingSurface(22)).toBe('record');
     expect(classifyTonearmLandingSurface(37.99)).toBe('record');
     expect(classifyTonearmLandingSurface(38)).toBe('label');

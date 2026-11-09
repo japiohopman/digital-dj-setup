@@ -26,8 +26,8 @@ export interface TonearmConfig {
 /** Kept as a reference for future seven-inch geometry. */
 export const SEVEN_INCH_OUTER_GROOVE_ANGLE = 24;
 
-export const LP_RECORD_EDGE_ANGLE = 14.7;
-export const LP_NEEDLE_DROP_MIN_ANGLE = 14.7;
+export const LP_RECORD_EDGE_ANGLE = 13.3;
+export const LP_NEEDLE_DROP_MIN_ANGLE = 13.3;
 export const LP_NEEDLE_DROP_MAX_ANGLE = 16.5;
 export const LP_OUTER_GROOVE_ANGLE = 15;
 export const LP_INNER_GROOVE_ANGLE = 35;

@@ -195,7 +195,7 @@ describe('deck state machine', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
       type: 'ARM_DROPPED',
-      angle: 14,
+      angle: 13.2,
       wasAlreadyNeedleDown: false,
       position: 0,
       surface: 'plinth',
