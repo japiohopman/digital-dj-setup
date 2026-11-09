@@ -1,20 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArmAngleMeter } from './widgets/ArmAngleMeter';
+import { DeckStateTrace } from './widgets/DeckStateTrace';
+import type { DeckDiagnosticsSnapshot } from './types';
 import './DevKit.css';
 import './widgets/ArmAngleMeter.css';
+import './widgets/DeckStateTrace.css';
 
 export interface DevKitProps {
   activeDeckLabel: string;
   activeArmAngle: number;
+  activeDeckDiagnostics?: DeckDiagnosticsSnapshot | undefined;
 }
 
 const DEV_WIDGETS = [
   { id: 'arm-angle-meter', label: 'Arm angle meter' },
+  { id: 'deck-state-trace', label: 'Deck state trace' },
 ] as const;
 type DevWidgetId = (typeof DEV_WIDGETS)[number]['id'];
 
 /** Development-only menu for diagnostics that must stay outside product UI. */
-export function DevKit({ activeDeckLabel, activeArmAngle }: DevKitProps) {
+export function DevKit({ activeDeckLabel, activeArmAngle, activeDeckDiagnostics }: DevKitProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [enabledWidgetIds, setEnabledWidgetIds] = useState<Set<DevWidgetId>>(() => new Set());
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -124,6 +129,9 @@ export function DevKit({ activeDeckLabel, activeArmAngle }: DevKitProps) {
         armAngle={activeArmAngle}
         isVisible={enabledWidgetIds.has('arm-angle-meter')}
       />
+      {enabledWidgetIds.has('deck-state-trace') && activeDeckDiagnostics && (
+        <DeckStateTrace deckLabel={activeDeckLabel} snapshot={activeDeckDiagnostics} />
+      )}
     </>
   );
 }
