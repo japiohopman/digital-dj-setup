@@ -104,9 +104,19 @@ export function useTonearm({
       return;
     }
 
-    // A vinyl scratch moves the record under a stationary stylus. Never derive
-    // tonearm position from the backwards/forwards scratch playhead.
-    if (transportPhase === 'scratching') return;
+    // If the component first mounts mid-scratch, place the arm once from the
+    // current playhead. After initialization it remains physically stationary
+    // for the entire scratch gesture.
+    if (transportPhase === 'scratching') {
+      if (lastPlaybackTimeRef.current === null && armState === 'needle-down' && duration > 0) {
+        lastPlaybackTimeRef.current = currentTime;
+        setArmPosition(playbackProgressToAngle(
+          Math.max(0, Math.min(1, currentTime / duration)),
+          config,
+        ));
+      }
+      return;
+    }
 
     // Re-anchor the playhead after scratching without moving the physical arm.
     // Normal forward playback will then advance the arm from its current radius.
