@@ -265,6 +265,27 @@ describe('deck state machine', () => {
     expect(selectRecordSoundState(state)).toBe('stopped');
   });
 
+  it('ignores a stale stopped-engine snapshot immediately after a valid needle drop', () => {
+    let state = createInitialDeckState({ trackLoaded: true });
+    state = apply(state, {
+      type: 'ARM_DROPPED',
+      angle: 22,
+      wasAlreadyNeedleDown: false,
+      position: 35,
+    });
+    expect(state.transport).toBe('playing');
+
+    const staleSnapshot = transitionDeck(state, {
+      type: 'ENGINE_PLAYBACK_SYNC',
+      playbackState: 'stopped',
+      endedNaturally: false,
+    });
+
+    expect(staleSnapshot.accepted).toBe(false);
+    expect(staleSnapshot.state.transport).toBe('playing');
+    expect(staleSnapshot.reason).toContain('stale engine pause');
+  });
+
   it('keeps a parked arm parked while the track is loading', () => {
     let state = createInitialDeckState();
     state = apply(state, { type: 'TRACK_LOAD_REQUESTED' });
