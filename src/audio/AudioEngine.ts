@@ -200,8 +200,13 @@ export class AudioEngine {
     return this.isStylusDown;
   }
 
-  /** Selects the independent crackle/off-record layer for this deck. */
-  public setRecordSoundState(state: RecordSoundState): void {
+  /**
+   * Selects the independent crackle/off-record layer for this deck.
+   *
+   * Resolves only after the requested loop is loaded and scheduled, allowing
+   * the deck store to start program audio in sync with the vinyl surface layer.
+   */
+  public async setRecordSoundState(state: RecordSoundState): Promise<void> {
     if (state === 'stopped') this.placementCueGeneration++;
     this.recordSoundState = state;
     if (state === 'stopped' || this.isDisposed) {
@@ -209,8 +214,13 @@ export class AudioEngine {
       this.stopRecordLoop('off-record');
       return;
     }
+
     const context = this.getOrCreateContext();
-    void this.ensureRecordSoundAssets(context).then(() => this.syncRecordSoundLoops());
+    await this.ensureRecordSoundAssets(context);
+    // Ignore a stale completion if the arm was lifted or another surface state
+    // was selected while the sound files were decoding.
+    if (this.isDisposed || this.recordSoundState !== state) return;
+    this.syncRecordSoundLoops();
   }
 
   /** Plays a single needle cue and resolves only when the sample has finished. */
