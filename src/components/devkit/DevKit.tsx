@@ -11,13 +11,23 @@ export interface DevKitProps {
 const DEV_WIDGETS = [
   { id: 'arm-angle-meter', label: 'Arm angle meter' },
 ] as const;
+type DevWidgetId = (typeof DEV_WIDGETS)[number]['id'];
 
 /** Development-only menu for diagnostics that must stay outside product UI. */
 export function DevKit({ activeDeckLabel, activeArmAngle }: DevKitProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isArmAngleMeterEnabled, setIsArmAngleMeterEnabled] = useState(false);
+  const [enabledWidgetIds, setEnabledWidgetIds] = useState<Set<DevWidgetId>>(() => new Set());
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const firstControlRef = useRef<HTMLInputElement | null>(null);
+
+  const setWidgetEnabled = (id: DevWidgetId, enabled: boolean) => {
+    setEnabledWidgetIds((current) => {
+      const next = new Set(current);
+      if (enabled) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -97,8 +107,8 @@ export function DevKit({ activeDeckLabel, activeArmAngle }: DevKitProps) {
                   <input
                     ref={widget.id === 'arm-angle-meter' ? firstControlRef : undefined}
                     type="checkbox"
-                    checked={isArmAngleMeterEnabled}
-                    onChange={(event) => setIsArmAngleMeterEnabled(event.currentTarget.checked)}
+                    checked={enabledWidgetIds.has(widget.id)}
+                    onChange={(event) => setWidgetEnabled(widget.id, event.currentTarget.checked)}
                   />
                   <span>{widget.label}</span>
                 </label>
@@ -112,7 +122,7 @@ export function DevKit({ activeDeckLabel, activeArmAngle }: DevKitProps) {
       <ArmAngleMeter
         deckLabel={activeDeckLabel}
         armAngle={activeArmAngle}
-        isVisible={isArmAngleMeterEnabled}
+        isVisible={enabledWidgetIds.has('arm-angle-meter')}
       />
     </>
   );
