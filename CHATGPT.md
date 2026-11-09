@@ -11,7 +11,7 @@ Primary references:
 
 Use references to understand the intended look and feel. Do not copy their source or assets without checking license and provenance.
 
-The mixer reference has not been selected yet. Keep mixer design and implementation out of scope until the user supplies a reference and a dedicated issue is created.
+The agreed mixer reference is the supplied Vestax PCV-275 image in `docs/manual_examples/manual/vestax_pro_look.jpeg`, with control notes in `docs/manual_examples/vestax.txt`. Mixer development is tracked in [Issue #17](https://github.com/japiohopman/digital-dj-setup/issues/17), which is deliberately phased: shared audio routing first, then crossfader, deck levels and real meters, followed by EQ/master refinements.
 
 ## Technical direction
 
@@ -49,7 +49,7 @@ The mixer reference has not been selected yet. Keep mixer design and implementat
 3. Issue #3 — dual-deck DMC layout; in landscape both decks rotate 90° counterclockwise (a quarter turn) in the same direction.
 4. Issue #4 — isolated Web Audio playback engine per deck.
 5. Issue #5 — touch-first scratching and reverse transport.
-6. Mixer — create a new issue only after the user chooses a mixer reference.
+6. Issue #17 — phased two-deck mixer: shared routing, crossfader, deck levels and real meters first; EQ and master-level refinements later.
 
 ## Definition of done
 
