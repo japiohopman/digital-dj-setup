@@ -58,6 +58,7 @@ export function createDeckStore(
   let coastTimer: ReturnType<typeof setTimeout> | null = null;
   let trackLoadRequestId = 0;
   let lastSoundState: RecordSoundState | null = null;
+  let needleDropSequence = 0;
 
   const clearSpinTimer = () => {
     if (spinTimer !== null) clearTimeout(spinTimer);
@@ -67,9 +68,11 @@ export function createDeckStore(
     if (coastTimer !== null) clearTimeout(coastTimer);
     coastTimer = null;
   };
-  const syncAudioGates = (state: DeckMachineState) => {
-    const soundState = selectRecordSoundState(state);
+  const syncAudioGates = (state: DeckMachineState, deferRecordLoop = false) => {
     transport?.setStylusContact(selectIsTrackAudible(state));
+    // The needle impact plays before the music and vinyl crackle. Keep both
+    // record layers stopped until the one-shot cue reports that it has ended.
+    const soundState = deferRecordLoop ? 'stopped' : selectRecordSoundState(state);
     if (soundState !== lastSoundState) {
       transport?.setRecordSoundState?.(soundState);
       lastSoundState = soundState;
@@ -101,12 +104,50 @@ export function createDeckStore(
       }, COAST_DOWN_MS);
     };
 
+    const sequenceNeedleDrop = (kind: 'correct' | 'wrong', position: number) => {
+      const sequence = ++needleDropSequence;
+      void (async () => {
+        await transport?.playNeedleDropSound?.(kind);
+        if (sequence !== needleDropSequence) return;
+
+        const current = get().machine;
+        if (current.track !== 'ready' || current.tonearm !== 'needle-down') return;
+
+        // Keep the record crackle in sync with the main track: both begin only
+        // after the needle-impact sample has completely finished.
+        if (current.transport === 'playing' && canRunMotor(current)) {
+          if (current.motorPhase === 'spinning-up') {
+            startSpinUp(current);
+          } else {
+            transport?.setRecordSoundState?.('on-record');
+            lastSoundState = 'on-record';
+            void transport?.play(position);
+          }
+        } else {
+          // Preserve the cue position while the motor is off. Starting the
+          // motor later will pick up from this point through the same store.
+          transport?.seek(position);
+        }
+      })();
+    };
+
     const performTransitionEffects = (
       previous: DeckMachineState,
       next: DeckMachineState,
       event: DeckEvent,
     ) => {
-      if (!isHighFrequencyEvent(event)) syncAudioGates(next);
+      const isFirstCorrectDrop = event.type === 'ARM_DROPPED' &&
+        next.tonearm === 'needle-down' &&
+        !previous.hasValidNeedleDrop &&
+        !event.wasAlreadyNeedleDown &&
+        event.grip !== 'cartridge' &&
+        !event.tooFast;
+      const isWrongNeedleDrop = event.type === 'ARM_DROPPED' &&
+        next.tonearm === 'needle-down' &&
+        (event.grip === 'cartridge' || event.tooFast === true);
+      if (!isHighFrequencyEvent(event)) {
+        syncAudioGates(next, isFirstCorrectDrop || isWrongNeedleDrop);
+      }
 
       switch (event.type) {
         case 'POWER_TOGGLED':
@@ -154,8 +195,15 @@ export function createDeckStore(
         case 'ARM_DROPPED':
           if (previous.transport === 'scratching') break;
           if (next.tonearm === 'needle-down') {
-            if (!event.wasAlreadyNeedleDown) transport?.playNeedleDropSound?.('correct');
-            if (previous.transport === 'playing') {
+            const wrongDrop = event.grip === 'cartridge' || event.tooFast === true;
+            const firstDrop = !previous.hasValidNeedleDrop && !event.wasAlreadyNeedleDown;
+            if (wrongDrop) {
+              sequenceNeedleDrop('wrong', event.position);
+            } else if (firstDrop) {
+              // The correct lead-in sound must finish before the MP3/WAV and
+              // vinyl crackle start together from the beginning of the track.
+              sequenceNeedleDrop('correct', 0);
+            } else if (previous.transport === 'playing') {
               transport?.seek(event.position);
             } else if (next.transport === 'playing') {
               if (next.motorPhase === 'spinning-up') {
@@ -165,8 +213,10 @@ export function createDeckStore(
             } else {
               transport?.seek(event.position);
             }
-          } else if (event.angle > 2 && next.hasRecord) {
-            transport?.playNeedleDropSound?.('wrong');
+          } else if (event.surface === 'record' && next.hasRecord) {
+            // A drop on vinyl but outside the playable groove is a wrong
+            // needle placement, not an off-record plinth landing.
+            void transport?.playNeedleDropSound?.('wrong');
           }
           break;
 
@@ -213,6 +263,12 @@ export function createDeckStore(
         const previous = get().machine;
         const result = transitionDeck(previous, event);
         if (result.accepted) {
+          if (
+            event.type === 'TRACK_LOAD_REQUESTED' ||
+            (previous.tonearm === 'needle-down' && result.state.tonearm !== 'needle-down')
+          ) {
+            needleDropSequence++;
+          }
           set({ machine: result.state });
           if (!isHighFrequencyEvent(event)) {
             set({
