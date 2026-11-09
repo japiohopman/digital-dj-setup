@@ -173,8 +173,9 @@ export function useTonearm({
 
     // Spiral the arm forward only as programme audio advances. It stays put
     // during reverse scratches instead of flying back to the lead-in groove.
-    const grooveSpan = config.innerGrooveAngle - config.outerGrooveAngle;
-    setArmPosition(currentAngleRef.current + (timeDelta / duration) * grooveSpan);
+    const remainingDuration = Math.max(0.001, duration - previousTime);
+    const remainingGroove = Math.max(0, config.innerGrooveAngle - currentAngleRef.current);
+    setArmPosition(currentAngleRef.current + (timeDelta / remainingDuration) * remainingGroove);
   }, [
     armState,
     armInteraction,
