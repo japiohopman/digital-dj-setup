@@ -834,11 +834,11 @@
 }
 
 .turntable .tonearm-tube-target {
-  /* Green mark: arm tube immediately before its cartridge bend. */
-  left: 60%;
-  top: 84%;
-  width: 27%;
-  height: 14%;
+  /* Green mark: exposed arm tube, just before the cartridge/headshell. */
+  left: 33%;
+  top: 87%;
+  width: 28%;
+  height: 12%;
   border-radius: 18px;
   z-index: 2;
   background: rgba(255, 255, 255, 0.001);
@@ -846,10 +846,10 @@
 
 .turntable .tonearm-headshell-target {
   /* Red mark: cartridge / headshell itself, separated from the arm tube. */
-  left: 37%;
-  top: 82%;
-  width: 25%;
-  height: 18%;
+  left: 15%;
+  top: 76%;
+  width: 32%;
+  height: 14%;
   min-width: 44px;
   min-height: 44px;
   border-radius: 14px;
