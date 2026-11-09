@@ -760,9 +760,25 @@
   filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.4));
 }
 
-/* Generous mobile touch hit-area targeting the cartridge and headshell (bottom 25% of arm) */
+/* Independent touch areas for gripping the arm tube or the cartridge itself. */
+.turntable .tonearm-tube-target,
 .turntable .tonearm-headshell-target {
   position: absolute;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.turntable .tonearm-tube-target {
+  left: 30%;
+  top: 19%;
+  width: 30%;
+  height: 58%;
+  border-radius: 22px;
+  z-index: 1;
+}
+
+.turntable .tonearm-headshell-target {
   left: 16%;
   bottom: 2%;
   width: 58%;
@@ -770,13 +786,21 @@
   min-width: 44px;
   min-height: 44px;
   border-radius: 14px;
-  cursor: grab;
-  pointer-events: auto;
-  touch-action: none;
+  z-index: 2;
 }
 
+.turntable .tonearm-holder.is-dragging .tonearm-tube-target,
 .turntable .tonearm-holder.is-dragging .tonearm-headshell-target {
   cursor: grabbing;
+}
+
+/* A turntable with no loaded vinyl shows its slipmat and has no needle wobble
+   or lift animation while a track is being loaded. */
+.turntable:not(.has-record) .tonearm-holder .tonearm {
+  animation: none !important;
+  transform: none !important;
+  transition: none !important;
+  filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.32));
 }
 
 /* Micro-wobble only when motor is spinning, needle is down on record, and arm is not being dragged */
