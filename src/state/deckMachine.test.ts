@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SEVEN_INCH_TONEARM_CONFIG } from '../audio/tonearmGeometry';
 import {
   canPlayTrack,
   createInitialDeckState,
@@ -38,7 +39,7 @@ describe('deck state machine', () => {
   it('keeps program audio audible during power-off coast and can restore torque before coast completes', () => {
     const playing = createInitialDeckState({ trackLoaded: true, isPlaying: true });
     const needleDown = apply(playing, {
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 0,
     });
     expect(selectIsTrackAudible(needleDown)).toBe(true);
 
@@ -66,7 +67,7 @@ describe('deck state machine', () => {
     expect(state.transport).toBe('paused');
 
     state = apply(state, {
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 0,
     });
     expect(state.tonearm).toBe('needle-down');
     expect(state.transport).toBe('playing');
@@ -82,7 +83,7 @@ describe('deck state machine', () => {
     expect(selectIsTrackAudible(state)).toBe(false);
 
     state = apply(state, {
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 0,
     });
     state = apply(state, { type: 'ARM_PICKED_UP' });
     state = apply(state, {
@@ -93,24 +94,48 @@ describe('deck state machine', () => {
     expect(selectIsTrackAudible(state)).toBe(true);
   });
 
-  it('allows a valid re-drop after an explicit lift, including away from the outer lead-in', () => {
+  it('resets initial-drop eligibility when the arm is lifted and requires the LP lead-in again', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 0,
     });
+    expect(state.hasValidNeedleDrop).toBe(true);
+
     state = apply(state, { type: 'ARM_LIFTED' });
+    expect(state.hasValidNeedleDrop).toBe(false);
+
     state = apply(state, {
       type: 'ARM_DROPPED', angle: 36, wasAlreadyNeedleDown: false, position: 52,
+    });
+    expect(state.hasValidNeedleDrop).toBe(false);
+    expect(state.tonearm).toBe('lifted');
+
+    state = apply(state, {
+      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 0,
     });
     expect(state.hasValidNeedleDrop).toBe(true);
     expect(state.tonearm).toBe('needle-down');
     expect(state.transport).toBe('playing');
   });
 
+  it('accepts the 7-inch lead-in at 24 degrees when seven-inch geometry is selected', () => {
+    const initial = createInitialDeckState({ trackLoaded: true });
+    const result = transitionDeck(initial, {
+      type: 'ARM_DROPPED',
+      angle: 24,
+      wasAlreadyNeedleDown: false,
+      position: 0,
+    }, SEVEN_INCH_TONEARM_CONFIG);
+
+    expect(result.accepted).toBe(true);
+    expect(result.state.hasValidNeedleDrop).toBe(true);
+    expect(result.state.tonearm).toBe('needle-down');
+  });
+
   it('resets re-drop eligibility when a new track is loaded', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 0,
     });
     expect(state.hasValidNeedleDrop).toBe(true);
     state = apply(state, { type: 'TRACK_LOAD_REQUESTED' });
@@ -126,7 +151,7 @@ describe('deck state machine', () => {
   it('rejects invalid needle-drop positions without opening the stylus gate', () => {
     const state = createInitialDeckState({ trackLoaded: true });
     const result = transitionDeck(state, {
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: Number.NaN,
+      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: Number.NaN,
     });
     expect(result.accepted).toBe(true);
     expect(result.state.tonearm).toBe('lifted');
@@ -137,7 +162,7 @@ describe('deck state machine', () => {
   it('rejects keyboard cue events during a physical scratch', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 0,
     });
     state = apply(state, { type: 'SCRATCH_STARTED' });
     const result = transitionDeck(state, { type: 'ARM_CUE', angle: 35, position: 50 });
@@ -148,11 +173,12 @@ describe('deck state machine', () => {
   it('keeps the motor running when the tonearm is lifted', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 0,
     });
     state = apply(state, { type: 'ARM_LIFTED' });
     expect(state.motorPhase).toBe('running');
     expect(state.motorSwitch).toBe('on');
+    expect(state.hasValidNeedleDrop).toBe(false);
     expect(state.transport).toBe('playing');
     expect(selectIsTrackAudible(state)).toBe(false);
     expect(selectRecordSoundState(state)).toBe('stopped');
@@ -162,7 +188,7 @@ describe('deck state machine', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
       type: 'ARM_DROPPED',
-      angle: 16,
+      angle: 5,
       wasAlreadyNeedleDown: false,
       position: 0,
       surface: 'plinth',
@@ -179,7 +205,7 @@ describe('deck state machine', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
       type: 'ARM_DROPPED',
-      angle: 25,
+      angle: 11,
       wasAlreadyNeedleDown: false,
       position: 0,
     });
@@ -207,7 +233,7 @@ describe('deck state machine', () => {
   it('loading never autoplays and forces the stylus gate closed', () => {
     let state = createInitialDeckState();
     state = apply(state, {
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 0,
     });
     state = apply(state, { type: 'TRACK_LOAD_REQUESTED' });
     state = apply(state, { type: 'TRACK_LOAD_SUCCEEDED' });
@@ -221,7 +247,7 @@ describe('deck state machine', () => {
   it('rejects a wrong/too-fast drop and does not unmute output', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0, tooFast: true,
+      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 0, tooFast: true,
     });
     expect(state.tonearm).toBe('lifted');
     expect(selectIsTrackAudible(state)).toBe(false);
@@ -267,7 +293,7 @@ describe('deck state machine', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
       type: 'ARM_DROPPED',
-      angle: 25,
+      angle: 11,
       wasAlreadyNeedleDown: false,
       position: 0,
     });
@@ -287,7 +313,7 @@ describe('deck state machine', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
       type: 'ARM_DROPPED',
-      angle: 25,
+      angle: 11,
       wasAlreadyNeedleDown: false,
       position: 0,
     });
