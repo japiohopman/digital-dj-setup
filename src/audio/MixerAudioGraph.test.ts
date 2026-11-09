@@ -99,7 +99,8 @@ describe('MixerAudioGraph', () => {
 
   it('closes and recreates the shared context only when the app-owned graph is disposed', () => {
     const contexts = [new MockAudioContext(), new MockAudioContext()];
-    const factory = vi.fn(() => contexts[factory.mock.calls.length] as unknown as AudioContext);
+    let contextIndex = 0;
+    const factory = vi.fn(() => contexts[contextIndex++] as unknown as AudioContext);
     const graph = new MixerAudioGraph({ audioContextFactory: factory });
     const options = graph.createDeckAudioOptions('a');
 
