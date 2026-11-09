@@ -227,7 +227,7 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
-  it('mutes on arm lift but keeps the motor running and off-record loop selected', () => {
+  it('mutes on arm lift but keeps the motor running and surface loops stopped', () => {
     const transport = makeTransport({ isLoaded: true, isPlaying: true, playbackState: 'playing' });
     const store = createDeckStore(transport);
     store.getState().dispatch({
@@ -336,6 +336,36 @@ describe('per-deck Zustand adapter', () => {
 
     expect(store.getState().machine.motorPhase).toBe('coasting');
     expect(transport.coastDown).toHaveBeenCalledWith(1200);
+    store.getState().dispose();
+  });
+
+  it('keeps program audio and vinyl crackle active through coast-down, then stops both at rest', async () => {
+    const transport = makeTransport({ isLoaded: true, isPlaying: true, playbackState: 'playing' });
+    const store = createDeckStore(transport);
+
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 25,
+      wasAlreadyNeedleDown: false,
+      position: 0,
+      grip: 'arm',
+      surface: 'record',
+    });
+    await flushMicrotasks();
+
+    store.getState().dispatch({ type: 'POWER_TOGGLED' });
+
+    expect(store.getState().machine.motorPhase).toBe('coasting');
+    expect(transport.coastDown).toHaveBeenCalledWith(1200);
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(true);
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('on-record');
+
+    store.getState().dispatch({ type: 'MOTOR_COAST_COMPLETED' });
+
+    expect(store.getState().machine.motorPhase).toBe('stopped');
+    expect(transport.pause).toHaveBeenLastCalledWith(0);
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(false);
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('stopped');
     store.getState().dispose();
   });
 
