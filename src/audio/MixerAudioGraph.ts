@@ -109,6 +109,14 @@ export class MixerAudioGraph {
     }
   }
 
+  /**
+   * Returns the cached signal path for a deck, creating it when first requested.
+   *
+   * @param deckId - Deck whose channel path is requested.
+   * @param context - Active shared AudioContext owned by this graph.
+   * @returns The deck input, channel gain, crossfader gain and analyser nodes.
+   * @throws Error when the context is not owned by this graph or the master route is unavailable.
+   */
   private getDeckPath(deckId: MixerDeckId, context: AudioContext): DeckChannelPath {
     const activeContext = this.getAudioContext();
     if (context !== activeContext) {
