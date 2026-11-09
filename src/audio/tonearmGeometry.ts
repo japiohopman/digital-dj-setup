@@ -21,7 +21,9 @@ export const DEFAULT_TONEARM_CONFIG: TonearmConfig = {
   minAngle: 0,
 };
 
-export type TonearmState = 'parked' | 'lifted' | 'needle-down';
+export type TonearmState = 'parked' | 'lifted' | 'needle-down' | 'off-record';
+export type TonearmGrip = 'arm' | 'cartridge';
+export type TonearmLandingSurface = 'record' | 'plinth' | 'air';
 
 export interface TonearmPivot {
   x: number;
@@ -128,6 +130,20 @@ export function isAngleAtOuterLeadIn(
     angleDeg >= config.outerGrooveAngle &&
     angleDeg <= config.outerGrooveAngle + tolerance
   );
+}
+
+/**
+ * Coarse physical landing classification for the stylus tip.
+ * The short range between the arm rest and the outer record edge is the
+ * Technics plinth; once the arm reaches the outer edge it is over vinyl.
+ * Groove validity remains a separate check from physical surface contact.
+ */
+export function classifyTonearmLandingSurface(
+  angleDeg: number,
+  config: TonearmConfig = DEFAULT_TONEARM_CONFIG,
+): TonearmLandingSurface {
+  if (!Number.isFinite(angleDeg) || angleDeg <= config.parkAngle + 2) return 'air';
+  return angleDeg < config.outerGrooveAngle - 2.5 ? 'plinth' : 'record';
 }
 
 export function playbackProgressToAngle(
