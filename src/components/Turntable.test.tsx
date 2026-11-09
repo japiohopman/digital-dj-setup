@@ -960,4 +960,52 @@ describe('Turntable interactive controls', () => {
     });
     container.remove();
   });
+
+  it('captures live tonearm angles and calculates the measured groove reach', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="MEASURE" />);
+    });
+
+    const tonearm = container.querySelector('.tonearm') as HTMLElement;
+    const startButton = container.querySelector(
+      'button[aria-label="MEASURE Capture groove start angle"]',
+    ) as HTMLButtonElement;
+    const endButton = container.querySelector(
+      'button[aria-label="MEASURE Capture groove end angle"]',
+    ) as HTMLButtonElement;
+
+    await act(async () => {
+      for (let step = 0; step < 6; step++) {
+        tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      }
+    });
+    expect(container.querySelector('[data-testid="tonearm-angle-readout"]')?.textContent).toBe('12.00°');
+
+    await act(async () => {
+      startButton.click();
+    });
+    expect(container.querySelector('[data-testid="tonearm-start-readout"]')?.textContent).toBe('12.00°');
+
+    await act(async () => {
+      for (let step = 0; step < 5; step++) {
+        tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      }
+    });
+    await act(async () => {
+      endButton.click();
+    });
+
+    expect(container.querySelector('[data-testid="tonearm-angle-readout"]')?.textContent).toBe('22.00°');
+    expect(container.querySelector('[data-testid="tonearm-end-readout"]')?.textContent).toBe('22.00°');
+    expect(container.querySelector('[data-testid="tonearm-reach-readout"]')?.textContent).toBe('10.00°');
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
 });
