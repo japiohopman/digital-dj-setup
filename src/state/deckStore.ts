@@ -113,20 +113,18 @@ export function createDeckStore(
         const current = get().machine;
         if (current.track !== 'ready' || current.tonearm !== 'needle-down') return;
 
-        // Keep the record crackle in sync with the main track: both begin only
-        // after the needle-impact sample has completely finished.
+        // Seek only after the one-shot has finished. This also replaces a
+        // still-running, muted source after the user lifted and re-dropped the
+        // needle, so a cartridge drop really starts at its 30s offset.
+        transport?.seek(position);
         if (current.transport === 'playing' && canRunMotor(current)) {
+          transport?.setRecordSoundState?.('on-record');
+          lastSoundState = 'on-record';
           if (current.motorPhase === 'spinning-up') {
             startSpinUp(current);
-          } else {
-            transport?.setRecordSoundState?.('on-record');
-            lastSoundState = 'on-record';
+          } else if (transport?.playbackState !== 'playing') {
             void transport?.play(position);
           }
-        } else {
-          // Preserve the cue position while the motor is off. Starting the
-          // motor later will pick up from this point through the same store.
-          transport?.seek(position);
         }
       })();
     };
