@@ -69,6 +69,10 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     }
   }, []);
 
+  const beginScratch = useCallback(() => {
+    engineRef.current?.beginScratch();
+  }, []);
+
   const scratch = useCallback((speed: number, isReversed: boolean, position: number) => {
     if (!engineRef.current) return;
     engineRef.current.scratch(speed, isReversed, position);
@@ -135,6 +139,7 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     pause,
     stop,
     togglePlayPause,
+    beginScratch,
     scratch,
     endScratch,
     seek,
