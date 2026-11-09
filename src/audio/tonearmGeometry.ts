@@ -130,7 +130,7 @@ export function isAngleInPlayableRecord(
     angleDeg <= config.runoutAngle;
 }
 
-/** The measured 14.70°–16.50° band is the LP's outer lead-in/start area. */
+/** The calibrated 13.30°–16.50° band is the LP's outer lead-in/start area. */
 export function isAngleAtOuterLeadIn(
   angleDeg: number,
   config: TonearmConfig = DEFAULT_TONEARM_CONFIG,

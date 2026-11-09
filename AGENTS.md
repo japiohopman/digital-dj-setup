@@ -8,6 +8,7 @@ These instructions apply to all automated and human-assisted coding work in this
 2. Read the linked GitHub Issue and its acceptance criteria.
 3. Check the current branch and open pull requests before creating another branch.
 4. Work only on the scope of the selected issue. Do not bundle future features or opportunistic refactors.
+5. Before changing recurring turntable mechanics, arm geometry, rotation, groove mapping or motor behaviour, consult the [technical reference index](docs/reference/README.md) and its linked baseline. Update the reference and relevant tests in the same PR when a verified value or behaviour changes.
 
 ## Branch and pull request workflow
 

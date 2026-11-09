@@ -47,6 +47,10 @@ CI uses `npm ci` and the committed `package-lock.json` so installs use the same 
 
 These are inspiration and behaviour references, not permission to copy code or assets. Check licensing and provenance before reusing any third-party material.
 
+## Technical reference
+
+Start with the [technical reference index](docs/reference/README.md) before researching or changing recurring turntable behaviour. The [turntable baseline](docs/reference/turntable-baseline.md) records current arm geometry, rotation angles, groove mapping, manufacturer facts and app-only simulation values. It explicitly separates hardware specifications from software calibration.
+
 ## Architecture principles
 
 - Build mobile-first; landscape is a separately considered DJ/battle layout.
