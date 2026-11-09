@@ -144,7 +144,6 @@ describe('useVinylMotion physical platter input', () => {
 
     act(() => result.current.onPointerDown(event));
 
-    const expectedAngle = 42 * (33.3333 / 60) * Math.PI * 2;
     expect(transport.getCurrentTime).toHaveBeenCalledTimes(1);
     expect(result.current.angle).toBe(0);
     expect(dispatch).toHaveBeenCalledWith({ type: 'SCRATCH_STARTED' });
