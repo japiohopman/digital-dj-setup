@@ -49,6 +49,8 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     await engineRef.current.play(offset);
   }, []);
 
+  const getCurrentTime = useCallback(() => engineRef.current?.getState().currentTime ?? 0, []);
+
   const pause = useCallback((durationMs?: number) => {
     if (!engineRef.current) return;
     engineRef.current.pause(durationMs);
@@ -136,6 +138,7 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     error: state.error,
     loadTrack,
     play,
+    getCurrentTime,
     pause,
     stop,
     togglePlayPause,
