@@ -50,7 +50,7 @@ describe('useTonearm', () => {
         armInteraction: 'idle',
         dispatch,
       }),
-      { initialProps: { currentTime: 50, armState: 'needle-down' as const } },
+      { initialProps: { currentTime: 50, armState: 'needle-down' as 'needle-down' | 'parked' } },
     );
 
     expect(result.current.armAngle).toBeCloseTo(34.875, 5);
