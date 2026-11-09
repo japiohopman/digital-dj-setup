@@ -4,10 +4,11 @@ import { createPortal } from 'react-dom';
 export interface ArmAngleMeterProps {
   deckLabel: string;
   armAngle: number;
+  isVisible: boolean;
 }
 
 /** Renders live tonearm calibration in a body portal, outside the deck layout. */
-export function ArmAngleMeter({ deckLabel, armAngle }: ArmAngleMeterProps) {
+export function ArmAngleMeter({ deckLabel, armAngle, isVisible }: ArmAngleMeterProps) {
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const [measuredGrooveStart, setMeasuredGrooveStart] = useState<number | null>(null);
   const [measuredGrooveEnd, setMeasuredGrooveEnd] = useState<number | null>(null);
@@ -21,7 +22,7 @@ export function ArmAngleMeter({ deckLabel, armAngle }: ArmAngleMeterProps) {
     ? measuredGrooveEnd - measuredGrooveStart
     : null;
 
-  if (!portalTarget) return null;
+  if (!portalTarget || !isVisible) return null;
 
   return createPortal(
     <section
