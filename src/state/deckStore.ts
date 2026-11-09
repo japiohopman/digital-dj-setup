@@ -35,6 +35,7 @@ const TRACE_LIMIT = 16;
 const isHighFrequencyEvent = (event: DeckEvent) =>
   event.type === 'SCRATCH_MOVED' || event.type === 'SEEK' || event.type === 'PLAYBACK_RATE_CHANGED';
 
+/** Creates an isolated Zustand adapter that owns transport and audio side effects for one deck. */
 export function createDeckStore(
   transport: DeckTransport | undefined,
   initial: InitialDeckState = {},
@@ -104,6 +105,7 @@ export function createDeckStore(
       return spinUp ?? Promise.resolve();
     };
 
+    /** Begins the platter coast-down and schedules its terminal machine event. */
     const startCoastDown = (previous: DeckMachineState) => {
       clearSpinTimer();
       clearCoastTimer();
@@ -175,6 +177,7 @@ export function createDeckStore(
       })();
     };
 
+    /** Executes transport/audio effects associated with an accepted machine transition. */
     const performTransitionEffects = (
       previous: DeckMachineState,
       next: DeckMachineState,

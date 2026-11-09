@@ -74,6 +74,7 @@ export interface DeckTransition {
   reason: string;
 }
 
+/** Builds the initial per-deck machine state from explicit power, motor and track options. */
 export function createInitialDeckState(options: InitialDeckState = {}): DeckMachineState {
   const powered = options.initiallyPowered ?? true;
   const motorOn = options.initiallyMotorOn ?? true;
@@ -94,14 +95,17 @@ export function createInitialDeckState(options: InitialDeckState = {}): DeckMach
   };
 }
 
+/** Returns whether power and the motor switch allow the platter motor to run. */
 export function canRunMotor(state: DeckMachineState): boolean {
   return state.power === 'on' && state.motorSwitch === 'on' && state.motorPhase !== 'stopped';
 }
 
+/** Returns whether the motor, loaded track and record are all ready for playback. */
 export function canPlayTrack(state: DeckMachineState): boolean {
   return canRunMotor(state) && state.track === 'ready' && state.hasRecord;
 }
 
+/** Derives platter rotation from the motor lifecycle state. */
 export function selectIsSpinning(state: DeckMachineState): boolean {
   return state.motorPhase !== 'stopped';
 }
@@ -119,6 +123,7 @@ export function selectIsTrackAudible(state: DeckMachineState): boolean {
     state.transport !== 'ended';
 }
 
+/** Derives which independent record-surface loop is allowed by the current deck state. */
 export function selectRecordSoundState(
   state: DeckMachineState,
 ): 'stopped' | 'on-record' | 'off-record' | 'runout' {
@@ -152,6 +157,7 @@ const reject = (state: DeckMachineState, reason: string): DeckTransition => ({
 
 const isFiniteNonNegative = (value: number) => Number.isFinite(value) && value >= 0;
 
+/** Applies one typed deck event through guarded, side-effect-free state transitions. */
 export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckTransition {
   switch (event.type) {
     case 'POWER_TOGGLED': {

@@ -17,11 +17,13 @@ export interface UseVinylMotionOptions {
 const TWO_PI = Math.PI * 2;
 const normalizeDelta = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
+/** Preserves the last real scratch direction when animation frames contain no pointer movement. */
 export function resolveScratchDirection(deltaAngle: number, previousDirection: boolean): boolean {
   const movementEpsilon = 1e-7;
   return Math.abs(deltaAngle) > movementEpsilon ? deltaAngle < 0 : previousDirection;
 }
 
+/** Converts angular movement into a non-negative scratch speed independent of direction. */
 export function calculateScratchSpeedMagnitude(deltaAngle: number, expectedAngleDelta: number): number {
   return expectedAngleDelta > 0 ? Math.abs(deltaAngle / expectedAngleDelta) : 0;
 }

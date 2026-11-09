@@ -46,6 +46,7 @@ export interface TurntableProps {
  * Provides realistic visual styling, spinning animations, speed selection,
  * power dial, target light toggle, and an interactive draggable pitch slider.
  */
+/** Mounts development-only calibration controls outside the clipped turntable artwork. */
 function TonearmMeterPortal({ children }: { children: ReactNode }) {
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 

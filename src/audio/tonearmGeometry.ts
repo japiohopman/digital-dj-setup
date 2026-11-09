@@ -56,6 +56,7 @@ export interface TonearmPivot {
   y: number;
 }
 
+/** Returns the real tonearm gimbal pivot in deck-local coordinates, including battle-mode rotation. */
 export function getTonearmPivot(
   deckWidth: number,
   deckHeight: number,
@@ -83,6 +84,7 @@ export function getTonearmPivot(
   };
 }
 
+/** Unwraps a new pointer bearing to the closest continuous angle around the previous bearing. */
 export function unwrapAngleNear(angle: number, reference: number): number {
   if (!Number.isFinite(angle) || !Number.isFinite(reference)) return reference;
   let unwrapped = angle;
@@ -91,6 +93,7 @@ export function unwrapAngleNear(angle: number, reference: number): number {
   return unwrapped;
 }
 
+/** Converts a pointer location into the tonearm bearing around the calibrated gimbal pivot. */
 export function calculateArmPointerBearingFromPointer(
   pointerX: number,
   pointerY: number,

@@ -50,6 +50,7 @@ interface PointerStart {
   grip: TonearmGrip;
 }
 
+/** Owns physical tonearm pickup, cueing, drop, and playback-following interaction for one deck. */
 export function useTonearm({
   duration,
   currentTime,
