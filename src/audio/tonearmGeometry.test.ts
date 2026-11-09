@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_TONEARM_CONFIG,
+  LP_OUTER_GROOVE_ANGLE,
+  LP_RECORD_EDGE_ANGLE,
+  SEVEN_INCH_OUTER_GROOVE_ANGLE,
   angleToPlaybackProgress,
   classifyTonearmLandingSurface,
   calculateArmPointerBearingFromPointer,
@@ -15,6 +18,8 @@ describe('tonearmGeometry', () => {
   it('identifies the playable groove range', () => {
     expect(isAngleInPlayableRecord(0)).toBe(false);
     expect(isAngleInPlayableRecord(20)).toBe(false);
+    expect(isAngleInPlayableRecord(22.5)).toBe(false);
+    expect(isAngleInPlayableRecord(LP_OUTER_GROOVE_ANGLE)).toBe(true);
     expect(isAngleInPlayableRecord(24)).toBe(true);
     expect(isAngleInPlayableRecord(35)).toBe(true);
     expect(isAngleInPlayableRecord(47)).toBe(true);
@@ -22,10 +27,10 @@ describe('tonearmGeometry', () => {
   });
 
   it('maps playback progress to the complete arm travel and back', () => {
-    expect(playbackProgressToAngle(0)).toBe(24);
-    expect(angleToPlaybackProgress(24)).toBeCloseTo(0, 5);
-    expect(playbackProgressToAngle(0.5)).toBe(35.5);
-    expect(angleToPlaybackProgress(35.5)).toBeCloseTo(0.5, 5);
+    expect(playbackProgressToAngle(0)).toBe(LP_OUTER_GROOVE_ANGLE);
+    expect(angleToPlaybackProgress(LP_OUTER_GROOVE_ANGLE)).toBeCloseTo(0, 5);
+    expect(playbackProgressToAngle(0.5)).toBeCloseTo(34.875, 5);
+    expect(angleToPlaybackProgress(34.875)).toBeCloseTo(0.5, 5);
     expect(playbackProgressToAngle(1)).toBe(47);
     expect(angleToPlaybackProgress(47)).toBeCloseTo(1, 5);
     expect(angleToPlaybackProgress(0)).toBeNull();
@@ -33,9 +38,9 @@ describe('tonearmGeometry', () => {
   });
 
   it('clamps invalid playback progress safely', () => {
-    expect(playbackProgressToAngle(-0.5)).toBe(24);
+    expect(playbackProgressToAngle(-0.5)).toBe(LP_OUTER_GROOVE_ANGLE);
     expect(playbackProgressToAngle(1.5)).toBe(47);
-    expect(playbackProgressToAngle(Number.NaN)).toBe(24);
+    expect(playbackProgressToAngle(Number.NaN)).toBe(LP_OUTER_GROOVE_ANGLE);
   });
 
   it('calculates the pivot from the rendered holder CSS geometry', () => {
@@ -76,17 +81,24 @@ describe('tonearmGeometry', () => {
     expect(landscapeBearing).toBeCloseTo(portraitBearing, 5);
   });
 
-  it('accepts an initial drop only at the outer lead-in', () => {
+  it('uses an LP lead-in halfway between the existing vinyl edge and 7-inch start', () => {
+    expect(SEVEN_INCH_OUTER_GROOVE_ANGLE).toBe(24);
+    expect(LP_RECORD_EDGE_ANGLE).toBe(21.5);
+    expect(LP_OUTER_GROOVE_ANGLE).toBe(22.75);
+    expect(DEFAULT_TONEARM_CONFIG.outerGrooveAngle).toBe(22.75);
+    expect(DEFAULT_TONEARM_CONFIG.recordEdgeAngle).toBe(21.5);
+    expect(isAngleAtOuterLeadIn(22.75)).toBe(true);
     expect(isAngleAtOuterLeadIn(24)).toBe(true);
-    expect(isAngleAtOuterLeadIn(26)).toBe(true);
-    expect(isAngleAtOuterLeadIn(27)).toBe(false);
+    expect(isAngleAtOuterLeadIn(25.25)).toBe(true);
+    expect(isAngleAtOuterLeadIn(25.5)).toBe(false);
     expect(isAngleAtOuterLeadIn(35)).toBe(false);
-    expect(isAngleAtOuterLeadIn(DEFAULT_TONEARM_CONFIG.outerGrooveAngle - 1)).toBe(false);
   });
 
   it('distinguishes the parked cradle, Technics plinth and vinyl surface', () => {
     expect(classifyTonearmLandingSurface(0)).toBe('air');
     expect(classifyTonearmLandingSurface(16)).toBe('plinth');
+    expect(classifyTonearmLandingSurface(21.49)).toBe('plinth');
+    expect(classifyTonearmLandingSurface(21.5)).toBe('record');
     expect(classifyTonearmLandingSurface(22)).toBe('record');
     expect(classifyTonearmLandingSurface(25)).toBe('record');
   });
