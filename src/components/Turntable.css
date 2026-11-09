@@ -73,7 +73,7 @@
 .turntable .model-badge-brand {
   color: #f0eee9;
   font-family: 'Humanist Slabserif 712', Georgia, serif;
-  font-size: clamp(20px, 2.2vw, 30px);
+  font-size: clamp(14px, 1.6vw, 21px);
   font-weight: 900;
   line-height: 0.95;
   letter-spacing: -0.035em;
@@ -82,7 +82,7 @@
 .turntable .model-badge-subtitle {
   color: rgba(238, 235, 228, 0.86);
   font-family: 'Humanist Slabserif 712', Georgia, serif;
-  font-size: clamp(7px, 0.7vw, 10px);
+  font-size: clamp(6px, 0.58vw, 8px);
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: 0.015em;
@@ -303,16 +303,22 @@
 
   /* The Technics lockup sits on the right-hand flank, by the cue lamp. */
   .turntable .model-badge {
-    top: 70%;
-    left: 77%;
-    width: 24%;
-    transform: rotate(90deg);
+    top: 79%;
+    left: 82%;
+    width: 18%;
+    transform: none;
     transform-origin: center;
   }
 
+  .turntable .model-badge-brand {
+    font-size: clamp(11px, 1.2vw, 16px);
+    letter-spacing: -0.04em;
+  }
+
   .turntable .model-badge-subtitle {
-    font-size: clamp(6px, 0.65vw, 8px);
+    font-size: clamp(5px, 0.48vw, 6px);
     letter-spacing: 0;
+    white-space: normal;
   }
 }
 
@@ -773,7 +779,7 @@
   pointer-events: none;
   z-index: 10;
   will-change: transform;
-  transition: transform 0.1s linear;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .turntable .tonearm-holder.is-dragging {
@@ -807,19 +813,20 @@
 /* A restrained contact shadow remains visible even while the arm is parked. */
 .turntable .tonearm-holder .tonearm {
   filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.32));
-  transition: transform 140ms ease, filter 140ms ease;
+  transition:
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Picking up the arm raises it visually; keep that lift during the drag itself. */
 .turntable .tonearm-holder.arm-lifted .tonearm,
 .turntable .tonearm-holder.is-dragging .tonearm {
-  transform: perspective(700px) rotateX(-7deg) translateY(-2px) scale(1.005);
+  transform: perspective(700px) rotateX(-9deg) translateY(-3px) scale(1.006);
   filter: drop-shadow(4px 8px 6px rgba(0, 0, 0, 0.5));
 }
 
-.turntable .tonearm-holder.is-dragging .tonearm {
-  transition: none;
-}
+/* Keep the small vertical lift animation active during pointer capture. The
+   platter-facing arm angle itself is still direct-manipulated without lag. */
 
 .turntable .tonearm-holder.needle-down .tonearm {
   filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.4));
