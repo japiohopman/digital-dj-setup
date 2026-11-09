@@ -213,7 +213,7 @@ describe('deck state machine', () => {
     state = apply(state, { type: 'TRACK_LOAD_SUCCEEDED' });
     expect(state.track).toBe('ready');
     expect(state.transport).toBe('paused');
-    expect(state.tonearm).toBe('lifted');
+    expect(state.tonearm).toBe('parked');
     expect(canPlayTrack(state)).toBe(true);
     expect(selectIsTrackAudible(state)).toBe(false);
   });
