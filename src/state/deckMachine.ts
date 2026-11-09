@@ -224,7 +224,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         scratchResumeTransport: null,
         hasValidNeedleDrop: false,
         hasRecord: false,
-        tonearm: state.tonearm === 'parked' ? 'parked' : 'lifted',
+        tonearm: 'parked',
         armInteraction: 'idle',
       }, 'Track loading: slipmat shown, arm kept stable and output muted; autoplay disabled');
 
