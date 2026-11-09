@@ -45,15 +45,15 @@ export interface TurntableProps {
  */
 export function Turntable({
   id,
+  transport,
   deckLabel = 'DECK 01',
   modelName = 'SL-1200 MK2',
   initialSpeed = 33,
   initiallyPowered = true,
   initiallyMotorOn,
   initiallySpinning = true,
-  initiallyHasRecord = true,
+  initiallyHasRecord = transport?.isLoaded ?? false,
   initiallyHasSlipmat = false,
-  transport,
 }: TurntableProps) {
   const motorActive = initiallyMotorOn !== undefined ? initiallyMotorOn : initiallySpinning;
   const [deckStore] = useState(() => createDeckStore(transport, {
@@ -72,7 +72,7 @@ export function Turntable({
   const armState = machine.tonearm;
   const isArmDragging = machine.armInteraction === 'dragging';
   const hasRecord = machine.hasRecord;
-  const hasSlipmat = initiallyHasSlipmat;
+  const hasSlipmat = !hasRecord || initiallyHasSlipmat;
   const [speed, setSpeed] = useState<TurntableSpeed>(initialSpeed);
   const [isLightOn, setIsLightOn] = useState(false);
   const [pitch, setPitch] = useState<number>(0);
@@ -291,6 +291,7 @@ export function Turntable({
     isScratching ? 'is-scratching' : '',
     motorState === 'coasting' ? 'coasting' : '',
     motorState === 'spinning-up' ? 'spinning-up' : '',
+    machine.track === 'loading' ? 'track-loading' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -479,9 +480,15 @@ export function Turntable({
             onLostPointerCapture={onArmLostPointerCapture}
             onKeyDown={onArmKeyDown}
           >
-            {/* Generous touch handle target over headshell and cartridge for mobile */}
+            {/* Separate touch targets preserve the difference between the arm tube and cartridge. */}
+            <div
+              className="tonearm-tube-target"
+              data-tonearm-grip="arm"
+              aria-hidden="true"
+            />
             <div
               className="tonearm-headshell-target"
+              data-tonearm-grip="cartridge"
               aria-hidden="true"
             />
           </div>
