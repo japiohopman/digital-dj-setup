@@ -1078,7 +1078,9 @@ describe('AudioEngine', () => {
       engineA.loadTrack(trackData.slice(0), 'deck-a.wav'),
       engineB.loadTrack(trackData.slice(0), 'deck-b.wav'),
     ]);
-    await Promise.all([engineA.play(), engineB.play()]);
+    // Start in a known order, then verify both transports remain active together.
+    await engineA.play();
+    await engineB.play();
 
     expect(engineA.getState().playbackState).toBe('playing');
     expect(engineB.getState().playbackState).toBe('playing');
