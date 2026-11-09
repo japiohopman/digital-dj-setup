@@ -75,11 +75,11 @@ describe('DevKit', () => {
     };
     render(<DevKit activeDeckLabel="DECK B" activeArmAngle={18} activeDeckDiagnostics={snapshot} />);
 
-    expect(screen.queryByTestId('deck-state-trace')).toBeNull();
+    expect(document.body.querySelector('[data-dev-widget="deck-state-trace"]')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'DEVKIT' }));
     fireEvent.click(screen.getByLabelText('Deck state trace'));
 
-    expect(screen.getByLabelText('DECK B state trace')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'DECK B state trace' })).toBeTruthy();
     fireEvent.click(screen.getByText(/DECK B STATE/));
     expect(screen.getByText('valid lead-in drop')).toBeTruthy();
   });
