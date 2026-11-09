@@ -66,8 +66,6 @@ export interface DeckTransport {
   pause: (durationMs?: number) => void;
   stop: () => void;
   togglePlayPause: () => Promise<void>;
-  /** Capture the current live playhead before a platter drag begins, even if no movement follows. */
-  beginScratch?: () => void;
   scratch: (speed: number, isReversed: boolean, position: number) => void;
   endScratch: (resumePlayback: boolean) => void;
   seek: (position: number) => void;
