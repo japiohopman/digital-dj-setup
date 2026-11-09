@@ -211,12 +211,17 @@ export function useVinylMotion({
 
     activePointerIdRef.current = e.pointerId;
     draggingFromRef.current = { x: e.clientX, y: e.clientY };
-    scratchStartAngleRef.current = angleRef.current;
     const duration = transport.duration;
+    const livePosition = transport.getCurrentTime?.() ?? transport.currentTime;
     scratchStartPositionRef.current = Number.isFinite(duration)
-      ? Math.max(0, Math.min(duration, transport.currentTime))
+      ? Math.max(0, Math.min(duration, livePosition))
       : 0;
+    // The platter's absolute angular position is the timecode, just like the
+    // reference scratch deck: one accumulated vinyl rotation advances audio.
+    scratchStartAngleRef.current = scratchStartPositionRef.current * effectiveRps * TWO_PI;
+    angleRef.current = scratchStartAngleRef.current;
     anglePreviousRef.current = angleRef.current;
+    setAngle(angleRef.current);
     isScratchingRef.current = true;
     setIsScratching(true);
     draggingSpeedsRef.current = [];
@@ -284,7 +289,7 @@ export function useVinylMotion({
     window.addEventListener('pointermove', onPointerMove, { passive: false });
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
-  }, [centerElementRef, dispatch, isMotorOn, isPowered, transport]);
+  }, [centerElementRef, dispatch, effectiveRps, isMotorOn, isPowered, transport]);
 
   useEffect(() => {
     if (transportPhase !== 'scratching' && isScratchingRef.current) {
