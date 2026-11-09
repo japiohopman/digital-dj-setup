@@ -5,6 +5,7 @@ import { useVinylMotion } from '../audio/useVinylMotion';
 import { useTonearm } from '../audio/useTonearm';
 import { createDeckStore } from '../state/deckStore';
 import { selectIsSpinning, selectIsTrackAudible } from '../state/deckMachine';
+import type { DeckDiagnosticsSnapshot } from './devkit/types';
 
 /**
  * Supported playback RPM speeds for the turntable deck.
@@ -37,6 +38,8 @@ export interface TurntableProps {
   transport?: DeckTransport;
   /** Reports the live screen-space arm angle to development-only diagnostics. */
   onArmAngleChange?: (angle: number) => void;
+  /** Reports a read-only state-machine snapshot to development-only diagnostics. */
+  onDevDiagnosticsChange?: (snapshot: DeckDiagnosticsSnapshot) => void;
 }
 
 /**
@@ -50,6 +53,7 @@ export function Turntable({
   id,
   transport,
   onArmAngleChange,
+  onDevDiagnosticsChange,
   deckLabel = 'DECK 01',
   modelName = 'SL-1200 MK2',
   initialSpeed = 33,
@@ -156,6 +160,26 @@ export function Turntable({
   useEffect(() => {
     onArmAngleChange?.(armAngle);
   }, [armAngle, onArmAngleChange]);
+
+  useEffect(() => {
+    onDevDiagnosticsChange?.({
+      power: machine.power,
+      motorPhase: machine.motorPhase,
+      tonearm: machine.tonearm,
+      track: machine.track,
+      transport: machine.transport,
+      isAudible: selectIsTrackAudible(machine),
+      trace,
+    });
+  }, [
+    machine.power,
+    machine.motorPhase,
+    machine.tonearm,
+    machine.track,
+    machine.transport,
+    trace,
+    onDevDiagnosticsChange,
+  ]);
 
   const updatePitchFromPointer = (clientY: number, clientX: number) => {
     if (!trackRef.current) return;
@@ -660,23 +684,6 @@ export function Turntable({
               <span className="deck-audio-status idle">NO TRACK LOADED</span>
             )}
           </div>
-          <details className="deck-state-trace">
-            <summary>
-              DECK STATE · {machine.power.toUpperCase()} / {machine.motorPhase.toUpperCase()} / {machine.tonearm.toUpperCase()}
-            </summary>
-            <dl>
-              <div><dt>Track</dt><dd>{machine.track}</dd></div>
-              <div><dt>Transport</dt><dd>{machine.transport}</dd></div>
-              <div><dt>Output</dt><dd>{selectIsTrackAudible(machine) ? 'AUDIBLE' : 'MUTED'}</dd></div>
-            </dl>
-            <ol>
-              {trace.slice(-8).map((entry, index) => (
-                <li key={`${entry.at}-${index}`} data-accepted={entry.accepted}>
-                  <span>{entry.event}</span> — {entry.reason}
-                </li>
-              ))}
-            </ol>
-          </details>
         </div>
 
     </div>
