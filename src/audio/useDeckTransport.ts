@@ -109,8 +109,8 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     engineRef.current.setStylusContact(isContact);
   }, []);
 
-  const setRecordSoundState = useCallback((surfaceState: RecordSoundState) => {
-    engineRef.current?.setRecordSoundState(surfaceState);
+  const setRecordSoundState = useCallback(async (surfaceState: RecordSoundState) => {
+    await engineRef.current?.setRecordSoundState(surfaceState);
   }, []);
 
   const playNeedleDropSound = useCallback((kind: NeedleDropSound) => {
