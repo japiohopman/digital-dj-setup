@@ -109,25 +109,37 @@ export function createDeckStore(
       const sequence = ++needleDropSequence;
       isNeedleCuePending = true;
       void (async () => {
+        // The one-shot must finish before the vinyl loop or program track starts.
         await transport?.playNeedleDropSound?.(kind);
         if (sequence !== needleDropSequence) return;
         isNeedleCuePending = false;
 
-        const current = get().machine;
+        let current = get().machine;
         if (current.track !== 'ready' || current.tonearm !== 'needle-down') return;
 
-        // Start the record layer only after the needle-impact sample ends.
-        // Seek after the cue so an old muted source cannot leak into the new
-        // position. If the user is already scratching, the next platter sample
-        // will start the transport through the same state-machine route.
         if (
           (current.transport === 'playing' || current.transport === 'scratching') &&
           canRunMotor(current)
         ) {
-          transport?.setRecordSoundState?.('on-record');
+          // Wait until the vinyl loop is actually scheduled, not merely requested.
+          // This makes the loop and program audio enter together after the impact.
+          await transport?.setRecordSoundState?.('on-record');
+          if (sequence !== needleDropSequence) return;
+
+          current = get().machine;
+          if (
+            current.track !== 'ready' ||
+            current.tonearm !== 'needle-down' ||
+            !canRunMotor(current) ||
+            (current.transport !== 'playing' && current.transport !== 'scratching')
+          ) {
+            return;
+          }
           lastSoundState = 'on-record';
-          transport?.seek(position);
+
+          // A pending needle drop should never replace an active scratch source.
           if (current.transport === 'playing') {
+            transport?.seek(position);
             if (current.motorPhase === 'spinning-up') {
               startSpinUp(current);
             } else if (transport?.playbackState !== 'playing') {
