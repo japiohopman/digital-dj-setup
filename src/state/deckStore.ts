@@ -162,7 +162,6 @@ export function createDeckStore(
       const isFirstCorrectDrop = event.type === 'ARM_DROPPED' &&
         next.tonearm === 'needle-down' &&
         !previous.hasValidNeedleDrop &&
-        !event.wasAlreadyNeedleDown &&
         event.grip !== 'cartridge' &&
         !event.tooFast;
       const isWrongNeedleDrop = event.type === 'ARM_DROPPED' &&
@@ -219,7 +218,7 @@ export function createDeckStore(
           if (previous.transport === 'scratching') break;
           if (next.tonearm === 'needle-down') {
             const wrongDrop = event.grip === 'cartridge' || event.tooFast === true;
-            const firstDrop = !previous.hasValidNeedleDrop && !event.wasAlreadyNeedleDown;
+            const firstDrop = !previous.hasValidNeedleDrop;
             if (wrongDrop) {
               sequenceNeedleDrop('wrong', event.position);
             } else if (firstDrop) {
