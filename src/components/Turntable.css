@@ -1042,69 +1042,78 @@
 
 
 /* --------------------------------------------------
-   Tonearm angle meter for physical groove calibration
+   Floating tonearm calibration dev widget
+   Rendered into document.body so it never changes the deck layout
+   or inherits the turntable's landscape rotation.
 -------------------------------------------------- */
-.turntable .tonearm-meter-panel {
-  position: relative;
+.tonearm-meter-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 10000;
   display: grid;
-  gap: 7px;
-  width: 100%;
+  gap: 6px;
+  width: min(290px, calc(100vw - 20px));
+  max-height: calc(100vh - 20px);
   box-sizing: border-box;
-  margin-top: 0.55rem;
-  padding: 10px 12px 9px;
+  margin: 0;
+  padding: 8px 10px;
+  overflow-y: auto;
+  transform: translate(-50%, -50%);
   color: #e5e7eb;
-  background: linear-gradient(180deg, rgba(20, 23, 26, 0.97), rgba(9, 11, 13, 0.97));
-  border: 1px solid rgba(197, 154, 88, 0.38);
+  background: rgba(13, 16, 18, 0.9);
+  border: 1px solid rgba(197, 154, 88, 0.48);
   border-radius: 6px;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(9px);
   font-family: 'SF Mono', Monaco, Consolas, monospace;
-  z-index: 20;
+  pointer-events: auto;
 }
 
-.turntable .tonearm-meter-heading {
+.tonearm-meter-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
 
-.turntable .tonearm-meter-heading > div {
+.tonearm-meter-heading > div {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.turntable .tonearm-meter-title {
+.tonearm-meter-title {
   color: #d5ad70;
-  font-size: clamp(10px, 0.9vw, 12px);
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.12em;
 }
 
-.turntable .tonearm-meter-subtitle,
-.turntable .tonearm-meter-hint {
-  color: rgba(229, 231, 235, 0.62);
-  font-size: clamp(9px, 0.72vw, 10px);
-  line-height: 1.4;
+.tonearm-meter-subtitle,
+.tonearm-meter-hint {
+  color: rgba(229, 231, 235, 0.68);
+  font-size: 8px;
+  line-height: 1.35;
 }
 
-.turntable .tonearm-meter-live {
-  min-width: 92px;
+.tonearm-meter-live {
+  min-width: 78px;
   color: #f8fafc;
-  font-size: clamp(20px, 2.1vw, 27px);
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.06em;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-.turntable .tonearm-meter-scale {
+.tonearm-meter-scale {
   position: relative;
-  height: 16px;
-  margin: 1px 2px 0;
+  height: 15px;
+  margin: 0 2px;
 }
 
-.turntable .tonearm-meter-track {
+.tonearm-meter-track {
   position: absolute;
   top: 6px;
   left: 0;
@@ -1115,155 +1124,148 @@
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-.turntable .tonearm-meter-marker {
+.tonearm-meter-marker {
   position: absolute;
   top: 1px;
+  z-index: 2;
   width: 2px;
   height: 14px;
   transform: translateX(-50%);
   border-radius: 2px;
-  z-index: 2;
 }
 
-.turntable .tonearm-meter-marker.current {
+.tonearm-meter-marker.current {
+  z-index: 4;
   width: 3px;
   background: #f8fafc;
   box-shadow: 0 0 5px rgba(248, 250, 252, 0.85);
-  z-index: 4;
 }
 
-.turntable .tonearm-meter-marker.start {
+.tonearm-meter-marker.start {
   background: #4ade80;
   box-shadow: 0 0 4px rgba(74, 222, 128, 0.7);
 }
 
-.turntable .tonearm-meter-marker.end {
+.tonearm-meter-marker.end {
   background: #fb923c;
   box-shadow: 0 0 4px rgba(251, 146, 60, 0.7);
 }
 
-.turntable .tonearm-meter-ticks {
+.tonearm-meter-ticks {
   position: relative;
-  height: 12px;
+  height: 10px;
   margin: -5px 2px 0;
-  color: rgba(229, 231, 235, 0.55);
-  font-size: 9px;
+  color: rgba(229, 231, 235, 0.58);
+  font-size: 8px;
   font-variant-numeric: tabular-nums;
 }
 
-.turntable .tonearm-meter-ticks span {
+.tonearm-meter-ticks span {
   position: absolute;
   transform: translateX(-50%);
 }
 
-.turntable .tonearm-meter-ticks span:first-child {
+.tonearm-meter-ticks span:first-child {
   transform: none;
 }
 
-.turntable .tonearm-meter-ticks span:last-child {
+.tonearm-meter-ticks span:last-child {
   transform: translateX(-100%);
 }
 
-.turntable .tonearm-meter-readings {
+.tonearm-meter-readings {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  gap: 5px;
 }
 
-.turntable .tonearm-meter-readings > div {
+.tonearm-meter-readings > div {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 2px;
-  min-width: 0;
-  padding: 5px 7px;
-  background: rgba(255, 255, 255, 0.045);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 5px 6px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 4px;
 }
 
-.turntable .tonearm-meter-readings span {
-  color: rgba(229, 231, 235, 0.58);
-  font-size: 9px;
+.tonearm-meter-readings span {
+  color: rgba(229, 231, 235, 0.64);
+  font-size: 8px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
 }
 
-.turntable .tonearm-meter-readings output {
+.tonearm-meter-readings output {
   color: #f3f4f6;
-  font-size: clamp(13px, 1.2vw, 16px);
+  font-size: 13px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.turntable .tonearm-meter-readings .tonearm-meter-reach output {
+.tonearm-meter-readings .tonearm-meter-reach output {
   color: #d5ad70;
 }
 
-.turntable .tonearm-meter-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.tonearm-meter-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
 }
 
-.turntable .tonearm-meter-button,
-.turntable .tonearm-meter-clear {
-  min-height: 30px;
-  padding: 5px 9px !important;
-  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+.tonearm-meter-button,
+.tonearm-meter-clear {
+  min-height: 28px;
+  padding: 5px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 4px;
   color: #e5e7eb;
-  font: 700 10px/1.2 'SF Mono', Monaco, Consolas, monospace;
+  font: 700 9px/1.2 'SF Mono', Monaco, Consolas, monospace;
   cursor: pointer;
 }
 
-.turntable .tonearm-meter-button {
-  background: rgba(61, 75, 64, 0.82) !important;
-  border-color: rgba(74, 222, 128, 0.28) !important;
+.tonearm-meter-button {
+  background: rgba(61, 75, 64, 0.9);
+  border-color: rgba(74, 222, 128, 0.32);
 }
 
-.turntable .tonearm-meter-button:hover {
-  background: rgba(45, 92, 58, 0.95) !important;
+.tonearm-meter-button:hover {
+  background: rgba(45, 92, 58, 0.98);
 }
 
-.turntable .tonearm-meter-clear {
-  background: rgba(50, 50, 50, 0.75) !important;
+.tonearm-meter-clear {
+  grid-column: 1 / -1;
+  background: rgba(50, 50, 50, 0.82);
 }
 
-.turntable .tonearm-meter-clear:disabled {
+.tonearm-meter-clear:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
 
-.turntable .tonearm-meter-hint {
+.tonearm-meter-hint {
   margin: 0;
 }
 
 @media (max-width: 480px) {
-  .turntable .tonearm-meter-panel {
-    padding: 9px;
-    gap: 6px;
-  }
-
-  .turntable .tonearm-meter-readings {
+  .tonearm-meter-panel {
+    width: min(280px, calc(100vw - 16px));
+    padding: 7px 8px;
     gap: 5px;
   }
 
-  .turntable .tonearm-meter-readings > div {
-    padding: 5px;
+  .tonearm-meter-live {
+    font-size: 20px;
   }
 
-  .turntable .tonearm-meter-actions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+  .tonearm-meter-readings > div {
+    padding: 4px;
   }
 
-  .turntable .tonearm-meter-button,
-  .turntable .tonearm-meter-clear {
-    min-height: 34px;
-    font-size: 9px;
-  }
-
-  .turntable .tonearm-meter-clear {
-    grid-column: 1 / -1;
+  .tonearm-meter-button,
+  .tonearm-meter-clear {
+    min-height: 30px;
+    font-size: 8px;
   }
 }
