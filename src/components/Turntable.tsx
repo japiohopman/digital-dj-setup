@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, type CSSProperties, type PointerEvent, type KeyboardEvent, type ChangeEvent } from 'react';
 import { useStore } from 'zustand';
 import type { DeckTransport } from '../audio/types';
+import { getTonearmConfig, type RecordFormat } from '../audio/tonearmGeometry';
 import { useVinylMotion } from '../audio/useVinylMotion';
 import { useTonearm } from '../audio/useTonearm';
 import { createDeckStore } from '../state/deckStore';
@@ -23,6 +24,8 @@ export interface TurntableProps {
   modelName?: string;
   /** Initial rotation speed setting in RPM (33 or 45). */
   initialSpeed?: TurntableSpeed;
+  /** Physical record size used for tonearm lead-in and vinyl-edge detection. */
+  recordFormat?: RecordFormat;
   /** Whether the turntable main power switch is enabled initially. */
   initiallyPowered?: boolean;
   /** Explicit initial motor state. If omitted, falls back to initiallySpinning. */
@@ -49,6 +52,7 @@ export function Turntable({
   deckLabel = 'DECK 01',
   modelName = 'SL-1200 MK2',
   initialSpeed = 33,
+  recordFormat = 'lp',
   initiallyPowered = true,
   initiallyMotorOn,
   initiallySpinning = true,
@@ -56,11 +60,12 @@ export function Turntable({
   initiallyHasSlipmat = false,
 }: TurntableProps) {
   const motorActive = initiallyMotorOn !== undefined ? initiallyMotorOn : initiallySpinning;
+  const tonearmConfig = getTonearmConfig(recordFormat);
   const [deckStore] = useState(() => createDeckStore(transport, {
     initiallyPowered,
     initiallyMotorOn: motorActive,
     hasRecord: initiallyHasRecord,
-  }));
+  }, tonearmConfig));
   const machine = useStore(deckStore, (state) => state.machine);
   const trace = useStore(deckStore, (state) => state.trace);
   const dispatch = useStore(deckStore, (state) => state.dispatch);
@@ -147,6 +152,7 @@ export function Turntable({
     dispatch,
     isBattleMode: isLandscape,
     hasRecord,
+    config: tonearmConfig,
   });
 
   const updatePitchFromPointer = (clientY: number, clientX: number) => {
