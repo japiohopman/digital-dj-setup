@@ -204,10 +204,13 @@ describe('deck state machine', () => {
       endedNaturally: true,
     });
     expect(state.transport).toBe('ended');
-    expect(selectIsTrackAudible(state)).toBe(false);
+    // The groove has stopped moving, so the run-out layer plays; the cartridge
+    // nevertheless remains connected to the phono amplifier until lifted.
+    expect(selectIsTrackAudible(state)).toBe(true);
     expect(selectRecordSoundState(state)).toBe('runout');
 
     state = apply(state, { type: 'ARM_LIFTED' });
+    expect(selectIsTrackAudible(state)).toBe(false);
     expect(selectRecordSoundState(state)).toBe('stopped');
   });
 
