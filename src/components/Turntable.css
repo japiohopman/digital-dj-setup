@@ -317,6 +317,15 @@
   }
 }
 
+
+/* On short landscape phone screens the rotated LOAD TRACK bar otherwise
+   sits above the viewport. Move only that control bar down into view. */
+@media (orientation: landscape) and (max-height: 600px) {
+  .turntable .deck-audio-panel {
+    left: 90%;
+  }
+}
+
 /* --------------------------------------------------
    Authentic Technics SL-1200 Pitch Control Assembly
    Positioned in the lower-right quadrant of unrotated deck;
