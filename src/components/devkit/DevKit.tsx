@@ -109,9 +109,11 @@ export function DevKit({ activeDeckLabel, activeArmAngle }: DevKitProps) {
         )}
       </aside>
 
-      {isArmAngleMeterEnabled && (
-        <ArmAngleMeter deckLabel={activeDeckLabel} armAngle={activeArmAngle} />
-      )}
+      <ArmAngleMeter
+        deckLabel={activeDeckLabel}
+        armAngle={activeArmAngle}
+        isVisible={isArmAngleMeterEnabled}
+      />
     </>
   );
 }
