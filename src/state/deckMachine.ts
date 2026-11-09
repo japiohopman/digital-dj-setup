@@ -87,7 +87,7 @@ export function createInitialDeckState(options: InitialDeckState = {}): DeckMach
     hasValidNeedleDrop: false,
     tonearm: 'parked',
     armInteraction: 'idle',
-    hasRecord: options.hasRecord ?? true,
+    hasRecord: options.hasRecord ?? trackLoaded,
     trackError: null,
   };
 }
@@ -235,7 +235,6 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         track: 'ready',
         trackError: null,
         hasRecord: true,
-        trackError: null,
         transport: 'paused',
       }, 'Track ready: vinyl shown; remains paused until a valid needle drop');
 
