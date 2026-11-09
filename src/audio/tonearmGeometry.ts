@@ -17,16 +17,18 @@ export interface TonearmConfig {
 }
 
 /**
- * Keep the current 24° start as the reference for future seven-inch support.
- * A standard LP begins farther out; its current target is halfway between
- * the 7-inch lead-in point and the existing vinyl/plinth boundary (21.5°).
+ * The LP groove begins farther out than a 7-inch single on this arm geometry.
+ * Keep the two formats separate so both the physical vinyl edge and valid
+ * lead-in are classified using the selected record size.
  */
-export const SEVEN_INCH_OUTER_GROOVE_ANGLE = 24;
-export const LP_RECORD_EDGE_ANGLE = SEVEN_INCH_OUTER_GROOVE_ANGLE - 2.5;
-export const LP_OUTER_GROOVE_ANGLE =
-  (SEVEN_INCH_OUTER_GROOVE_ANGLE + LP_RECORD_EDGE_ANGLE) / 2;
+export type RecordFormat = 'lp' | '7-inch';
 
-export const DEFAULT_TONEARM_CONFIG: TonearmConfig = {
+export const LP_OUTER_GROOVE_ANGLE = 11;
+export const LP_RECORD_EDGE_ANGLE = 8.5;
+export const SEVEN_INCH_OUTER_GROOVE_ANGLE = 24;
+export const SEVEN_INCH_RECORD_EDGE_ANGLE = 21.5;
+
+export const LP_TONEARM_CONFIG: TonearmConfig = {
   parkAngle: 0,
   outerGrooveAngle: LP_OUTER_GROOVE_ANGLE,
   recordEdgeAngle: LP_RECORD_EDGE_ANGLE,
@@ -34,6 +36,22 @@ export const DEFAULT_TONEARM_CONFIG: TonearmConfig = {
   maxAngle: 49,
   minAngle: 0,
 };
+
+export const SEVEN_INCH_TONEARM_CONFIG: TonearmConfig = {
+  parkAngle: 0,
+  outerGrooveAngle: SEVEN_INCH_OUTER_GROOVE_ANGLE,
+  recordEdgeAngle: SEVEN_INCH_RECORD_EDGE_ANGLE,
+  innerGrooveAngle: 47,
+  maxAngle: 49,
+  minAngle: 0,
+};
+
+/** The deck defaults to LP geometry unless a seven-inch format is selected. */
+export const DEFAULT_TONEARM_CONFIG = LP_TONEARM_CONFIG;
+
+export function getTonearmConfig(recordFormat: RecordFormat = 'lp'): TonearmConfig {
+  return recordFormat === '7-inch' ? SEVEN_INCH_TONEARM_CONFIG : LP_TONEARM_CONFIG;
+}
 
 export type TonearmState = 'parked' | 'lifted' | 'needle-down' | 'off-record';
 export type TonearmGrip = 'arm' | 'cartridge';
