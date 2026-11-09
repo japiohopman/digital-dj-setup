@@ -143,6 +143,23 @@ describe('AudioEngine', () => {
     engine.dispose();
   });
 
+  it('resolves on-record activation only after the vinyl loop source has started', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    })));
+    const engine = createEngine();
+
+    await engine.setRecordSoundState('on-record');
+
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(mockContext.createdSources).toHaveLength(1);
+    expect(mockContext.createdSources[0]?.start).toHaveBeenCalledOnce();
+    expect(mockContext.createdSources[0]?.loop).toBe(true);
+
+    engine.dispose();
+  });
+
   it('retries only missing record sound assets after a failed fetch', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
