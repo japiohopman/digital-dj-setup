@@ -713,8 +713,8 @@ export function Turntable({
           >
             <div className="tonearm-meter-heading">
               <div>
-                <span className="tonearm-meter-title">TONEARM DEV</span>
-                <span className="tonearm-meter-subtitle">Nulpunt = arm in de rusthouder</span>
+                <span className="tonearm-meter-title">{deckLabel} · TONEARM DEV</span>
+                <span className="tonearm-meter-subtitle">0° = arm in de rusthouder</span>
               </div>
               <output
                 className="tonearm-meter-live"
@@ -805,9 +805,6 @@ export function Turntable({
                 Wis meting
               </button>
             </div>
-            <p className="tonearm-meter-hint">
-              Sleep de arm naar het gewenste punt en leg het vast.
-            </p>
           </section>
         </TonearmMeterPortal>
       )}
