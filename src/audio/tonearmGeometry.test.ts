@@ -83,6 +83,15 @@ describe('tonearmGeometry', () => {
     expect(classifyTonearmLandingSurface(49)).toBe('label');
   });
 
+  it('calculates the tonearm pivot from the deck dimensions in both orientations', () => {
+    const portraitPivot = getTonearmPivot(800, 600);
+    expect(portraitPivot.x).toBeCloseTo(672.936, 3);
+    expect(portraitPivot.y).toBeCloseTo(129.595, 3);
+
+    const battlePivot = getTonearmPivot(600, 800, true);
+    expect(battlePivot).toEqual(portraitPivot);
+  });
+
   it('unwraps pointer bearings continuously across the 180 degree boundary', () => {
     expect(unwrapAngleNear(-179, 179)).toBe(181);
     expect(unwrapAngleNear(179, -179)).toBe(-181);
