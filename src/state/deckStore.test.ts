@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DeckTransport } from '../audio/types';
 import { createDeckStore } from './deckStore';
 
+async function flushMicrotasks(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 function makeTransport(overrides: Partial<DeckTransport> = {}): DeckTransport {
   return {
     trackName: null,
@@ -65,7 +70,9 @@ describe('per-deck Zustand adapter', () => {
       type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 42,
     });
 
-    expect(transport.seek).toHaveBeenCalledWith(42);
+    await flushMicrotasks();
+    // The first valid lead-in drop always starts the selected track at 0.
+    expect(transport.seek).toHaveBeenCalledWith(0);
     expect(transport.spinUp).toHaveBeenCalledWith(450);
     expect(vi.mocked(transport.seek).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(transport.spinUp).mock.invocationCallOrder[0] ?? Infinity,
@@ -104,6 +111,8 @@ describe('per-deck Zustand adapter', () => {
     });
 
     expect(transport.playNeedleDropSound).toHaveBeenCalledWith('correct');
+    expect(transport.play).not.toHaveBeenCalled();
+    await flushMicrotasks();
     expect(transport.play).toHaveBeenCalledWith(0);
     expect(store.getState().machine.transport).toBe('playing');
     expect(transport.setStylusContact).toHaveBeenLastCalledWith(true);
@@ -114,13 +123,95 @@ describe('per-deck Zustand adapter', () => {
     const transport = makeTransport({ isLoaded: true });
     const store = createDeckStore(transport);
     store.getState().dispatch({
-      type: 'ARM_DROPPED', angle: 35, wasAlreadyNeedleDown: false, position: 50,
+      type: 'ARM_DROPPED', angle: 35, wasAlreadyNeedleDown: false, position: 50, surface: 'record',
     });
 
     expect(transport.play).not.toHaveBeenCalled();
     expect(transport.playNeedleDropSound).toHaveBeenCalledWith('wrong');
     expect(transport.setStylusContact).not.toHaveBeenCalledWith(true);
     expect(store.getState().machine.tonearm).toBe('lifted');
+    store.getState().dispose();
+  });
+
+  it('waits for the correct needle impact before starting music and vinyl crackle together', async () => {
+    let finishCue: (() => void) | undefined;
+    const transport = makeTransport({
+      playNeedleDropSound: vi.fn(() => new Promise<void>((resolve) => { finishCue = resolve; })),
+    });
+    const store = createDeckStore(transport);
+
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 25,
+      wasAlreadyNeedleDown: false,
+      position: 18,
+      grip: 'arm',
+      surface: 'record',
+    });
+
+    expect(transport.playNeedleDropSound).toHaveBeenCalledWith('correct');
+    expect(transport.play).not.toHaveBeenCalled();
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('stopped');
+
+    finishCue?.();
+    await flushMicrotasks();
+
+    expect(transport.seek).toHaveBeenCalledWith(0);
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('on-record');
+    expect(transport.play).toHaveBeenCalledWith(0);
+    expect(vi.mocked(transport.setRecordSoundState).mock.invocationCallOrder.at(-1)).toBeLessThan(
+      vi.mocked(transport.play).mock.invocationCallOrder.at(-1) ?? Infinity,
+    );
+    store.getState().dispose();
+  });
+
+  it('plays the wrong-drop cue before restarting at 30 seconds when the cartridge is grabbed', async () => {
+    let finishCue: (() => void) | undefined;
+    const transport = makeTransport({
+      playNeedleDropSound: vi.fn(() => new Promise<void>((resolve) => { finishCue = resolve; })),
+    });
+    const store = createDeckStore(transport);
+
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 25,
+      wasAlreadyNeedleDown: false,
+      position: 30,
+      grip: 'cartridge',
+      surface: 'record',
+    });
+
+    expect(store.getState().machine.tonearm).toBe('needle-down');
+    expect(transport.playNeedleDropSound).toHaveBeenCalledWith('wrong');
+    expect(transport.play).not.toHaveBeenCalled();
+
+    finishCue?.();
+    await flushMicrotasks();
+
+    expect(transport.seek).toHaveBeenCalledWith(30);
+    expect(transport.play).toHaveBeenCalledWith(30);
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('on-record');
+    store.getState().dispose();
+  });
+
+  it('starts the off-record loop only when the stylus physically lands on the plinth', () => {
+    const transport = makeTransport({ isLoaded: true });
+    const store = createDeckStore(transport);
+
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 16,
+      wasAlreadyNeedleDown: false,
+      position: 0,
+      surface: 'plinth',
+    });
+
+    expect(store.getState().machine.tonearm).toBe('off-record');
+    expect(transport.setStylusContact).not.toHaveBeenCalledWith(true);
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('off-record');
+
+    store.getState().dispatch({ type: 'ARM_LIFTED' });
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('stopped');
     store.getState().dispose();
   });
 
@@ -135,7 +226,7 @@ describe('per-deck Zustand adapter', () => {
     expect(store.getState().machine.motorPhase).toBe('running');
     expect(store.getState().machine.transport).toBe('playing');
     expect(transport.setStylusContact).toHaveBeenLastCalledWith(false);
-    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('off-record');
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('stopped');
     store.getState().dispose();
   });
 
@@ -242,7 +333,7 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispatch({ type: 'POWER_TOGGLED' });
 
     expect(transport.coastDown).toHaveBeenCalledWith(1200);
-    expect(transport.setStylusContact).toHaveBeenLastCalledWith(false);
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(true);
     expect(store.getState().machine.motorPhase).toBe('coasting');
 
     store.getState().dispatch({ type: 'POWER_TOGGLED' });
