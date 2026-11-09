@@ -1,47 +1,75 @@
 import { useEffect, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from 'react';
 import type { DeckTransport } from './types';
-
-export type TurntableMotorState = 'driven' | 'coasting' | 'spinning-up' | 'stopped';
+import type { DeckEvent, MotorPhase, TransportPhase } from '../state/deckMachine';
 
 export interface UseVinylMotionOptions {
   isPowered: boolean;
   isMotorOn: boolean;
   speedRpm: 33 | 45;
-  pitch: number; // -8 to +8 percentage
-  motorState?: TurntableMotorState | undefined;
+  pitch: number;
+  motorState: MotorPhase;
+  transportPhase: TransportPhase;
   transport?: DeckTransport | undefined;
+  dispatch: (event: DeckEvent) => boolean;
   centerElementRef?: React.RefObject<HTMLElement | null> | undefined;
 }
 
 const TWO_PI = Math.PI * 2;
-
-// Normalized angle delta between two radians
 const normalizeDelta = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
-/**
- * Keeps the most recent real scratch direction while the pointer is momentarily still.
- * A stationary animation frame has no direction and must not reset reverse playback.
- */
+/** Preserves the last real scratch direction when animation frames contain no pointer movement. */
 export function resolveScratchDirection(deltaAngle: number, previousDirection: boolean): boolean {
   const movementEpsilon = 1e-7;
   return Math.abs(deltaAngle) > movementEpsilon ? deltaAngle < 0 : previousDirection;
 }
 
-/**
- * Scratch direction is handled separately, so velocity smoothing must use magnitude.
- * Keeping this positive prevents forward and reverse samples from cancelling each other.
- */
+/** Converts angular movement into a non-negative scratch speed independent of direction. */
 export function calculateScratchSpeedMagnitude(deltaAngle: number, expectedAngleDelta: number): number {
   return expectedAngleDelta > 0 ? Math.abs(deltaAngle / expectedAngleDelta) : 0;
 }
 
 /**
- * Custom hook providing realistic vinyl physics, touch/pointer scratching,
- * auto-rotation at Technics 33/45 RPM speeds with pitch modulation, and real-time audio sync.
- *
- * @param options - Configuration including power, motor status, speed (33/45 RPM), pitch (-8% to +8%),
- * optional deck transport instance, and an element reference for center spindle measurement.
- * @returns Platter rotation angle, scratching state, disc element ref, and pointer-down event handler.
+ * Mirrors the CodePen's single-source-of-truth timecode:
+ * elapsed seconds = absolute platter angle / (2π × platter rotations per second).
+ */
+export function calculateScratchTrackPosition(
+  platterAngle: number,
+  effectiveRps: number,
+  duration: number,
+): number {
+  if (!Number.isFinite(platterAngle) || !Number.isFinite(effectiveRps) ||
+    effectiveRps <= 0 || !Number.isFinite(duration) || duration < 0) {
+    return 0;
+  }
+  return Math.max(0, Math.min(duration, platterAngle / (TWO_PI * effectiveRps)));
+}
+
+/**
+ * Derives scratch timecode from the live transport position at pointer-down
+ * plus the visible platter's angular movement during this gesture.
+ */
+export function calculateScratchTrackPositionFromGesture(
+  startPosition: number,
+  currentVisualAngle: number,
+  startVisualAngle: number,
+  effectiveRps: number,
+  duration: number,
+): number {
+  if (
+    ![startPosition, currentVisualAngle, startVisualAngle, effectiveRps, duration].every(Number.isFinite) ||
+    effectiveRps <= 0 ||
+    duration < 0
+  ) {
+    return 0;
+  }
+  const angularDelta = currentVisualAngle - startVisualAngle;
+  return Math.max(0, Math.min(duration,
+    startPosition + angularDelta / (TWO_PI * effectiveRps)));
+}
+
+/**
+ * Platter rendering and pointer physics stay local to this hook.
+ * Every playback-affecting action is emitted as a typed deck event.
  */
 export function useVinylMotion({
   isPowered,
@@ -49,167 +77,134 @@ export function useVinylMotion({
   speedRpm,
   pitch,
   motorState,
+  transportPhase,
   transport,
+  dispatch,
   centerElementRef,
 }: UseVinylMotionOptions) {
   const [angle, setAngle] = useState(0);
   const [isScratching, setIsScratching] = useState(false);
-
   const angleRef = useRef(0);
   const anglePreviousRef = useRef(0);
   const isScratchingRef = useRef(false);
   const activePointerIdRef = useRef<number | null>(null);
   const draggingFromRef = useRef<{ x: number; y: number } | null>(null);
+  const cleanupScratchRef = useRef<((dispatchEnd: boolean, updateState?: boolean) => void) | null>(null);
   const centerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const rafIdRef = useRef<number | null>(null);
   const timestampPreviousRef = useRef(performance.now());
   const discRef = useRef<HTMLDivElement | null>(null);
   const draggingSpeedsRef = useRef<number[]>([]);
   const lastScratchDirectionRef = useRef(false);
+  const scratchStartPositionRef = useRef(0);
+  const scratchStartVisualAngleRef = useRef(0);
 
-  // Calculate rotations per second based on 33.333 or 45 RPM and pitch
-  // 33.333 RPM = 33.333 / 60 = ~0.5555 rps; 45 RPM = 45 / 60 = 0.75 rps
   const baseRps = speedRpm === 33 ? 33.3333 / 60 : 45 / 60;
   const effectiveRps = baseRps * (1 + pitch / 100);
   const radsPerMs = (effectiveRps * TWO_PI) / 1000;
-
-  // The base reference speed is standard Technics 33⅓ RPM
-  // Effective playback rate multiplier relative to standard 33⅓ RPM
   const effectivePlaybackRate = (speedRpm === 45 ? 45 / 33.3333 : 1.0) * (1 + pitch / 100);
 
-  // Synchronize audio engine playback rate when speed or pitch changes
   useEffect(() => {
-    if (transport?.setPlaybackRate) {
-      transport.setPlaybackRate(effectivePlaybackRate);
-    }
-  }, [transport, effectivePlaybackRate]);
+    dispatch({ type: 'PLAYBACK_RATE_CHANGED', rate: effectivePlaybackRate });
+  }, [dispatch, effectivePlaybackRate]);
 
-  const duration = transport?.duration || 0;
-  const maxAngle = duration > 0 ? duration * effectiveRps * TWO_PI : Infinity;
+  // A running platter keeps rotating even after the loaded track reaches its end.
 
-  // Detect prefers-reduced-motion
   const prefersReducedMotionRef = useRef(false);
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return;
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     prefersReducedMotionRef.current = mediaQuery.matches;
-
     const handler = (e: MediaQueryListEvent) => {
       prefersReducedMotionRef.current = e.matches;
     };
     mediaQuery.addEventListener?.('change', handler);
-    return () => {
-      mediaQuery.removeEventListener?.('change', handler);
-    };
+    return () => mediaQuery.removeEventListener?.('change', handler);
   }, []);
 
-  // Synchronize platter visual position from transport current time on jumps (seek, stop, load, replay)
   const lastTransportTimeRef = useRef(transport?.currentTime ?? 0);
   useEffect(() => {
     if (!transport || isScratchingRef.current) return;
     const currentTime = transport.currentTime;
-    const prevTime = lastTransportTimeRef.current;
+    const previousTime = lastTransportTimeRef.current;
     lastTransportTimeRef.current = currentTime;
-
-    // If time jumps backwards or by more than 1.5 seconds, re-align platter angle with track time
-    if (currentTime === 0 || Math.abs(currentTime - prevTime) > 1.5) {
+    if (currentTime === 0 || Math.abs(currentTime - previousTime) > 1.5) {
       const targetAngle = currentTime * effectiveRps * TWO_PI;
       angleRef.current = targetAngle;
       setAngle(targetAngle);
     }
   }, [transport?.currentTime, effectiveRps, transport]);
 
-  // Auto-rotate and physics loop with coast-down and spin-up support
   const coastProgressRef = useRef<{ start: number; duration: number } | null>(null);
   const spinUpProgressRef = useRef<{ start: number; duration: number } | null>(null);
 
   useEffect(() => {
-    if (motorState === 'coasting') {
-      coastProgressRef.current = { start: performance.now(), duration: 1200 };
-    } else {
-      coastProgressRef.current = null;
-    }
+    if (motorState === 'coasting') coastProgressRef.current = { start: performance.now(), duration: 1200 };
+    else coastProgressRef.current = null;
 
-    if (motorState === 'spinning-up') {
-      spinUpProgressRef.current = { start: performance.now(), duration: 450 };
-    } else {
-      spinUpProgressRef.current = null;
-    }
+    if (motorState === 'spinning-up') spinUpProgressRef.current = { start: performance.now(), duration: 450 };
+    else spinUpProgressRef.current = null;
   }, [motorState]);
 
   useEffect(() => {
     let active = true;
-
     const loop = () => {
       if (!active) return;
-
       const now = performance.now();
       const dt = Math.min(100, Math.max(1, now - timestampPreviousRef.current));
 
       const isCoasting = motorState === 'coasting' && coastProgressRef.current !== null;
-      let coastFactor = 1.0;
+      let coastFactor = 1;
       if (isCoasting) {
         const elapsed = now - coastProgressRef.current!.start;
         const progress = Math.min(1, Math.max(0, elapsed / coastProgressRef.current!.duration));
-        coastFactor = 1 - progress; // Linear decay 1 -> 0
+        coastFactor = 1 - progress;
       }
 
       const isSpinningUp = motorState === 'spinning-up' && spinUpProgressRef.current !== null;
-      let spinUpFactor = 1.0;
+      let spinUpFactor = 1;
       if (isSpinningUp) {
         const elapsed = now - spinUpProgressRef.current!.start;
         const progress = Math.min(1, Math.max(0, elapsed / spinUpProgressRef.current!.duration));
-        // Linear acceleration 0.2 -> 1.0
         spinUpFactor = 0.2 + 0.8 * progress;
       }
 
-      const isMotorSpinning = isPowered && isMotorOn;
-      const isAudioPlaying = transport?.isPlaying;
-
       if (!isScratchingRef.current) {
-        // If track is loaded, rotate when track is actively playing, coasting or spinning up
-        // If no track loaded, rotate if motor is on, coasting or spinning up
         const shouldRotate = isCoasting
           ? coastFactor > 0.001
-          : isSpinningUp
-            ? true
-            : transport?.isLoaded
-              ? isAudioPlaying
-              : isMotorSpinning;
+          : isSpinningUp || motorState === 'running';
 
-        // Respect prefers-reduced-motion: skip continuous visual platter rotation while keeping audio playing
         if (shouldRotate && !prefersReducedMotionRef.current) {
-          const speedMod = isCoasting ? coastFactor : isSpinningUp ? spinUpFactor : 1.0;
-          const deltaAngle = radsPerMs * dt * speedMod;
-          let newAngle = angleRef.current + deltaAngle;
-          if (maxAngle !== Infinity && newAngle > maxAngle) {
-            newAngle = maxAngle;
-          }
+          const speedMod = isCoasting ? coastFactor : isSpinningUp ? spinUpFactor : 1;
+          const newAngle = angleRef.current + radsPerMs * dt * speedMod;
           angleRef.current = newAngle;
           setAngle(newAngle);
         }
       } else {
-        // When scratching: compute instantaneous rotation velocity and direction
         const deltaAngle = angleRef.current - anglePreviousRef.current;
         const expectedAngleDelta = radsPerMs * dt;
         const instantSpeed = calculateScratchSpeedMagnitude(deltaAngle, expectedAngleDelta);
-
         draggingSpeedsRef.current.push(instantSpeed);
-        if (draggingSpeedsRef.current.length > 8) {
-          draggingSpeedsRef.current.shift();
-        }
+        if (draggingSpeedsRef.current.length > 8) draggingSpeedsRef.current.shift();
 
-        const avgSpeed =
-          draggingSpeedsRef.current.reduce((a, b) => a + b, 0) /
-          draggingSpeedsRef.current.length;
+        const averageSpeed = draggingSpeedsRef.current.reduce((a, b) => a + b, 0) /
+          Math.max(1, draggingSpeedsRef.current.length);
+        const reversed = resolveScratchDirection(deltaAngle, lastScratchDirectionRef.current);
+        lastScratchDirectionRef.current = reversed;
+        const currentSeconds = calculateScratchTrackPositionFromGesture(
+          scratchStartPositionRef.current,
+          angleRef.current,
+          scratchStartVisualAngleRef.current,
+          effectiveRps,
+          transport?.duration ?? 0,
+        );
 
-        const isReversed = resolveScratchDirection(deltaAngle, lastScratchDirectionRef.current);
-        lastScratchDirectionRef.current = isReversed;
-        const currentSeconds = effectiveRps > 0 ? angleRef.current / (TWO_PI * effectiveRps) : 0;
-
-        if (transport && transport.isLoaded) {
-          transport.scratch(avgSpeed, isReversed, currentSeconds);
-        }
+        dispatch({
+          type: 'SCRATCH_MOVED',
+          speed: averageSpeed,
+          reversed,
+          position: currentSeconds,
+        });
       }
 
       anglePreviousRef.current = angleRef.current;
@@ -219,7 +214,6 @@ export function useVinylMotion({
 
     timestampPreviousRef.current = performance.now();
     rafIdRef.current = requestAnimationFrame(loop);
-
     return () => {
       active = false;
       if (rafIdRef.current !== null) {
@@ -227,24 +221,31 @@ export function useVinylMotion({
         rafIdRef.current = null;
       }
     };
-  }, [isPowered, isMotorOn, motorState, transport, radsPerMs, maxAngle, effectiveRps]);
+  }, [motorState, dispatch, radsPerMs, effectiveRps, transport?.duration]);
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!isPowered) return;
-    if (activePointerIdRef.current !== null && activePointerIdRef.current !== e.pointerId) {
-      // Ignore additional pointers on the same deck
-      return;
-    }
+    if (e.button !== 0 || e.isPrimary === false) return;
+    if (!isPowered || !isMotorOn || !transport?.isLoaded) return;
+    e.preventDefault();
+    if (activePointerIdRef.current !== null) return;
+    if (!dispatch({ type: 'SCRATCH_STARTED' })) return;
 
-    // Measure scratch center from the spindle / actual record disc if provided,
-    // otherwise fallback to discRef
+    // Anchor timecode independently from the visible platter transform. A
+    // paused record may have rotated visually; pointer-down must not snap it
+    // back to the transport angle before the user actually moves the record.
+    const duration = transport.duration;
+    const livePosition = transport.getCurrentTime?.() ?? transport.currentTime;
+    const startPosition = Number.isFinite(duration)
+      ? Math.max(0, Math.min(duration, livePosition))
+      : 0;
+    scratchStartPositionRef.current = startPosition;
+    scratchStartVisualAngleRef.current = angleRef.current;
+    anglePreviousRef.current = angleRef.current;
+
     const centerTarget = centerElementRef?.current ?? discRef.current;
     if (centerTarget) {
       const rect = centerTarget.getBoundingClientRect();
-      centerRef.current = {
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
-      };
+      centerRef.current = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
     }
 
     activePointerIdRef.current = e.pointerId;
@@ -254,11 +255,19 @@ export function useVinylMotion({
     draggingSpeedsRef.current = [];
     lastScratchDirectionRef.current = false;
 
-    // Capture pointer
+    // Freeze the engine at the same timecode immediately, even if this is a
+    // quick tap that ends before the next animation-frame callback.
+    dispatch({
+      type: 'SCRATCH_MOVED',
+      speed: 0,
+      reversed: false,
+      position: startPosition,
+    });
+
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
-      // ignore in tests
+      // Pointer capture can be unavailable in test environments.
     }
 
     const onPointerMove = (moveEvent: PointerEvent) => {
@@ -266,63 +275,84 @@ export function useVinylMotion({
         !isScratchingRef.current ||
         !draggingFromRef.current ||
         moveEvent.pointerId !== activePointerIdRef.current
-      ) {
-        return;
-      }
+      ) return;
       moveEvent.preventDefault();
 
       const current = { x: moveEvent.clientX, y: moveEvent.clientY };
       const center = centerRef.current;
-
       const angleCurrent = Math.atan2(current.y - center.y, current.x - center.x);
       const angleFrom = Math.atan2(
         draggingFromRef.current.y - center.y,
         draggingFromRef.current.x - center.x,
       );
-
       const delta = normalizeDelta(angleFrom, angleCurrent);
       const nextAngle = Math.max(0, angleRef.current - delta);
-
       angleRef.current = nextAngle;
       setAngle(nextAngle);
       draggingFromRef.current = current;
     };
 
-    const onPointerUp = (upEvent: PointerEvent) => {
-      if (upEvent.pointerId !== activePointerIdRef.current) {
-        return;
-      }
-
+    const upPointerId = e.pointerId;
+    const pointerTarget = e.currentTarget;
+    const finishGesture = (dispatchEnd: boolean, updateState = true) => {
+      if (activePointerIdRef.current !== upPointerId) return;
       try {
-        e.currentTarget.releasePointerCapture(upEvent.pointerId);
+        if (
+          typeof pointerTarget.hasPointerCapture !== 'function' ||
+          pointerTarget.hasPointerCapture(upPointerId)
+        ) {
+          pointerTarget.releasePointerCapture(upPointerId);
+        }
       } catch {
-        // ignore
+        // The pointer may already have been released or capture lost.
       }
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
-
       activePointerIdRef.current = null;
       isScratchingRef.current = false;
-      setIsScratching(false);
+      if (updateState) setIsScratching(false);
       draggingFromRef.current = null;
-
-      if (transport) {
-        // Resume playback if motor is on and track is loaded
-        const shouldResume = isMotorOn;
-        transport.endScratch(shouldResume);
+      cleanupScratchRef.current = null;
+      if (dispatchEnd) {
+        // Include the final pointer position even when pointerup lands between
+        // animation frames; endScratch must resume at the visible platter timecode.
+        dispatch({
+          type: 'SCRATCH_MOVED',
+          speed: 0,
+          reversed: lastScratchDirectionRef.current,
+          position: calculateScratchTrackPositionFromGesture(
+            scratchStartPositionRef.current,
+            angleRef.current,
+            scratchStartVisualAngleRef.current,
+            effectiveRps,
+            transport?.duration ?? 0,
+          ),
+        });
+        dispatch({ type: 'SCRATCH_ENDED' });
       }
     };
+
+    const onPointerUp = (upEvent: PointerEvent) => {
+      if (upEvent.pointerId !== activePointerIdRef.current) return;
+      finishGesture(true);
+    };
+    cleanupScratchRef.current = finishGesture;
 
     window.addEventListener('pointermove', onPointerMove, { passive: false });
     window.addEventListener('pointerup', onPointerUp);
     window.addEventListener('pointercancel', onPointerUp);
-  }, [isPowered, isMotorOn, transport, centerElementRef]);
+  }, [centerElementRef, dispatch, effectiveRps, isMotorOn, isPowered, transport]);
 
-  return {
-    angle,
-    isScratching,
-    discRef,
-    onPointerDown,
-  };
+  useEffect(() => {
+    if (transportPhase !== 'scratching' && isScratchingRef.current) {
+      cleanupScratchRef.current?.(false);
+    }
+  }, [transportPhase]);
+
+  useEffect(() => () => {
+    cleanupScratchRef.current?.(false, false);
+  }, []);
+
+  return { angle, isScratching, discRef, onPointerDown };
 }

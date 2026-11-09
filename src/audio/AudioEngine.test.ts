@@ -14,6 +14,7 @@ class MockAudioParam {
 
 class MockAudioBufferSourceNode {
   buffer: AudioBuffer | null = null;
+  loop = false;
   onended: (() => void) | null = null;
   startedAtOffset: number | null = null;
   isStarted = false;
@@ -108,6 +109,7 @@ describe('AudioEngine', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
@@ -117,6 +119,182 @@ describe('AudioEngine', () => {
       audioContextFactory: () => ctx as unknown as AudioContext,
     });
   };
+
+  it('cancels a pending needle placement cue when stylus contact is lifted', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    })));
+    const engine = createEngine();
+
+    engine.setStylusContact(true);
+    engine.playNeedleDropSound('correct');
+    engine.setStylusContact(false);
+
+    await vi.waitFor(() => {
+      expect(fetch).toHaveBeenCalledTimes(4);
+    });
+    const assetsPromise = (engine as unknown as {
+      recordSoundAssetsPromise: Promise<void> | null;
+    }).recordSoundAssetsPromise;
+    await assetsPromise;
+    await Promise.resolve();
+
+    expect(mockContext.createdSources).toHaveLength(0);
+    engine.dispose();
+  });
+
+  it('stops an already-playing needle one-shot when stylus contact is lifted', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    })));
+    const engine = createEngine();
+
+    engine.setStylusContact(true);
+    const cuePromise = engine.playNeedleDropSound('correct');
+    await vi.waitFor(() => expect(mockContext.createdSources).toHaveLength(1));
+
+    const cueSource = mockContext.createdSources[0];
+    const cueGain = mockContext.createdGainParams.at(-1);
+    expect(cueSource).toBeDefined();
+
+    engine.setStylusContact(false);
+
+    expect(cueSource?.stop).toHaveBeenCalled();
+    expect(cueGain?.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
+
+    // The mock stop() does not dispatch onended automatically.
+    cueSource?.onended?.();
+    await cuePromise;
+
+    expect(cueSource?.disconnect).toHaveBeenCalled();
+    engine.dispose();
+  });
+
+  it('resolves on-record activation only after the vinyl loop source has started', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    })));
+    const engine = createEngine();
+
+    await engine.setRecordSoundState('on-record');
+
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(mockContext.createdSources).toHaveLength(1);
+    expect(mockContext.createdSources[0]?.start).toHaveBeenCalledOnce();
+    expect(mockContext.createdSources[0]?.loop).toBe(true);
+
+    engine.dispose();
+  });
+
+  it('retries only missing record sound assets after a failed fetch', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('needle_start_record.wav') && fetchMock.mock.calls.filter(([call]) =>
+        String(call).endsWith('needle_start_record.wav'),
+      ).length === 1) {
+        return { ok: false, arrayBuffer: async () => new ArrayBuffer(0) };
+      }
+      return { ok: true, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const engine = createEngine();
+
+    engine.setRecordSoundState('off-record');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    const firstAssetsPromise = (engine as unknown as {
+      recordSoundAssetsPromise: Promise<void> | null;
+    }).recordSoundAssetsPromise;
+    await firstAssetsPromise;
+
+    engine.playNeedleDropSound('correct');
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+    const retryPromise = (engine as unknown as {
+      recordSoundAssetsPromise: Promise<void> | null;
+    }).recordSoundAssetsPromise;
+    await retryPromise;
+    await Promise.resolve();
+
+    expect(fetchMock.mock.calls.filter(([call]) =>
+      String(call).endsWith('needle_start_record.wav'),
+    )).toHaveLength(2);
+    expect(fetchMock.mock.calls.filter(([call]) =>
+      String(call).endsWith('vinyl_loop.wav'),
+    )).toHaveLength(1);
+    expect(mockContext.createdSources).toHaveLength(2);
+    engine.dispose();
+  });
+
+  it('resolves a needle placement cue only after its one-shot source ends', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    })));
+    const engine = createEngine();
+
+    let resolved = false;
+    const cuePromise = engine.playNeedleDropSound('correct').then(() => {
+      resolved = true;
+    });
+
+    await vi.waitFor(() => expect(mockContext.createdSources).toHaveLength(1));
+    const cueSource = mockContext.createdSources[0];
+    expect(cueSource).toBeDefined();
+    await Promise.resolve();
+    expect(resolved).toBe(false);
+
+    cueSource?.onended?.();
+    await cuePromise;
+    expect(resolved).toBe(true);
+    expect(cueSource?.disconnect).toHaveBeenCalled();
+
+    engine.dispose();
+  });
+
+  it('loops needle_start_record.wav for run-out and stops it on state change', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    })));
+    const engine = createEngine();
+
+    engine.setRecordSoundState('runout');
+    await vi.waitFor(() => expect(mockContext.createdSources).toHaveLength(1));
+    await Promise.resolve();
+
+    const runoutSource = mockContext.createdSources[0];
+    expect(runoutSource).toBeDefined();
+    expect((runoutSource as unknown as { loop?: boolean }).loop).toBe(true);
+    const correctDropBuffer = (engine as unknown as { correctDropBuffer: AudioBuffer | null }).correctDropBuffer;
+    expect(runoutSource?.buffer).toBe(correctDropBuffer);
+    expect(mockContext.createdSources).toHaveLength(1);
+
+    engine.setRecordSoundState('stopped');
+    await vi.advanceTimersByTimeAsync(110);
+    expect(runoutSource?.stop).toHaveBeenCalledOnce();
+    engine.dispose();
+  });
+
+  it('uses not_on_record_loop.wav for an intentional off-record landing', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    })));
+    const engine = createEngine();
+
+    engine.setRecordSoundState('off-record');
+    await vi.waitFor(() => expect(mockContext.createdSources).toHaveLength(1));
+    await Promise.resolve();
+
+    const labelSource = mockContext.createdSources[0];
+    const offRecordBuffer = (engine as unknown as { offRecordLoopBuffer: AudioBuffer | null }).offRecordLoopBuffer;
+    expect(labelSource?.buffer).toBe(offRecordBuffer);
+    expect(labelSource?.loop).toBe(true);
+
+    engine.dispose();
+  });
 
   it('initializes with default idle state', () => {
     const engine = createEngine();
@@ -197,6 +375,62 @@ describe('AudioEngine', () => {
     await engine.play();
     // A second single-use source node was created
     expect(mockContext.createdSources).toHaveLength(2);
+  });
+
+  it('holds the interpolated stylus gain when contact reverses during the fallback ramp', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'stylus-ramp-fallback.mp3');
+    await engine.play();
+
+    const stylusGain = mockContext.createdGainParams[1];
+    expect(stylusGain).toBeDefined();
+
+    engine.setStylusContact(true);
+    expect(stylusGain?.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 0.015);
+
+    mockContext.currentTime = 0.0075;
+    engine.setStylusContact(false);
+    expect(stylusGain?.setValueAtTime).toHaveBeenLastCalledWith(0.5, 0.0075);
+    expect(stylusGain?.linearRampToValueAtTime).toHaveBeenLastCalledWith(0, 0.0225);
+
+    mockContext.currentTime = 0.01125;
+    engine.setStylusContact(true);
+    expect(stylusGain?.setValueAtTime).toHaveBeenLastCalledWith(0.375, 0.01125);
+    expect(stylusGain?.linearRampToValueAtTime).toHaveBeenLastCalledWith(1, 0.02625);
+
+    engine.dispose();
+  });
+
+  it('crossfades the outgoing source when seeking during playback', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'seek-crossfade.mp3');
+    await engine.play();
+
+    const outgoingSource = mockContext.createdSources[0];
+    const outgoingGain = mockContext.createdGainParams[2];
+    expect(outgoingSource).toBeDefined();
+    expect(outgoingGain).toBeDefined();
+
+    mockContext.currentTime = 4;
+    engine.seek(18);
+
+    const incomingSource = mockContext.createdSources[1];
+    const incomingGain = mockContext.createdGainParams[3];
+    expect(incomingSource).toBeDefined();
+    expect(incomingGain).toBeDefined();
+    expect(outgoingSource?.stop).not.toHaveBeenCalled();
+    expect(outgoingGain?.linearRampToValueAtTime).toHaveBeenCalledWith(0, 4.015);
+    expect(incomingSource?.start).toHaveBeenCalledWith(0, 18);
+    expect(incomingGain?.setValueAtTime).toHaveBeenCalledWith(0, 4);
+    expect(incomingGain?.linearRampToValueAtTime).toHaveBeenCalledWith(1, 4.015);
+
+    await vi.advanceTimersByTimeAsync(19);
+    expect(outgoingSource?.stop).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(outgoingSource?.stop).toHaveBeenCalledTimes(1);
+    expect(outgoingSource?.disconnect).toHaveBeenCalledTimes(1);
+
+    engine.dispose();
   });
 
   it('tracks elapsed time while playing and maintains position on pause', async () => {
@@ -309,6 +543,27 @@ describe('AudioEngine', () => {
     deckB.dispose();
   });
 
+  it('keeps the live playhead after a quick scratch with no animation-frame movement', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'scratch-tap.wav');
+    await engine.play(24);
+
+    // The source progresses between the last UI ticker and the user's touch.
+    mockContext.currentTime = 5;
+    expect(engine.getState().currentTime).toBe(29);
+
+    // The first platter sample carries the live absolute-angle timecode.
+    engine.scratch(0, false, 29);
+    expect(engine.getState().currentTime).toBe(29);
+    engine.endScratch(true);
+
+    const resumedSource = mockContext.createdSources[1];
+    expect(resumedSource?.startedAtOffset).toBe(29);
+    expect(engine.getState().playbackState).toBe('playing');
+
+    engine.dispose();
+  });
+
   it('supports bidirectional scratching and playbackRate modulation', async () => {
     const engine = createEngine();
     await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'scratch-cue.wav');
@@ -320,25 +575,70 @@ describe('AudioEngine', () => {
     expect(firstSource).toBeDefined();
     expect(firstSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(1.5, expect.any(Number));
 
-    // Scratch backward with 2.0x speed
+    // Reverse PCM is prepared asynchronously. Rapid pointer updates keep only
+    // the newest position and speed rather than blocking the main thread.
     engine.scratch(2.0, true, 11);
-    // When switching direction to reversed buffer, a new source is started with the reversed buffer
+    engine.scratch(2.5, true, 9);
+    expect(mockContext.createdSources).toHaveLength(1);
+    expect(firstSource?.isStopped).toBe(false);
+
+    await vi.runAllTimersAsync();
     expect(mockContext.createdSources).toHaveLength(2);
     const secondSource = mockContext.createdSources[1];
     expect(secondSource).toBeDefined();
-    expect(secondSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(2.0, expect.any(Number));
+    expect(secondSource?.startedAtOffset).toBe(111);
+    expect(secondSource?.playbackRate.linearRampToValueAtTime).toHaveBeenCalledWith(2.5, expect.any(Number));
 
     // endScratch resumes normal forward playback if requested
-    // Ensure the reverse scratch source was stopped and a fresh forward source was started
+    // The reverse scratch source remains connected until its short crossfade completes.
     expect(secondSource?.isStopped).toBe(false);
     engine.endScratch(true);
 
+    expect(secondSource?.isStopped).toBe(false);
+    await vi.advanceTimersByTimeAsync(20);
     expect(secondSource?.isStopped).toBe(true);
     expect(mockContext.createdSources).toHaveLength(3);
     const forwardResumeSource = mockContext.createdSources[2];
     expect(forwardResumeSource).toBeDefined();
-    expect(forwardResumeSource?.startedAtOffset).toBe(11);
+    expect(forwardResumeSource?.startedAtOffset).toBe(9);
     expect(forwardResumeSource?.playbackRate.setValueAtTime).toHaveBeenCalledWith(1.0, expect.any(Number));
+    expect(engine.getState().playbackState).toBe('playing');
+
+    engine.dispose();
+  });
+
+  it('does not create reverse PCM while loading or starting normal forward playback', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'forward-only.wav');
+
+    expect(mockContext.createBuffer).not.toHaveBeenCalled();
+
+    await engine.play();
+    expect(mockContext.createdSources).toHaveLength(1);
+    expect(mockContext.createBuffer).not.toHaveBeenCalled();
+
+    engine.dispose();
+  });
+
+  it('does not start a stale reverse source when scratch is released during preparation', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'cancel-reverse.wav');
+
+    engine.scratch(1.0, false, 18);
+    const firstSource = mockContext.createdSources[0];
+    expect(firstSource).toBeDefined();
+
+    engine.scratch(2.0, true, 15);
+    engine.endScratch(true);
+
+    expect(mockContext.createdSources).toHaveLength(2);
+    const resumedForwardSource = mockContext.createdSources[1];
+    expect(resumedForwardSource).toBeDefined();
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(mockContext.createdSources).toHaveLength(2);
+    expect(resumedForwardSource?.startedAtOffset).toBe(15);
+    expect(resumedForwardSource?.buffer).toBe(firstSource?.buffer);
     expect(engine.getState().playbackState).toBe('playing');
 
     engine.dispose();

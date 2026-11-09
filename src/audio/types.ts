@@ -5,6 +5,9 @@ import type { AudioMetadata } from './metadata';
  */
 export type AudioPlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'stopped';
 
+export type RecordSoundState = 'stopped' | 'on-record' | 'off-record' | 'runout';
+export type NeedleDropSound = 'correct' | 'wrong';
+
 export type { AudioMetadata };
 
 /**
@@ -21,6 +24,8 @@ export interface AudioEngineState {
   currentTime: number;
   /** Current lifecycle playback state. */
   playbackState: AudioPlaybackState;
+  /** Whether the stylus is down in contact with the record grooves (unmuted). */
+  isStylusDown: boolean;
   /** Human-readable error message, or null if healthy. */
   error: string | null;
 }
@@ -49,9 +54,15 @@ export interface DeckTransport {
   playbackState: AudioPlaybackState;
   isPlaying: boolean;
   isLoaded: boolean;
+  isStylusDown: boolean;
+  setStylusContact: (isContact: boolean) => void;
+  setRecordSoundState?: (state: RecordSoundState) => void | Promise<void>;
+  playNeedleDropSound?: (kind: NeedleDropSound) => Promise<void>;
   error: string | null;
   loadTrack: (file: File) => Promise<void>;
   play: (offset?: number) => Promise<void>;
+  /** Returns the live engine playhead, without waiting for a React render. */
+  getCurrentTime?: () => number;
   pause: (durationMs?: number) => void;
   stop: () => void;
   togglePlayPause: () => Promise<void>;

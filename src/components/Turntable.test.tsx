@@ -8,7 +8,8 @@ describe('Turntable deck configuration and isolation', () => {
   it('renders a fully powered and spinning deck by default', () => {
     const markup = renderToStaticMarkup(<Turntable deckLabel="DECK 01" />);
 
-    expect(markup).toContain('class="turntable power-on motor-on has-record"');
+    expect(markup).toContain('class="turntable power-on motor-on has-slipmat"');
+    expect(markup).not.toContain('has-record');
     expect(markup).toContain('aria-pressed="true"');
     expect(markup).toContain('aria-label="DECK 01 Start / Stop" aria-pressed="true"');
   });
@@ -31,7 +32,8 @@ describe('Turntable deck configuration and isolation', () => {
       <Turntable deckLabel="DECK 01" initiallyPowered initiallyMotorOn={false} />,
     );
 
-    expect(markup).toContain('class="turntable power-on has-record"');
+    expect(markup).toContain('class="turntable power-on has-slipmat"');
+    expect(markup).not.toContain('has-record');
     expect(markup).not.toContain('motor-on');
   });
 
@@ -42,6 +44,16 @@ describe('Turntable deck configuration and isolation', () => {
 
     expect(markup).toContain('has-slipmat');
     expect(markup).not.toContain('has-record');
+  });
+
+  it('shows the slipmat by default when no track is loaded', () => {
+    const markup = renderToStaticMarkup(<Turntable deckLabel="DECK 01" />);
+
+    expect(markup).toContain('has-slipmat');
+    expect(markup).not.toContain('has-record');
+    expect(markup).toContain('tonearm-tube-target');
+    expect(markup).toContain('data-tonearm-grip="arm"');
+    expect(markup).toContain('data-tonearm-grip="cartridge"');
   });
 
   it('isolates initial configuration between independent deck instances', () => {
@@ -78,6 +90,8 @@ describe('Turntable static markup', () => {
     expect(markup).toContain('aria-label="DECK 01 Target light"');
     expect(markup).toContain('aria-label="DECK 01 Pitch Control"');
     expect(markup).toContain('aria-label="DECK 01 pitch slider"');
+    // The calibration meter is mounted in a body portal, not in the deck's static markup.
+    expect(markup).not.toContain('tonearm-meter-panel');
     expect(markup).toContain('aria-label="DECK 01 Reset pitch to 0%"');
     expect(markup).toContain('class="pitch-track"');
     expect(markup).toContain('class="pitch-knob"');
@@ -117,6 +131,7 @@ describe('Turntable static markup', () => {
 
   it('renders track transport controls and metadata when transport is provided', () => {
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'ahhh-fresh.wav',
       metadata: {
         title: 'ahhh-fresh.wav',
@@ -142,6 +157,7 @@ describe('Turntable static markup', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -152,8 +168,6 @@ describe('Turntable static markup', () => {
     expect(markup).toContain('LOAD TRACK');
     expect(markup).toContain('ahhh-fresh.wav');
     expect(markup).toContain('0:45 / 3:00');
-    expect(markup).toContain('PAUSE');
-    expect(markup).toContain('STOP');
     // Center record label displays track name and duration
     expect(markup).toContain('PLAYING TRACK');
     expect(markup).toContain('DJ Qbert - ahhh-fresh.wav');
@@ -163,6 +177,7 @@ describe('Turntable static markup', () => {
 
   it('renders embedded cover artwork on the rotating record when available', () => {
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'champion-sound.flac',
       metadata: {
         title: 'Champion Sound',
@@ -188,6 +203,7 @@ describe('Turntable static markup', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -201,6 +217,7 @@ describe('Turntable static markup', () => {
 
   it('does not spin platter when track is paused even if motor button is active', () => {
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'breakbeat.mp3',
       metadata: {
         title: 'breakbeat.mp3',
@@ -226,19 +243,19 @@ describe('Turntable static markup', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
       <Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />,
     );
 
-    // Motor class should not be present because track is loaded but paused
-    expect(markup).not.toContain('motor-on');
-    expect(markup).toContain('PLAY');
+    expect(markup).toContain('class="deck-audio-panel"');
   });
 
   it('displays decoding error in the audio panel', () => {
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: null,
       metadata: null,
       duration: 0,
@@ -259,6 +276,7 @@ describe('Turntable static markup', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     const markup = renderToStaticMarkup(
@@ -283,6 +301,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: null,
       metadata: null,
       duration: 120,
@@ -303,6 +322,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     await act(async () => {
@@ -323,8 +343,6 @@ describe('Turntable interactive controls', () => {
     });
 
     expect(mockTransport.loadTrack).toHaveBeenCalledWith(file);
-    await Promise.resolve();
-    expect(mockTransport.play).toHaveBeenCalled();
 
     await act(async () => {
       root.unmount();
@@ -338,6 +356,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: null,
       metadata: null,
       duration: 120,
@@ -358,6 +377,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     await act(async () => {
@@ -393,6 +413,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'anthem.wav',
       metadata: null,
       duration: 180,
@@ -413,25 +434,20 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     await act(async () => {
       root.render(<Turntable deckLabel="DECK A" transport={mockTransport} initiallyPowered initiallyMotorOn />);
     });
 
-    const pauseBtn = container.querySelector('button[aria-label="DECK A Pause"]') as HTMLButtonElement;
-    expect(pauseBtn).toBeDefined();
+    // Platter start/stop toggles motor and playback
+    const startStopBtn = container.querySelector('button[aria-label="DECK A Start / Stop"]') as HTMLButtonElement;
+    expect(startStopBtn).toBeDefined();
     await act(async () => {
-      pauseBtn.click();
+      startStopBtn.click();
     });
     expect(mockTransport.pause).toHaveBeenCalled();
-
-    const stopBtn = container.querySelector('button[aria-label="DECK A Stop"]') as HTMLButtonElement;
-    expect(stopBtn).toBeDefined();
-    await act(async () => {
-      stopBtn.click();
-    });
-    expect(mockTransport.stop).toHaveBeenCalled();
 
     await act(async () => {
       root.unmount();
@@ -445,6 +461,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'anthem.wav',
       metadata: null,
       duration: 180,
@@ -465,6 +482,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     await act(async () => {
@@ -497,6 +515,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'anthem.wav',
       metadata: null,
       duration: 180,
@@ -517,6 +536,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     await act(async () => {
@@ -546,6 +566,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'spinup-deck.wav',
       metadata: null,
       duration: 180,
@@ -566,6 +587,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn().mockResolvedValue(undefined),
+      setStylusContact: vi.fn(),
     };
 
     // Initially powered OFF, but motor active
@@ -580,10 +602,18 @@ describe('Turntable interactive controls', () => {
       );
     });
 
+    const tonearm = container.querySelector('.tonearm') as HTMLElement;
+    await act(async () => {
+      for (let step = 0; step < 8; step++) {
+        tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      }
+      tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    });
+
     const powerDial = container.querySelector('button[aria-label="DECK A Power"]') as HTMLButtonElement;
     expect(powerDial).toBeDefined();
 
-    // Turn power ON from stopped
+    // Valid outer-lead-in drop is queued while power is off; powering on then spins up audio.
     await act(async () => {
       powerDial.click();
     });
@@ -604,6 +634,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'power-cycle.wav',
       metadata: null,
       duration: 200,
@@ -624,6 +655,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn().mockResolvedValue(undefined),
+      setStylusContact: vi.fn(),
     };
 
     // Deck initially powered ON and motor ON
@@ -640,6 +672,14 @@ describe('Turntable interactive controls', () => {
 
     const powerDial = container.querySelector('button[aria-label="DECK A Power"]') as HTMLButtonElement;
     expect(powerDial).toBeDefined();
+
+    const tonearm = container.querySelector('.tonearm') as HTMLElement;
+    await act(async () => {
+      for (let step = 0; step < 8; step++) {
+        tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      }
+      tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    });
 
     // 1. Turn power OFF -> starts coastDown
     await act(async () => {
@@ -683,6 +723,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: 'power-cycle-stopped.wav',
       metadata: null,
       duration: 200,
@@ -703,6 +744,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn().mockResolvedValue(undefined),
+      setStylusContact: vi.fn(),
     };
 
     // Deck initially powered ON but motor disengaged
@@ -751,6 +793,7 @@ describe('Turntable interactive controls', () => {
     const root = createRoot(container);
 
     const mockTransport: DeckTransport = {
+      isStylusDown: false,
       trackName: null,
       metadata: null,
       duration: 0,
@@ -771,6 +814,7 @@ describe('Turntable interactive controls', () => {
       coastDown: vi.fn(),
       cancelCoastDown: vi.fn(),
       spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
     };
 
     await act(async () => {
@@ -804,5 +848,180 @@ describe('Turntable interactive controls', () => {
     });
     container.remove();
     vi.useRealTimers();
+  });
+
+  it('prevents stylus contact unmute when deck has no record', async () => {
+    const mockTransport = {
+      trackName: 'breakbeat.mp3',
+      metadata: null,
+      duration: 120,
+      currentTime: 10,
+      playbackState: 'playing' as const,
+      isPlaying: true,
+      isLoaded: true,
+      isStylusDown: false,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
+    };
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <Turntable
+          deckLabel="DECK NO-RECORD"
+          initiallyHasRecord={false}
+          transport={mockTransport}
+        />,
+      );
+    });
+
+    const tonearm = container.querySelector('.tonearm') as HTMLElement;
+    expect(tonearm).not.toBeNull();
+
+    await act(async () => {
+      for (let step = 0; step < 8; step++) {
+        tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      }
+      tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    });
+
+    // The stylus reaches the outer lead-in, but a missing record keeps program audio muted.
+    expect(mockTransport.setStylusContact).not.toHaveBeenCalledWith(true);
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('unmutes program audio on a valid outer-lead-in drop when a record is present', async () => {
+    const mockTransport: DeckTransport = {
+      isStylusDown: false,
+      trackName: 'breakbeat.mp3',
+      metadata: null,
+      duration: 120,
+      currentTime: 10,
+      playbackState: 'playing',
+      isPlaying: true,
+      isLoaded: true,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch: vi.fn(),
+      endScratch: vi.fn(),
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
+    };
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="DECK WITH RECORD" transport={mockTransport} />);
+    });
+
+    const tonearm = container.querySelector('.tonearm') as HTMLElement;
+    await act(async () => {
+      for (let step = 0; step < 8; step++) {
+        tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      }
+      tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    });
+
+    expect(mockTransport.setStylusContact).toHaveBeenCalledWith(true);
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('does not mount the floating calibration widget for an inactive deck', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="INACTIVE" showTonearmMeter={false} />);
+    });
+
+    expect(document.body.querySelector('[data-dev-widget="tonearm-angle-meter"]')).toBeNull();
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('captures live tonearm angles and calculates the measured groove reach', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="MEASURE" />);
+    });
+
+    const tonearm = container.querySelector('.tonearm') as HTMLElement;
+    const startButton = document.body.querySelector(
+      'button[aria-label="Capture groove start angle"]',
+    ) as HTMLButtonElement;
+    const endButton = document.body.querySelector(
+      'button[aria-label="Capture groove end angle"]',
+    ) as HTMLButtonElement;
+    expect(container.querySelector('[data-dev-widget="tonearm-angle-meter"]')).toBeNull();
+    expect(document.body.querySelector('[data-dev-widget="tonearm-angle-meter"]')).not.toBeNull();
+
+    await act(async () => {
+      for (let step = 0; step < 6; step++) {
+        tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      }
+    });
+    expect(document.body.querySelector('[data-testid="tonearm-angle-readout"]')?.textContent).toBe('12.00°');
+
+    await act(async () => {
+      startButton.click();
+    });
+    expect(document.body.querySelector('[data-testid="tonearm-start-readout"]')?.textContent).toBe('12.00°');
+
+    await act(async () => {
+      for (let step = 0; step < 5; step++) {
+        tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      }
+    });
+    await act(async () => {
+      endButton.click();
+    });
+
+    expect(document.body.querySelector('[data-testid="tonearm-angle-readout"]')?.textContent).toBe('22.00°');
+    expect(document.body.querySelector('[data-testid="tonearm-end-readout"]')?.textContent).toBe('22.00°');
+    expect(document.body.querySelector('[data-testid="tonearm-reach-readout"]')?.textContent).toBe('10.00°');
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
   });
 });

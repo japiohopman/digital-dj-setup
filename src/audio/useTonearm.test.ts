@@ -1,0 +1,554 @@
+import { renderHook, act } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { getTonearmPivot } from './tonearmGeometry';
+import { useTonearm } from './useTonearm';
+
+describe('useTonearm', () => {
+  it('initializes in parked state at 0 degrees', () => {
+    const dispatch = vi.fn(() => true);
+
+    const { result } = renderHook(() =>
+      useTonearm({
+        duration: 100,
+        currentTime: 0,
+        armState: 'parked',
+        armInteraction: 'idle',
+        dispatch,
+      })
+    );
+
+    expect(result.current.armAngle).toBe(0);
+    expect(result.current.isNeedleDown).toBe(false);
+  });
+
+  it('updates angle when following playback progress while needle is down', () => {
+    const dispatch = vi.fn(() => true);
+
+    const { result, rerender } = renderHook(
+      ({ currentTime, armState }) =>
+        useTonearm({
+          duration: 100,
+          currentTime,
+          armState,
+          armInteraction: 'idle',
+          dispatch,
+        }),
+      { initialProps: { currentTime: 0, armState: 'needle-down' as const } }
+    );
+
+    // LP outer: 22.75, inner: 47 -> at 50% (50s) progress = 25
+    rerender({ currentTime: 50, armState: 'needle-down' });
+    expect(result.current.armAngle).toBeCloseTo(25, 5);
+  });
+
+  it('keeps the physical arm still during reverse scratching, then follows forward playback', () => {
+    const dispatch = vi.fn(() => true);
+    const { result, rerender } = renderHook(
+      ({ currentTime, transportPhase }: {
+        currentTime: number;
+        transportPhase: 'playing' | 'scratching';
+      }) => useTonearm({
+        duration: 100,
+        currentTime,
+        armState: 'needle-down',
+        armInteraction: 'idle',
+        transportPhase,
+        dispatch,
+      }),
+      { initialProps: { currentTime: 35, transportPhase: 'playing' as 'playing' | 'scratching' } },
+    );
+
+    // 35% into the track maps to the physical 22° groove position.
+    expect(result.current.armAngle).toBeCloseTo(22, 5);
+
+    rerender({ currentTime: 15, transportPhase: 'scratching' });
+    expect(result.current.armAngle).toBeCloseTo(22, 5);
+
+    rerender({ currentTime: 5, transportPhase: 'scratching' });
+    expect(result.current.armAngle).toBeCloseTo(22, 5);
+
+    // Ending the scratch re-anchors time but does not fly the arm back to 15°.
+    rerender({ currentTime: 5, transportPhase: 'playing' });
+    expect(result.current.armAngle).toBeCloseTo(22, 5);
+
+    // Subsequent normal forward playback advances the arm through the remaining groove.
+    rerender({ currentTime: 6, transportPhase: 'playing' });
+    expect(result.current.armAngle).toBeCloseTo(22 + (13 / 95), 4);
+  });
+
+  it('returns the tonearm to its cradle when a new track is loaded', () => {
+    const dispatch = vi.fn(() => true);
+    const { result, rerender } = renderHook(
+      ({ currentTime, armState }) => useTonearm({
+        duration: 100,
+        currentTime,
+        armState,
+        armInteraction: 'idle',
+        dispatch,
+      }),
+      { initialProps: { currentTime: 50, armState: 'needle-down' as 'needle-down' | 'parked' } },
+    );
+
+    expect(result.current.armAngle).toBeCloseTo(25, 5);
+
+    // TRACK_LOAD_REQUESTED parks the arm before replacing the record.
+    rerender({ currentTime: 0, armState: 'parked' });
+    expect(result.current.armAngle).toBe(0);
+  });
+
+  it('keeps the manually selected drop angle until the transport publishes the new timecode', () => {
+    const dispatch = vi.fn(() => true);
+    const { result, rerender } = renderHook(
+      ({ armState, currentTime }) => useTonearm({
+        duration: 100,
+        currentTime,
+        armState,
+        armInteraction: 'idle',
+        dispatch,
+      }),
+      { initialProps: { armState: 'lifted' as 'lifted' | 'needle-down', currentTime: 0 } },
+    );
+
+    act(() => {
+      for (let step = 0; step < 11; step++) {
+        result.current.handleKeyDown({
+          key: 'ArrowRight',
+          preventDefault: vi.fn(),
+        } as unknown as React.KeyboardEvent<HTMLElement>);
+      }
+    });
+    expect(result.current.armAngle).toBe(22);
+
+    rerender({ armState: 'needle-down', currentTime: 0 });
+    expect(result.current.armAngle).toBe(22);
+
+    rerender({ armState: 'needle-down', currentTime: 35 });
+    expect(result.current.armAngle).toBe(22);
+  });
+
+  it('parks the arm at 38° when the programme reaches the run-out state', () => {
+    const dispatch = vi.fn(() => true);
+    const { result } = renderHook(() => useTonearm({
+      duration: 100,
+      currentTime: 100,
+      armState: 'needle-down',
+      armInteraction: 'idle',
+      transportPhase: 'ended',
+      dispatch,
+    }));
+
+    expect(result.current.armAngle).toBe(38);
+  });
+
+  it('uses arm position as a linear timecode when lowering the needle', () => {
+    const dispatch = vi.fn(() => true);
+    const { result } = renderHook(() => useTonearm({
+      duration: 100,
+      currentTime: 0,
+      armState: 'lifted',
+      armInteraction: 'idle',
+      dispatch,
+    }));
+
+    act(() => {
+      for (let step = 0; step < 11; step++) {
+        result.current.handleKeyDown({
+          key: 'ArrowRight',
+          preventDefault: vi.fn(),
+        } as unknown as React.KeyboardEvent<HTMLElement>);
+      }
+      result.current.lowerArm();
+    });
+
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'ARM_DROPPED',
+      angle: 22,
+      position: 35,
+    }));
+  });
+
+  it('starts a drag from either the arm-tube grip or the cartridge grip', () => {
+    const dispatch = vi.fn(() => true);
+    const { result } = renderHook(() => useTonearm({
+      duration: 100,
+      currentTime: 0,
+      armState: 'lifted',
+      armInteraction: 'idle',
+      dispatch,
+    }));
+
+    act(() => {
+      for (let step = 0; step < 8; step++) {
+        result.current.handleKeyDown({
+          key: 'ArrowRight',
+          preventDefault: vi.fn(),
+        } as unknown as React.KeyboardEvent<HTMLElement>);
+      }
+    });
+    expect(result.current.armAngle).toBe(16);
+
+    for (const grip of ['arm', 'cartridge'] as const) {
+      const board = document.createElement('div');
+      board.className = 'bd';
+      vi.spyOn(board, 'getBoundingClientRect').mockReturnValue({
+        left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600,
+        x: 0, y: 0, toJSON: () => ({}),
+      } as DOMRect);
+      const target = Object.assign(document.createElement('div'), {
+        setPointerCapture: vi.fn(),
+        hasPointerCapture: vi.fn().mockReturnValue(true),
+        releasePointerCapture: vi.fn(),
+      });
+      target.dataset.tonearmGrip = grip;
+      board.append(target);
+      const event = {
+        button: 0,
+        pointerId: grip === 'arm' ? 11 : 12,
+        isPrimary: true,
+        clientX: 400,
+        clientY: 200,
+        stopPropagation: vi.fn(),
+        currentTarget: target,
+        target,
+      } as unknown as React.PointerEvent<HTMLElement>;
+
+      act(() => {
+        result.current.handlePointerDown(event);
+        result.current.handlePointerUp(event);
+      });
+
+      expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'ARM_DROPPED',
+        grip,
+        position: grip === 'cartridge' ? 30 : 5,
+      }));
+    }
+  });
+
+  it('dispatches ARM_LIFTED and ARM_PARKED on lift and park', () => {
+    const dispatch = vi.fn(() => true);
+
+    const { result } = renderHook(() =>
+      useTonearm({
+        duration: 100,
+        currentTime: 10,
+        armState: 'needle-down',
+        armInteraction: 'idle',
+        dispatch,
+      })
+    );
+
+    act(() => {
+      result.current.liftArm();
+    });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'ARM_LIFTED' });
+
+    act(() => {
+      result.current.parkArm();
+    });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'ARM_PARKED' });
+    expect(result.current.armAngle).toBe(0);
+  });
+
+  it('dispatches ARM_DROPPED on lowerArm', () => {
+    const dispatch = vi.fn(() => true);
+
+    const { result } = renderHook(() =>
+      useTonearm({
+        duration: 100,
+        currentTime: 0,
+        armState: 'lifted',
+        armInteraction: 'idle',
+        dispatch,
+      })
+    );
+
+    act(() => {
+      result.current.lowerArm();
+    });
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'ARM_DROPPED',
+      })
+    );
+  });
+
+  it('does not move the arm with keyboard cues while the platter is scratching', () => {
+    const dispatch = vi.fn(() => true);
+    const { result } = renderHook(() => useTonearm({
+      duration: 100,
+      currentTime: 20,
+      armState: 'needle-down',
+      armInteraction: 'idle',
+      transportPhase: 'scratching',
+      dispatch,
+    }));
+
+    act(() => {
+      result.current.handleKeyDown({
+        key: 'ArrowRight',
+        preventDefault: vi.fn(),
+      } as unknown as React.KeyboardEvent<HTMLElement>);
+    });
+
+    expect(result.current.armAngle).toBeCloseTo(19, 5);
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ARM_CUE' }));
+  });
+
+  it('clears an active pointer when the machine resets arm interaction', () => {
+    const dispatch = vi.fn(() => true);
+    const board = document.createElement('div');
+    board.className = 'bd';
+    vi.spyOn(board, 'getBoundingClientRect').mockReturnValue({
+      left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600,
+      x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect);
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn().mockReturnValue(true),
+      releasePointerCapture: vi.fn(),
+      closest: vi.fn().mockReturnValue(board),
+    });
+    const { result, rerender } = renderHook(
+      ({ armInteraction }) => useTonearm({
+        duration: 100, currentTime: 0, armState: 'lifted',
+        armInteraction, dispatch,
+      }),
+      { initialProps: { armInteraction: 'idle' as 'idle' | 'dragging' } },
+    );
+    const event = {
+      button: 0, pointerId: 5, isPrimary: true,
+      clientX: 200, clientY: 200,
+      stopPropagation: vi.fn(), currentTarget: target,
+    } as unknown as React.PointerEvent<HTMLElement>;
+
+    act(() => result.current.handlePointerDown(event));
+    rerender({ armInteraction: 'dragging' });
+    rerender({ armInteraction: 'idle' });
+    expect(target.releasePointerCapture).toHaveBeenCalledWith(5);
+    expect(dispatch).toHaveBeenCalledWith({ type: 'ARM_PICKED_UP' });
+  });
+
+  it('aborts an active drag on lostpointercapture without cueing', () => {
+    const dispatch = vi.fn(() => true);
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn().mockReturnValue(true),
+      releasePointerCapture: vi.fn(),
+      closest: vi.fn().mockReturnValue(null),
+    });
+    const { result } = renderHook(() => useTonearm({
+      duration: 100,
+      currentTime: 0,
+      armState: 'lifted',
+      armInteraction: 'idle',
+      dispatch,
+    }));
+    const event = {
+      button: 0,
+      pointerId: 77,
+      isPrimary: true,
+      clientX: 10,
+      clientY: 10,
+      stopPropagation: vi.fn(),
+      currentTarget: target,
+    } as unknown as React.PointerEvent<HTMLElement>;
+
+    act(() => result.current.handlePointerDown(event));
+    act(() => result.current.handleLostPointerCapture(event));
+
+    expect(dispatch).toHaveBeenCalledWith({ type: 'ARM_PICKED_UP' });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'ARM_DRAG_CANCELLED' });
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ARM_DROPPED' }));
+    expect(target.releasePointerCapture).toHaveBeenCalledWith(77);
+  });
+
+  it('handles pointer cancel and lostpointercapture gracefully by dispatching ARM_DRAG_CANCELLED', () => {
+    const dispatch = vi.fn(() => true);
+
+    const { result } = renderHook(() =>
+      useTonearm({
+        duration: 100,
+        currentTime: 0,
+        armState: 'lifted',
+        armInteraction: 'dragging',
+        dispatch,
+      })
+    );
+
+    const mockEvent = {
+      button: 0,
+      pointerId: 42,
+      isPrimary: true,
+      stopPropagation: vi.fn(),
+      currentTarget: {
+        setPointerCapture: vi.fn(),
+        hasPointerCapture: vi.fn().mockReturnValue(true),
+        releasePointerCapture: vi.fn(),
+        closest: vi.fn(),
+      },
+    } as unknown as React.PointerEvent<HTMLElement>;
+
+    act(() => {
+      result.current.handlePointerDown(mockEvent);
+    });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'ARM_PICKED_UP' });
+
+    act(() => {
+      result.current.handlePointerCancel(mockEvent);
+    });
+    expect(dispatch).toHaveBeenCalledWith({ type: 'ARM_DRAG_CANCELLED' });
+  });
+
+  it('keeps a dragged 22° physical drop while playback advances during pointer ownership', () => {
+    const dispatch = vi.fn(() => true);
+    const { result, rerender } = renderHook(
+      ({ currentTime, armState, armInteraction }) => useTonearm({
+        duration: 100,
+        currentTime,
+        armState,
+        armInteraction,
+        dispatch,
+      }),
+      {
+        initialProps: {
+          currentTime: 0,
+          armState: 'lifted' as 'lifted' | 'needle-down',
+          armInteraction: 'idle' as 'idle' | 'dragging',
+        },
+      },
+    );
+
+    act(() => {
+      for (let step = 0; step < 11; step++) {
+        result.current.handleKeyDown({
+          key: 'ArrowRight',
+          preventDefault: vi.fn(),
+        } as unknown as React.KeyboardEvent<HTMLElement>);
+      }
+    });
+    expect(result.current.armAngle).toBe(22);
+
+    const board = document.createElement('div');
+    board.className = 'bd';
+    board.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 500, bottom: 500, width: 500, height: 500,
+      x: 0, y: 0, toJSON: () => ({}),
+    }) as DOMRect;
+    const pivot = getTonearmPivot(500, 500);
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn().mockReturnValue(false),
+      releasePointerCapture: vi.fn(),
+    });
+    target.dataset.tonearmGrip = 'arm';
+    board.appendChild(target);
+    document.body.appendChild(board);
+
+    let now = 0;
+    const dateNow = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const pointerDown = {
+      button: 0,
+      isPrimary: true,
+      pointerId: 91,
+      clientX: pivot.x + 100,
+      clientY: pivot.y,
+      target,
+      currentTarget: target,
+      stopPropagation: vi.fn(),
+    } as unknown as React.PointerEvent<HTMLElement>;
+    act(() => result.current.handlePointerDown(pointerDown));
+    rerender({ currentTime: 50, armState: 'lifted', armInteraction: 'dragging' });
+
+    const pointerMove = {
+      pointerId: 91,
+      clientX: pivot.x + 110,
+      clientY: pivot.y,
+      target,
+      currentTarget: target,
+    } as unknown as React.PointerEvent<HTMLElement>;
+    act(() => result.current.handlePointerMove(pointerMove));
+    expect(result.current.armAngle).toBeCloseTo(22, 5);
+
+    now = 500;
+    act(() => result.current.handlePointerUp(pointerMove));
+    rerender({ currentTime: 35, armState: 'needle-down', armInteraction: 'idle' });
+    expect(result.current.armAngle).toBeCloseTo(22, 5);
+
+    rerender({ currentTime: 36, armState: 'needle-down', armInteraction: 'idle' });
+    expect(result.current.armAngle).toBeGreaterThan(22);
+    expect(result.current.armAngle).toBeLessThan(23);
+
+    dateNow.mockRestore();
+    board.remove();
+  });
+
+  it('preserves a 30° cartridge drop when the transport publishes its 30-second cue offset', () => {
+    const dispatch = vi.fn(() => true);
+    const { result, rerender } = renderHook(
+      ({ currentTime, armState, transportPhase }) => useTonearm({
+        duration: 300,
+        currentTime,
+        armState,
+        armInteraction: 'idle',
+        transportPhase,
+        dispatch,
+      }),
+      { initialProps: { currentTime: 0, armState: 'lifted' as 'lifted' | 'needle-down', transportPhase: 'idle' as 'idle' | 'playing' } },
+    );
+
+    act(() => {
+      for (let step = 0; step < 15; step++) {
+        result.current.handleKeyDown({
+          key: 'ArrowRight',
+          preventDefault: vi.fn(),
+        } as unknown as React.KeyboardEvent<HTMLElement>);
+      }
+    });
+    expect(result.current.armAngle).toBe(30);
+
+    const board = document.createElement('div');
+    board.className = 'bd';
+    board.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 500, bottom: 500, width: 500, height: 500,
+      x: 0, y: 0, toJSON: () => ({}),
+    }) as DOMRect;
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn().mockReturnValue(false),
+      releasePointerCapture: vi.fn(),
+    });
+    target.dataset.tonearmGrip = 'cartridge';
+    board.appendChild(target);
+    document.body.appendChild(board);
+    const pointer = {
+      button: 0,
+      isPrimary: true,
+      pointerId: 92,
+      clientX: 100,
+      clientY: 100,
+      target,
+      currentTarget: target,
+      stopPropagation: vi.fn(),
+    } as unknown as React.PointerEvent<HTMLElement>;
+
+    act(() => result.current.handlePointerDown(pointer));
+    act(() => result.current.handlePointerUp(pointer));
+
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'ARM_DROPPED',
+      angle: 30,
+      position: 30,
+      grip: 'cartridge',
+    }));
+
+    rerender({ currentTime: 30.5, armState: 'needle-down', transportPhase: 'playing' });
+    expect(result.current.armAngle).toBeCloseTo(30, 5);
+
+    rerender({ currentTime: 31.5, armState: 'needle-down', transportPhase: 'playing' });
+    expect(result.current.armAngle).toBeGreaterThan(30);
+    expect(result.current.armAngle).toBeLessThan(31);
+    board.remove();
+  });
+
+});

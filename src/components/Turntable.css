@@ -1,3 +1,6 @@
+/* Humanist Slabserif 712 is a commercial typeface. Use the system-serif
+ * fallback until a licensed font asset is supplied for this repository. */
+
 /**
  * SoundManager 2: "Turntable UI" - CSS
  * Adapted for React Technics dual-deck setup
@@ -51,14 +54,34 @@
   position: absolute;
   top: 3.5%;
   left: 4%;
-  color: #8e9596;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  color: #e5e2dc;
   font-family: helvetica, arial, sans-serif;
-  font-size: clamp(6px, 1.1vw, 11px);
-  font-weight: 700;
-  letter-spacing: 0.12em;
   text-shadow: 0 1px 2px #000;
   pointer-events: none;
-  z-index: 5;
+  z-index: 12;
+}
+
+.turntable .model-badge-brand {
+  color: #f0eee9;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(14px, 1.6vw, 21px);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+}
+
+.turntable .model-badge-subtitle {
+  color: rgba(238, 235, 228, 0.86);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(6px, 0.58vw, 8px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.015em;
+  white-space: nowrap;
 }
 
 /* --------------------------------------------------
@@ -249,6 +272,57 @@
 
   .turntable .deck-audio-status {
     font-size: 10px;
+  }
+}
+
+
+/* The battle layout rotates the deck -90°. Counter-rotate the track UI so
+   file selection and transport stay horizontal and readable above each deck. */
+@media (orientation: landscape) {
+  .turntable .deck-audio-panel {
+    top: 50%;
+    left: 102%;
+    right: auto;
+    width: 64%;
+    padding: 4px 8px;
+    gap: 8px;
+    transform: translate(-50%, -50%) rotate(90deg);
+    transform-origin: center;
+  }
+
+  /* Keep the rotated loader clean: the long diagnostic trace is available in
+     portrait mode but would crowd the compact landscape file controls. */
+  .turntable .deck-audio-panel .deck-state-trace {
+    display: none;
+  }
+
+  /* The Technics lockup sits on the right-hand flank, by the cue lamp. */
+  .turntable .model-badge {
+    top: 79%;
+    left: 82%;
+    width: 18%;
+    transform: none;
+    transform-origin: center;
+  }
+
+  .turntable .model-badge-brand {
+    font-size: clamp(11px, 1.2vw, 16px);
+    letter-spacing: -0.04em;
+  }
+
+  .turntable .model-badge-subtitle {
+    font-size: clamp(5px, 0.48vw, 6px);
+    letter-spacing: 0;
+    white-space: normal;
+  }
+}
+
+
+/* On short landscape phone screens the rotated LOAD TRACK bar otherwise
+   sits above the viewport. Move only that control bar down into view. */
+@media (orientation: landscape) and (max-height: 600px) {
+  .turntable .deck-audio-panel {
+    left: 90%;
   }
 }
 
@@ -707,6 +781,13 @@
   width: 28.55%;
   height: 99.75%;
   pointer-events: none;
+  z-index: 10;
+  will-change: transform;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.turntable .tonearm-holder.is-dragging {
+  transition: none !important;
 }
 
 .turntable .tonearm {
@@ -717,10 +798,94 @@
   height: 100%;
   background: transparent url(/turntable/landscape/tt_arm.png) no-repeat 0 0;
   background-size: contain;
-  transition: transform 0.1s;
+  /* Let platter gestures pass through transparent areas of the arm image. */
+  pointer-events: none;
+  touch-action: auto;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.turntable.motor-on.has-record .tonearm-holder {
+.turntable .tonearm:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: 4px;
+}
+
+.turntable .tonearm-holder.is-dragging .tonearm {
+  cursor: grabbing;
+}
+
+/* A restrained contact shadow remains visible even while the arm is parked. */
+.turntable .tonearm-holder .tonearm {
+  filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.32));
+  transition:
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Picking up the arm raises it visually; keep that lift during the drag itself. */
+.turntable .tonearm-holder.arm-lifted .tonearm,
+.turntable .tonearm-holder.is-dragging .tonearm {
+  transform: perspective(700px) rotateX(-9deg) translateY(-3px) scale(1.006);
+  filter: drop-shadow(4px 8px 6px rgba(0, 0, 0, 0.5));
+}
+
+/* Keep the small vertical lift animation active during pointer capture. The
+   platter-facing arm angle itself is still direct-manipulated without lag. */
+
+.turntable .tonearm-holder.needle-down .tonearm {
+  filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.4));
+}
+
+/* Independent touch areas for gripping the arm tube or the cartridge itself. */
+.turntable .tonearm-tube-target,
+.turntable .tonearm-headshell-target {
+  position: absolute;
+  cursor: grab;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.turntable .tonearm-tube-target {
+  /* Green mark: exposed arm tube, just before the cartridge/headshell. */
+  left: 33%;
+  top: 87%;
+  width: 28%;
+  height: 12%;
+  border-radius: 18px;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.001);
+}
+
+.turntable .tonearm-headshell-target {
+  /* Red mark: cartridge / headshell itself, separated from the arm tube. */
+  left: 15%;
+  top: 76%;
+  width: 32%;
+  height: 14%;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 14px;
+  z-index: 3;
+  background: rgba(255, 255, 255, 0.001);
+}
+
+.turntable .tonearm-holder.is-dragging .tonearm-tube-target,
+.turntable .tonearm-holder.is-dragging .tonearm-headshell-target {
+  cursor: grabbing;
+}
+
+/* A turntable with no loaded vinyl shows its slipmat and has no needle wobble
+   or lift animation while a track is being loaded. */
+.turntable:not(.has-record) .tonearm-holder .tonearm {
+  animation: none !important;
+  transform: none !important;
+  transition: none !important;
+  filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.32));
+}
+
+/* Micro-wobble only when motor is spinning, needle is down on record, and arm is not being dragged */
+.turntable.motor-on.has-record .tonearm-holder.needle-down:not(.is-dragging) .tonearm {
   animation: wobble 1s ease-in-out alternate infinite;
 }
 
@@ -905,7 +1070,265 @@
   .turntable.power-on.motor-on .record,
   .turntable.power-on.motor-on .slipmat,
   .turntable.power-on.motor-on .power-light,
-  .turntable.motor-on.has-record .tonearm-holder {
+  .turntable.motor-on.has-record .tonearm-holder.needle-down:not(.is-dragging) .tonearm {
     animation: none;
+  }
+}
+
+
+/* Collapsible machine trace: kept quiet until a deck needs inspection. */
+.deck-state-trace {
+  margin-top: 0.45rem;
+  font: 0.62rem/1.35 var(--font-mono, monospace);
+  color: rgba(235, 235, 235, 0.72);
+}
+
+.deck-state-trace summary {
+  cursor: pointer;
+  user-select: none;
+  letter-spacing: 0.04em;
+}
+
+.deck-state-trace dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+  margin: 0.35rem 0;
+}
+
+.deck-state-trace dl div {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.deck-state-trace dt {
+  opacity: 0.6;
+}
+
+.deck-state-trace dd {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.deck-state-trace ol {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.deck-state-trace li[data-accepted="false"] {
+  color: #f0a27b;
+}
+
+
+/* --------------------------------------------------
+   Floating tonearm calibration dev widget
+   Rendered into document.body so it never changes the deck layout
+   or inherits the turntable's landscape rotation.
+-------------------------------------------------- */
+.tonearm-meter-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 10000;
+  display: grid;
+  gap: 4px;
+  width: min(286px, calc(100vw - 16px));
+  max-height: calc(100vh - 20px);
+  box-sizing: border-box;
+  margin: 0;
+  padding: 7px 8px;
+  overflow-y: auto;
+  transform: translate(-50%, -50%);
+  color: #e5e7eb;
+  background: rgba(13, 16, 18, 0.9);
+  border: 1px solid rgba(197, 154, 88, 0.48);
+  border-radius: 6px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(9px);
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+  pointer-events: auto;
+}
+
+.tonearm-meter-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tonearm-meter-heading > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tonearm-meter-title {
+  color: #d5ad70;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.tonearm-meter-subtitle {
+  color: rgba(229, 231, 235, 0.68);
+  font-size: 7px;
+  line-height: 1.2;
+}
+
+.tonearm-meter-live {
+  min-width: 72px;
+  color: #f8fafc;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.06em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tonearm-meter-scale {
+  position: relative;
+  height: 13px;
+  margin: 0 2px;
+}
+
+.tonearm-meter-track {
+  position: absolute;
+  top: 5px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #4b5563, #a16207 52%, #4b5563);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.tonearm-meter-marker {
+  position: absolute;
+  top: 1px;
+  z-index: 2;
+  width: 2px;
+  height: 12px;
+  transform: translateX(-50%);
+  border-radius: 2px;
+}
+
+.tonearm-meter-marker.current {
+  z-index: 4;
+  width: 3px;
+  background: #f8fafc;
+  box-shadow: 0 0 5px rgba(248, 250, 252, 0.85);
+}
+
+.tonearm-meter-marker.start {
+  background: #4ade80;
+  box-shadow: 0 0 4px rgba(74, 222, 128, 0.7);
+}
+
+.tonearm-meter-marker.end {
+  background: #fb923c;
+  box-shadow: 0 0 4px rgba(251, 146, 60, 0.7);
+}
+
+.tonearm-meter-ticks {
+  position: relative;
+  height: 8px;
+  margin: -5px 2px 0;
+  color: rgba(229, 231, 235, 0.58);
+  font-size: 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tonearm-meter-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.tonearm-meter-ticks span:first-child {
+  transform: none;
+}
+
+.tonearm-meter-ticks span:last-child {
+  transform: translateX(-100%);
+}
+
+.tonearm-meter-readings {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.tonearm-meter-readings > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+  padding: 3px 5px;
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 4px;
+}
+
+.tonearm-meter-readings span {
+  color: rgba(229, 231, 235, 0.64);
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tonearm-meter-readings output {
+  color: #f3f4f6;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tonearm-meter-readings .tonearm-meter-reach output {
+  color: #d5ad70;
+}
+
+.tonearm-meter-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 4px;
+}
+
+.tonearm-meter-button,
+.tonearm-meter-clear {
+  min-height: 26px;
+  padding: 4px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  color: #e5e7eb;
+  font: 700 8px/1.15 'SF Mono', Monaco, Consolas, monospace;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tonearm-meter-button {
+  background: rgba(61, 75, 64, 0.9);
+  border-color: rgba(74, 222, 128, 0.32);
+}
+
+.tonearm-meter-button:hover {
+  background: rgba(45, 92, 58, 0.98);
+}
+
+.tonearm-meter-clear {
+  background: rgba(50, 50, 50, 0.82);
+}
+
+.tonearm-meter-clear:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+@media (orientation: portrait) {
+  .tonearm-meter-panel {
+    top: auto;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
   }
 }

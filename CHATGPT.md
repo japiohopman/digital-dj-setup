@@ -19,7 +19,11 @@ The mixer reference has not been selected yet. Keep mixer design and implementat
 - Mobile-first responsive CSS.
 - Keep UI components separate from audio-engine code.
 - Prefer browser-native APIs and a small dependency footprint.
-- Do not introduce a state-management library, PWA layer or backend prematurely.
+- Do not introduce a PWA layer or backend prematurely.
+- Issue #14 is an explicit exception to the small-dependency default: use Zustand vanilla with one guarded state machine/store per deck as the single source of truth for power, motor, track, transport and tonearm transitions.
+- Keep transition logic pure and typed. Use derived selectors for spinning, program-audio audibility and record-surface sound state; reject invalid transitions instead of creating contradictory combinations.
+- UI components and interaction hooks must dispatch typed deck events. They must not call transport play/pause/stop/seek/scratch/stylus-contact commands directly; keep those side effects inside the per-deck Zustand adapter.
+- Keep Web Audio objects inside AudioEngine. Keep pointer ownership, coordinates and animation-frame physics local to interaction hooks, never in Zustand.
 
 ## Collaboration style
 

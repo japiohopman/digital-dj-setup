@@ -1,6 +1,11 @@
-import { useState, useRef, useEffect, type CSSProperties, type PointerEvent, type KeyboardEvent, type ChangeEvent } from 'react';
+import { useState, useRef, useEffect, type CSSProperties, type PointerEvent, type KeyboardEvent, type ChangeEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { useStore } from 'zustand';
 import type { DeckTransport } from '../audio/types';
-import { useVinylMotion, type TurntableMotorState } from '../audio/useVinylMotion';
+import { useVinylMotion } from '../audio/useVinylMotion';
+import { useTonearm } from '../audio/useTonearm';
+import { createDeckStore } from '../state/deckStore';
+import { selectIsSpinning, selectIsTrackAudible } from '../state/deckMachine';
 
 /**
  * Supported playback RPM speeds for the turntable deck.
@@ -31,6 +36,8 @@ export interface TurntableProps {
   initiallyHasSlipmat?: boolean;
   /** Optional DeckTransport instance connected to the deck's audio engine. */
   transport?: DeckTransport;
+  /** Whether this deck currently owns the floating tonearm calibration dev widget. */
+  showTonearmMeter?: boolean;
 }
 
 /**
@@ -39,54 +46,74 @@ export interface TurntableProps {
  * Provides realistic visual styling, spinning animations, speed selection,
  * power dial, target light toggle, and an interactive draggable pitch slider.
  */
+/** Mounts development-only calibration controls outside the clipped turntable artwork. */
+function TonearmMeterPortal({ children }: { children: ReactNode }) {
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
+
+  return portalTarget ? createPortal(children, portalTarget) : null;
+}
+
 export function Turntable({
   id,
+  transport,
+  showTonearmMeter = true,
   deckLabel = 'DECK 01',
   modelName = 'SL-1200 MK2',
   initialSpeed = 33,
   initiallyPowered = true,
   initiallyMotorOn,
   initiallySpinning = true,
-  initiallyHasRecord = true,
+  initiallyHasRecord = transport?.isLoaded ?? false,
   initiallyHasSlipmat = false,
-  transport,
 }: TurntableProps) {
   const motorActive = initiallyMotorOn !== undefined ? initiallyMotorOn : initiallySpinning;
-  const [isPowered, setIsPowered] = useState(initiallyPowered);
-  const [isMotorOn, setIsMotorOn] = useState(motorActive);
-  const [motorState, setMotorState] = useState<TurntableMotorState>(
-    initiallyPowered && motorActive ? 'driven' : 'stopped',
-  );
+  const [deckStore] = useState(() => createDeckStore(transport, {
+    initiallyPowered,
+    initiallyMotorOn: motorActive,
+    hasRecord: initiallyHasRecord,
+  }));
+  const machine = useStore(deckStore, (state) => state.machine);
+  const trace = useStore(deckStore, (state) => state.trace);
+  const dispatch = useStore(deckStore, (state) => state.dispatch);
+  const loadDeckTrack = useStore(deckStore, (state) => state.loadTrack);
+  const isPowered = machine.power === 'on';
+  const isMotorOn = machine.motorSwitch === 'on';
+  const motorState = machine.motorPhase;
+  const isNeedleDown = machine.tonearm === 'needle-down';
+  const armState = machine.tonearm;
+  const isArmDragging = machine.armInteraction === 'dragging';
+  const hasRecord = machine.hasRecord;
+  const hasSlipmat = !hasRecord || initiallyHasSlipmat;
   const [speed, setSpeed] = useState<TurntableSpeed>(initialSpeed);
   const [isLightOn, setIsLightOn] = useState(false);
-  const [hasRecord] = useState(initiallyHasRecord);
-  const [hasSlipmat] = useState(initiallyHasSlipmat);
+  const [measuredGrooveStart, setMeasuredGrooveStart] = useState<number | null>(null);
+  const [measuredGrooveEnd, setMeasuredGrooveEnd] = useState<number | null>(null);
   const [pitch, setPitch] = useState<number>(0);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isDragOverRecord, setIsDragOverRecord] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const recordRef = useRef<HTMLDivElement | null>(null);
-  const coastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const spinUpTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Keep live refs of power and motor state to avoid stale closures in async file loaders
-  const isPoweredRef = useRef(isPowered);
-  isPoweredRef.current = isPowered;
-  const isMotorOnRef = useRef(isMotorOn);
-  isMotorOnRef.current = isMotorOn;
+  useEffect(() => () => deckStore.getState().dispose(), [deckStore]);
 
-  // Cleanup coast and spin-up timers on unmount
+  const transportEndedNaturally = !!transport &&
+    transport.playbackState === 'stopped' &&
+    transport.duration > 0 &&
+    transport.currentTime >= transport.duration - 0.05;
+
   useEffect(() => {
-    return () => {
-      if (coastTimeoutRef.current !== null) {
-        clearTimeout(coastTimeoutRef.current);
-      }
-      if (spinUpTimeoutRef.current !== null) {
-        clearTimeout(spinUpTimeoutRef.current);
-      }
-    };
-  }, []);
+    if (!transport) return;
+    dispatch({
+      type: 'ENGINE_PLAYBACK_SYNC',
+      playbackState: transport.playbackState,
+      endedNaturally: transportEndedNaturally,
+    });
+  }, [dispatch, transport?.playbackState, transportEndedNaturally]);
 
   const {
     angle: vinylAngle,
@@ -99,8 +126,44 @@ export function Turntable({
     speedRpm: speed,
     pitch,
     motorState,
+    transportPhase: machine.transport,
     transport,
+    dispatch,
     centerElementRef: recordRef,
+  });
+
+  // Detect battle mode orientation (landscape viewport where deck is rotated -90deg)
+  const [isLandscape, setIsLandscape] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mql = window.matchMedia('(orientation: landscape)');
+    setIsLandscape(mql.matches);
+    const handler = (e: MediaQueryListEvent) => {
+      setIsLandscape(e.matches);
+    };
+    mql.addEventListener?.('change', handler);
+    return () => {
+      mql.removeEventListener?.('change', handler);
+    };
+  }, []);
+
+  const {
+    armAngle,
+    handlePointerDown: onArmPointerDown,
+    handlePointerMove: onArmPointerMove,
+    handlePointerUp: onArmPointerUp,
+    handlePointerCancel: onArmPointerCancel,
+    handleLostPointerCapture: onArmLostPointerCapture,
+    handleKeyDown: onArmKeyDown,
+  } = useTonearm({
+    duration: transport?.duration ?? 0,
+    currentTime: transport?.currentTime ?? 0,
+    armState,
+    armInteraction: machine.armInteraction,
+    transportPhase: machine.transport,
+    dispatch,
+    isBattleMode: isLandscape,
+    hasRecord,
   });
 
   const updatePitchFromPointer = (clientY: number, clientX: number) => {
@@ -176,112 +239,16 @@ export function Turntable({
   };
 
   const handlePowerToggle = () => {
-    const nextPower = !isPowered;
-    setIsPowered(nextPower);
-
-    if (!nextPower) {
-      // Power turned OFF
-      setIsLightOn(false);
-      if (spinUpTimeoutRef.current !== null) {
-        clearTimeout(spinUpTimeoutRef.current);
-        spinUpTimeoutRef.current = null;
-      }
-
-      const wasSpinning = isMotorOn || (transport?.isPlaying ?? false);
-
-      if (wasSpinning) {
-        // Initiate realistic motor coast-down: audio and platter decelerate together over 1200ms
-        setMotorState('coasting');
-        // Do NOT clear isMotorOn: retain motor START/STOP intent across power toggles
-
-        if (transport && transport.isPlaying) {
-          transport.coastDown(1200);
-        }
-
-        if (coastTimeoutRef.current !== null) {
-          clearTimeout(coastTimeoutRef.current);
-        }
-        coastTimeoutRef.current = setTimeout(() => {
-          setMotorState('stopped');
-          coastTimeoutRef.current = null;
-        }, 1200);
-      } else {
-        setMotorState('stopped');
-        if (transport) {
-          transport.pause();
-        }
-      }
-    } else {
-      // Power turned ON
-      if (coastTimeoutRef.current !== null) {
-        // Power restored while still coasting: restore motor torque seamlessly!
-        clearTimeout(coastTimeoutRef.current);
-        coastTimeoutRef.current = null;
-        setMotorState('driven');
-        if (transport && transport.isPlaying) {
-          transport.cancelCoastDown();
-        }
-      } else {
-        // Power restored from fully stopped
-        // If motor START/STOP was left in ON position, spin up smoothly over 450ms from preserved position
-        if (isMotorOn) {
-          setMotorState('spinning-up');
-          if (transport && transport.isLoaded) {
-            void transport.spinUp(450);
-          }
-          if (spinUpTimeoutRef.current !== null) {
-            clearTimeout(spinUpTimeoutRef.current);
-          }
-          spinUpTimeoutRef.current = setTimeout(() => {
-            setMotorState('driven');
-            spinUpTimeoutRef.current = null;
-          }, 450);
-        } else {
-          setMotorState('stopped');
-        }
-      }
-    }
+    dispatch({ type: 'POWER_TOGGLED' });
   };
 
   const handleStartStopToggle = () => {
-    if (!isPowered) return;
-    const nextMotor = !isMotorOn;
-    setIsMotorOn(nextMotor);
-
-    if (spinUpTimeoutRef.current !== null) {
-      clearTimeout(spinUpTimeoutRef.current);
-      spinUpTimeoutRef.current = null;
-    }
-
-    if (nextMotor) {
-      // Technics high-torque motor spin-up to 33/45 RPM
-      setMotorState('spinning-up');
-      if (transport && transport.isLoaded) {
-        void transport.spinUp(450);
-      }
-      spinUpTimeoutRef.current = setTimeout(() => {
-        setMotorState('driven');
-        spinUpTimeoutRef.current = null;
-      }, 450);
-    } else {
-      // START/STOP button provides immediate Play/Pause (no coast-down)
-      setMotorState('stopped');
-      if (transport && transport.isLoaded) {
-        transport.pause();
-      }
-    }
+    dispatch({ type: 'START_STOP_TOGGLED' });
   };
 
   const handleLoadTrackFile = (file: File) => {
-    if (!transport || !isPoweredRef.current) return;
-    void transport.loadTrack(file).then(() => {
-      // Re-verify power and motor state on live refs after async decoding completes
-      if (isPoweredRef.current && isMotorOnRef.current) {
-        void transport.play();
-      } else {
-        transport.pause();
-      }
-    });
+    if (!transport || !isPowered) return;
+    void loadDeckTrack(file);
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -339,12 +306,27 @@ export function Turntable({
     setPitch(0);
   };
 
-  // If a track is loaded, the platter only spins when actually playing, coasting or spinning up
-  // If no track loaded, platter spins if motor is on, coasting or spinning up
-  const isSpinning =
-    motorState === 'coasting' ||
-    motorState === 'spinning-up' ||
-    (isPowered && isMotorOn && (!transport?.isLoaded || transport.isPlaying));
+  const handleCaptureGrooveStart = () => {
+    setMeasuredGrooveStart(Number(armAngle.toFixed(2)));
+    // Never combine a newly captured start with a stale end from another try.
+    setMeasuredGrooveEnd(null);
+  };
+
+  const handleCaptureGrooveEnd = () => {
+    setMeasuredGrooveEnd(Number(armAngle.toFixed(2)));
+  };
+
+  const handleClearArmMeasurement = () => {
+    setMeasuredGrooveStart(null);
+    setMeasuredGrooveEnd(null);
+  };
+
+  const armMeterPercent = (angle: number) => Math.max(0, Math.min(100, (angle / 49) * 100));
+  const measuredGrooveReach = measuredGrooveStart !== null && measuredGrooveEnd !== null
+    ? measuredGrooveEnd - measuredGrooveStart
+    : null;
+
+  const isSpinning = selectIsSpinning(machine);
 
   const classes = [
     'turntable',
@@ -355,6 +337,7 @@ export function Turntable({
     isScratching ? 'is-scratching' : '',
     motorState === 'coasting' ? 'coasting' : '',
     motorState === 'spinning-up' ? 'spinning-up' : '',
+    machine.track === 'loading' ? 'track-loading' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -413,13 +396,10 @@ export function Turntable({
             if (!transport || !transport.isLoaded) return;
             if (e.key === 'ArrowRight') {
               e.preventDefault();
-              transport.seek(transport.currentTime + 2);
+              dispatch({ type: 'SEEK', position: transport.currentTime + 2 });
             } else if (e.key === 'ArrowLeft') {
               e.preventDefault();
-              transport.seek(Math.max(0, transport.currentTime - 2));
-            } else if (e.key === ' ') {
-              e.preventDefault();
-              void transport.togglePlayPause();
+              dispatch({ type: 'SEEK', position: Math.max(0, transport.currentTime - 2) });
             }
           }}
           role="slider"
@@ -523,99 +503,48 @@ export function Turntable({
           onClick={handleLightToggle}
         />
 
-        <div className="tonearm-holder">
-          <div className="tonearm" role="img" aria-label="Tonearm and cartridge" />
+        <div
+          className={`tonearm-holder ${isNeedleDown ? 'needle-down' : ''} ${isArmDragging ? 'is-dragging' : ''} arm-${armState}`}
+          style={{
+            transformOrigin: '54% 27%',
+            transform: `rotate(${armAngle}deg)`,
+          }}
+        >
+          <div
+            className="tonearm"
+            role="slider"
+            tabIndex={0}
+            aria-label={`${deckLabel} Tonearm and cartridge`}
+            aria-valuemin={0}
+            aria-valuemax={49}
+            aria-valuenow={Math.round(armAngle)}
+            aria-valuetext={`Tonearm ${armState}, ${Math.round(armAngle)} degrees`}
+            onPointerDown={onArmPointerDown}
+            onPointerMove={onArmPointerMove}
+            onPointerUp={onArmPointerUp}
+            onPointerCancel={onArmPointerCancel}
+            onLostPointerCapture={onArmLostPointerCapture}
+            onKeyDown={onArmKeyDown}
+          >
+            {/* Separate touch targets preserve the difference between the arm tube and cartridge. */}
+            <div
+              className="tonearm-tube-target"
+              data-tonearm-grip="arm"
+              aria-hidden="true"
+            />
+            <div
+              className="tonearm-headshell-target"
+              data-tonearm-grip="cartridge"
+              aria-hidden="true"
+            />
+          </div>
         </div>
 
         <div className="model-badge" aria-hidden="true">
-          <span>{modelName}</span>
-        </div>
-
-        {/* Track Loading and Audio Transport Info Bar */}
-        <div className="deck-audio-panel" role="region" aria-label={`${deckLabel} audio transport`}>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept="audio/*,.mp3,.wav,.ogg,.flac,.aac,.m4a"
-            className="deck-file-input"
-            aria-label={`${deckLabel} Select audio file`}
-            tabIndex={-1}
-          />
-
-          <div className="deck-audio-controls">
-            <button
-              type="button"
-              className="deck-load-btn"
-              onClick={handleOpenFileDialog}
-              disabled={!isPowered || !transport}
-              aria-label={`${deckLabel} Load audio track`}
-            >
-              <span className="deck-load-icon" aria-hidden="true">▲</span>
-              LOAD TRACK
-            </button>
-
-            {transport && transport.isLoaded && (
-              <div className="deck-transport-actions">
-                <button
-                  type="button"
-                  className={`deck-action-btn${transport.isPlaying ? ' active' : ''}`}
-                  onClick={() => {
-                    if (transport.isPlaying) {
-                      transport.pause();
-                    } else if (isPowered) {
-                      setIsMotorOn(true);
-                      void transport.play();
-                    }
-                  }}
-                  disabled={!isPowered}
-                  aria-label={`${deckLabel} ${transport.isPlaying ? 'Pause' : 'Play'}`}
-                >
-                  {transport.isPlaying ? 'PAUSE' : 'PLAY'}
-                </button>
-                <button
-                  type="button"
-                  className="deck-action-btn"
-                  onClick={() => {
-                    transport.stop();
-                    setIsMotorOn(false);
-                  }}
-                  disabled={!isPowered}
-                  aria-label={`${deckLabel} Stop`}
-                >
-                  STOP
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="deck-audio-readout">
-            {transport?.playbackState === 'loading' ? (
-              <span className="deck-audio-status loading">DECODING AUDIO...</span>
-            ) : transport?.error ? (
-              <span className="deck-audio-status error" role="alert">{transport.error}</span>
-            ) : transport?.trackName ? (
-              <div className="deck-track-meta">
-                <span
-                  className="deck-track-name"
-                  title={
-                    transport.metadata?.artist
-                      ? `${transport.metadata.artist} — ${transport.metadata.title}`
-                      : transport.trackName
-                  }
-                >
-                  {transport.metadata?.artist
-                    ? `${transport.metadata.artist} — ${transport.metadata.title}`
-                    : transport.trackName}
-                </span>
-                <span className="deck-track-time">
-                  {formatTime(transport.currentTime)} / {formatTime(transport.duration)}
-                </span>
-              </div>
-            ) : (
-              <span className="deck-audio-status idle">NO TRACK LOADED</span>
-            )}
-          </div>
+          <span className="model-badge-brand">Technics</span>
+          <span className="model-badge-subtitle">
+            direct drive turntable system {modelName}
+          </span>
         </div>
 
         {/* Authentic Technics Pitch Control Assembly */}
@@ -701,6 +630,189 @@ export function Turntable({
           </div>
         </div>
       </div>
+
+        {/* Track Loading and Audio Transport Info Bar */}
+        <div className="deck-audio-panel" role="region" aria-label={`${deckLabel} audio transport`}>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="audio/*,.mp3,.wav,.ogg,.flac,.aac,.m4a"
+            className="deck-file-input"
+            aria-label={`${deckLabel} Select audio file`}
+            tabIndex={-1}
+          />
+
+          <div className="deck-audio-controls">
+            <button
+              type="button"
+              className="deck-load-btn"
+              onClick={handleOpenFileDialog}
+              disabled={!isPowered || !transport}
+              aria-label={`${deckLabel} Load audio track`}
+            >
+              <span className="deck-load-icon" aria-hidden="true">▲</span>
+              LOAD TRACK
+            </button>
+
+            {machine.track === 'loading' && (
+              <span className="deck-transport-state">LOADING TRACK</span>
+            )}
+          </div>
+
+          <div className="deck-audio-readout">
+            {machine.track === 'loading' ? (
+              <span className="deck-audio-status loading">DECODING AUDIO...</span>
+            ) : machine.track === 'error' ? (
+              <span className="deck-audio-status error" role="alert">{machine.trackError || transport?.error || 'Unable to load track'}</span>
+            ) : transport?.error ? (
+              <span className="deck-audio-status error" role="alert">{transport.error}</span>
+            ) : transport?.trackName ? (
+              <div className="deck-track-meta">
+                <span
+                  className="deck-track-name"
+                  title={
+                    transport.metadata?.artist
+                      ? `${transport.metadata.artist} — ${transport.metadata.title}`
+                      : transport.trackName
+                  }
+                >
+                  {transport.metadata?.artist
+                    ? `${transport.metadata.artist} — ${transport.metadata.title}`
+                    : transport.trackName}
+                </span>
+                <span className="deck-track-time">
+                  {formatTime(transport.currentTime)} / {formatTime(transport.duration)}
+                </span>
+              </div>
+            ) : (
+              <span className="deck-audio-status idle">NO TRACK LOADED</span>
+            )}
+          </div>
+          <details className="deck-state-trace">
+            <summary>
+              DECK STATE · {machine.power.toUpperCase()} / {machine.motorPhase.toUpperCase()} / {machine.tonearm.toUpperCase()}
+            </summary>
+            <dl>
+              <div><dt>Track</dt><dd>{machine.track}</dd></div>
+              <div><dt>Transport</dt><dd>{machine.transport}</dd></div>
+              <div><dt>Output</dt><dd>{selectIsTrackAudible(machine) ? 'AUDIBLE' : 'MUTED'}</dd></div>
+            </dl>
+            <ol>
+              {trace.slice(-8).map((entry, index) => (
+                <li key={`${entry.at}-${index}`} data-accepted={entry.accepted}>
+                  <span>{entry.event}</span> — {entry.reason}
+                </li>
+              ))}
+            </ol>
+          </details>
+        </div>
+
+      {import.meta.env.DEV && showTonearmMeter && (
+        <TonearmMeterPortal>
+          <section
+            className="tonearm-meter-panel"
+            data-dev-widget="tonearm-angle-meter"
+            aria-label={`${deckLabel} tonearm measurement`}
+          >
+            <div className="tonearm-meter-heading">
+              <div>
+                <span className="tonearm-meter-title">{deckLabel} · TONEARM DEV</span>
+                <span className="tonearm-meter-subtitle">0° = arm in the rest cradle</span>
+              </div>
+              <output
+                className="tonearm-meter-live"
+                data-testid="tonearm-angle-readout"
+                aria-label="Current tonearm angle"
+                aria-live="polite"
+              >
+                {armAngle.toFixed(2)}°
+              </output>
+            </div>
+
+            <div
+              className="tonearm-meter-scale"
+              role="img"
+              aria-label={`Arm angle ${armAngle.toFixed(2)} degrees on a scale from 0 to 49 degrees`}
+            >
+              <div className="tonearm-meter-track" />
+              {measuredGrooveStart !== null && (
+                <span
+                  className="tonearm-meter-marker start"
+                  style={{ left: `${armMeterPercent(measuredGrooveStart)}%` }}
+                  title={`Beginpunt: ${measuredGrooveStart.toFixed(2)}°`}
+                />
+              )}
+              {measuredGrooveEnd !== null && (
+                <span
+                  className="tonearm-meter-marker end"
+                  style={{ left: `${armMeterPercent(measuredGrooveEnd)}%` }}
+                  title={`Eindpunt: ${measuredGrooveEnd.toFixed(2)}°`}
+                />
+              )}
+              <span
+                className="tonearm-meter-marker current"
+                style={{ left: `${armMeterPercent(armAngle)}%` }}
+              />
+            </div>
+
+            <div className="tonearm-meter-ticks" aria-hidden="true">
+              {[0, 10, 20, 30, 40, 49].map((degree) => (
+                <span key={degree} style={{ left: `${armMeterPercent(degree)}%` }}>{degree}°</span>
+              ))}
+            </div>
+
+            <div className="tonearm-meter-readings">
+              <div>
+                <span>Groove start</span>
+                <output data-testid="tonearm-start-readout">
+                  {measuredGrooveStart === null ? '—' : `${measuredGrooveStart.toFixed(2)}°`}
+                </output>
+              </div>
+              <div>
+                <span>Groove end</span>
+                <output data-testid="tonearm-end-readout">
+                  {measuredGrooveEnd === null ? '—' : `${measuredGrooveEnd.toFixed(2)}°`}
+                </output>
+              </div>
+              <div className="tonearm-meter-reach">
+                <span>Arm reach</span>
+                <output data-testid="tonearm-reach-readout">
+                  {measuredGrooveReach === null ? '—' : `${measuredGrooveReach.toFixed(2)}°`}
+                </output>
+              </div>
+            </div>
+
+            <div className="tonearm-meter-actions">
+              <button
+                type="button"
+                className="tonearm-meter-button"
+                onClick={handleCaptureGrooveStart}
+                aria-label="Capture groove start angle"
+              >
+                Capture groove start angle
+              </button>
+              <button
+                type="button"
+                className="tonearm-meter-button"
+                onClick={handleCaptureGrooveEnd}
+                aria-label="Capture groove end angle"
+              >
+                Capture groove end angle
+              </button>
+              <button
+                type="button"
+                className="tonearm-meter-clear"
+                onClick={handleClearArmMeasurement}
+                aria-label="Clear measurement"
+                disabled={measuredGrooveStart === null && measuredGrooveEnd === null}
+              >
+                Clear measurement
+              </button>
+            </div>
+          </section>
+        </TonearmMeterPortal>
+      )}
     </div>
   );
 }

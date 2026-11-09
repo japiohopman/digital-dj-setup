@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { AudioEngine } from './AudioEngine';
-import type { DeckTransport, AudioEngineState, AudioEngineOptions } from './types';
+import type { DeckTransport, AudioEngineState, AudioEngineOptions, NeedleDropSound, RecordSoundState } from './types';
 
 /**
  * Custom React hook managing an independent AudioEngine instance for a deck.
@@ -40,18 +40,16 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
   }, []);
 
   const loadTrack = useCallback(async (file: File) => {
-    if (!engineRef.current) return;
-    try {
-      await engineRef.current.loadTrack(file);
-    } catch {
-      // Error is set in engine state and propagated via subscriber
-    }
+    if (!engineRef.current) throw new Error('Audio engine is not available');
+    await engineRef.current.loadTrack(file);
   }, []);
 
   const play = useCallback(async (offset?: number) => {
     if (!engineRef.current) return;
     await engineRef.current.play(offset);
   }, []);
+
+  const getCurrentTime = useCallback(() => engineRef.current?.getState().currentTime ?? 0, []);
 
   const pause = useCallback((durationMs?: number) => {
     if (!engineRef.current) return;
@@ -108,6 +106,19 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     await engineRef.current.spinUp(durationMs);
   }, []);
 
+  const setStylusContact = useCallback((isContact: boolean) => {
+    if (!engineRef.current) return;
+    engineRef.current.setStylusContact(isContact);
+  }, []);
+
+  const setRecordSoundState = useCallback(async (surfaceState: RecordSoundState) => {
+    await engineRef.current?.setRecordSoundState(surfaceState);
+  }, []);
+
+  const playNeedleDropSound = useCallback((kind: NeedleDropSound) => {
+    return engineRef.current?.playNeedleDropSound(kind) ?? Promise.resolve();
+  }, []);
+
   return {
     trackName: state.trackName,
     metadata: state.metadata,
@@ -116,9 +127,14 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     playbackState: state.playbackState,
     isPlaying: state.playbackState === 'playing',
     isLoaded: state.playbackState !== 'idle' && state.playbackState !== 'loading',
+    isStylusDown: state.isStylusDown,
+    setStylusContact,
+    setRecordSoundState,
+    playNeedleDropSound,
     error: state.error,
     loadTrack,
     play,
+    getCurrentTime,
     pause,
     stop,
     togglePlayPause,

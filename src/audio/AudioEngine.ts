@@ -4,7 +4,22 @@ import type {
   AudioEngineOptions,
   AudioEngineState,
   AudioPlaybackState,
+  NeedleDropSound,
+  RecordSoundState,
 } from './types';
+
+interface GainRampState {
+  from: number;
+  to: number;
+  startTime: number;
+  endTime: number;
+}
+
+interface PendingReverseScratch {
+  speed: number;
+  position: number;
+  loadId: number;
+}
 
 /**
  * Isolated Web Audio API playback engine for a single turntable deck.
@@ -19,8 +34,31 @@ export class AudioEngine {
 
   private audioBuffer: AudioBuffer | null = null;
   private audioBufferReversed: AudioBuffer | null = null;
+  private reversedAudioBufferPromise: Promise<AudioBuffer | null> | null = null;
+  private pendingReverseScratch: PendingReverseScratch | null = null;
   private currentSource: AudioBufferSourceNode | null = null;
+  private currentSourceGainNode: GainNode | null = null;
+  private readonly sourceGainNodes = new WeakMap<AudioBufferSourceNode, GainNode>();
+  private currentSourceGainRamp: GainRampState | null = null;
   private gainNode: GainNode | null = null;
+  private stylusGainNode: GainNode | null = null;
+  private stylusGainRamp: GainRampState | null = null;
+  private isStylusDown = false;
+  private recordSoundState: RecordSoundState = 'stopped';
+  private recordSoundAssetsPromise: Promise<void> | null = null;
+  private placementCueGeneration = 0;
+  private placementCueSource: AudioBufferSourceNode | null = null;
+  private placementCueGain: GainNode | null = null;
+  private vinylLoopBuffer: AudioBuffer | null = null;
+  private offRecordLoopBuffer: AudioBuffer | null = null;
+  private correctDropBuffer: AudioBuffer | null = null;
+  private wrongDropBuffer: AudioBuffer | null = null;
+  private vinylLoopSource: AudioBufferSourceNode | null = null;
+  private vinylLoopGain: GainNode | null = null;
+  private vinylLoopStopTimer: ReturnType<typeof setTimeout> | null = null;
+  private offRecordLoopSource: AudioBufferSourceNode | null = null;
+  private offRecordLoopGain: GainNode | null = null;
+  private offRecordLoopStopTimer: ReturnType<typeof setTimeout> | null = null;
   private isReversed = false;
   private isScratching = false;
 
@@ -83,7 +121,11 @@ export class AudioEngine {
     if (!this.audioContext) {
       this.audioContext = this.contextFactory();
       this.gainNode = this.audioContext.createGain();
-      this.gainNode.connect(this.audioContext.destination);
+      this.stylusGainNode = this.audioContext.createGain();
+      // Default to muted (stylus lifted/parked)
+      this.stylusGainNode.gain.value = this.isStylusDown ? 1.0 : 0.0;
+      this.gainNode.connect(this.stylusGainNode);
+      this.stylusGainNode.connect(this.audioContext.destination);
     }
     return this.audioContext;
   }
@@ -92,9 +134,312 @@ export class AudioEngine {
     const ctx = this.getOrCreateContext();
     if (!this.gainNode) {
       this.gainNode = ctx.createGain();
-      this.gainNode.connect(ctx.destination);
+      this.stylusGainNode = ctx.createGain();
+      this.stylusGainNode.gain.value = this.isStylusDown ? 1.0 : 0.0;
+      this.gainNode.connect(this.stylusGainNode);
+      this.stylusGainNode.connect(ctx.destination);
     }
     return this.gainNode;
+  }
+
+  /**
+   * Sets stylus contact with the record surface.
+   * Smoothly unmutes or mutes track audio through the dedicated stylus GainNode.
+   *
+   * @param isContact - True if needle is on the record; false if lifted or parked.
+   */
+  private getRampValue(ramp: GainRampState | null, time: number, fallback: number): number {
+    if (!ramp) return fallback;
+    const duration = ramp.endTime - ramp.startTime;
+    if (duration <= 0 || time >= ramp.endTime) return ramp.to;
+    if (time <= ramp.startTime) return ramp.from;
+    const progress = (time - ramp.startTime) / duration;
+    return ramp.from + (ramp.to - ramp.from) * progress;
+  }
+
+  public setStylusContact(isContact: boolean): void {
+    if (!isContact) this.invalidatePlacementCue();
+    if (this.isStylusDown === isContact) {
+      return;
+    }
+    this.isStylusDown = isContact;
+
+    if (this.audioContext && this.stylusGainNode) {
+      const now = this.audioContext.currentTime;
+      const target = isContact ? 1.0 : 0.0;
+      const parameter = this.stylusGainNode.gain;
+      const currentValue = this.getRampValue(this.stylusGainRamp, now, parameter.value);
+      try {
+        if (typeof parameter.cancelAndHoldAtTime === 'function') {
+          parameter.cancelAndHoldAtTime(now);
+        } else {
+          // AudioParam.value is not a reliable read of an in-flight automation
+          // ramp on every browser. Reconstruct our own 15ms ramp position.
+          parameter.cancelScheduledValues(now);
+          parameter.setValueAtTime(currentValue, now);
+        }
+        parameter.linearRampToValueAtTime(target, now + 0.015);
+        this.stylusGainRamp = {
+          from: currentValue,
+          to: target,
+          startTime: now,
+          endTime: now + 0.015,
+        };
+      } catch {
+        // Fallback for mocked AudioParam in tests
+        parameter.value = target;
+        this.stylusGainRamp = null;
+      }
+    }
+
+    this.notify();
+  }
+
+  /**
+   * Returns whether the stylus is down in contact with the record.
+   */
+  public getIsStylusDown(): boolean {
+    return this.isStylusDown;
+  }
+
+  /**
+   * Stops a playing needle-placement one-shot with a short de-click fade.
+   * This is separate from programme audio and is called whenever stylus
+   * contact is broken or the record-surface audio is stopped.
+   */
+  private stopActivePlacementCue(): void {
+    const source = this.placementCueSource;
+    const gain = this.placementCueGain;
+    this.placementCueSource = null;
+    this.placementCueGain = null;
+    if (!source) return;
+
+    try {
+      if (gain && this.audioContext && this.audioContext.state !== 'closed') {
+        const now = this.audioContext.currentTime;
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setValueAtTime(gain.gain.value, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.008);
+        source.stop(now + 0.01);
+      } else {
+        source.stop();
+      }
+    } catch {
+      try {
+        source.stop();
+      } catch {
+        // The browser may already have ended the one-shot.
+      }
+    }
+  }
+
+  /** Invalidates a cue waiting for assets and stops an active cue. */
+  private invalidatePlacementCue(): void {
+    this.placementCueGeneration++;
+    this.stopActivePlacementCue();
+  }
+
+  /**
+   * Selects the independent crackle/off-record layer for this deck.
+   *
+   * Resolves only after the requested loop is loaded and scheduled, allowing
+   * the deck store to start program audio in sync with the vinyl surface layer.
+   */
+  public async setRecordSoundState(state: RecordSoundState): Promise<void> {
+    if (state === 'stopped') this.invalidatePlacementCue();
+    this.recordSoundState = state;
+    if (state === 'stopped' || this.isDisposed) {
+      this.stopRecordLoop('vinyl');
+      this.stopRecordLoop('off-record');
+      return;
+    }
+
+    const context = this.getOrCreateContext();
+    await this.ensureRecordSoundAssets(context);
+    // Ignore a stale completion if the arm was lifted or another surface state
+    // was selected while the sound files were decoding.
+    if (this.isDisposed || this.recordSoundState !== state) return;
+    this.syncRecordSoundLoops();
+  }
+
+  /** Plays a single needle cue and resolves only when the sample has finished. */
+  public async playNeedleDropSound(kind: NeedleDropSound): Promise<void> {
+    if (this.isDisposed) return;
+    this.stopActivePlacementCue();
+    const cueGeneration = ++this.placementCueGeneration;
+    const context = this.getOrCreateContext();
+
+    try {
+      await this.ensureContextRunning();
+      await this.ensureRecordSoundAssets(context);
+      if (this.isDisposed || cueGeneration !== this.placementCueGeneration) return;
+      const buffer = kind === 'correct' ? this.correctDropBuffer : this.wrongDropBuffer;
+      if (!buffer) return;
+
+      await new Promise<void>((resolve) => {
+        const source = context.createBufferSource();
+        const voiceGain = context.createGain();
+        source.buffer = buffer;
+        voiceGain.gain.value = kind === 'correct' ? 0.62 : 0.7;
+        source.connect(voiceGain);
+        voiceGain.connect(context.destination);
+        this.placementCueSource = source;
+        this.placementCueGain = voiceGain;
+        source.onended = () => {
+          if (this.placementCueSource === source) {
+            this.placementCueSource = null;
+            this.placementCueGain = null;
+          }
+          try {
+            source.disconnect();
+            voiceGain.disconnect();
+          } catch {
+            // One-shot nodes may already have been disconnected.
+          }
+          resolve();
+        };
+        try {
+          source.start(0);
+        } catch {
+          try {
+            source.disconnect();
+            voiceGain.disconnect();
+          } catch {
+            // Ignore cleanup errors after a failed start.
+          }
+          resolve();
+        }
+      });
+    } catch {
+      // Placement cues must never break normal deck playback.
+    }
+  }
+
+  private ensureRecordSoundAssets(context: AudioContext): Promise<void> {
+    if (this.recordSoundAssetsPromise) return this.recordSoundAssetsPromise;
+    const baseUrl = import.meta.env.BASE_URL || '/';
+    const soundBase = baseUrl.endsWith('/') ? baseUrl + 'sounds/' : baseUrl + '/sounds/';
+    const decode = async (filename: string): Promise<AudioBuffer | null> => {
+      try {
+        const response = await fetch(soundBase + filename);
+        if (!response.ok) return null;
+        return await context.decodeAudioData((await response.arrayBuffer()).slice(0));
+      } catch {
+        return null;
+      }
+    };
+    this.recordSoundAssetsPromise = Promise.all([
+      this.vinylLoopBuffer ? Promise.resolve(this.vinylLoopBuffer) : decode('vinyl_loop.wav'),
+      this.offRecordLoopBuffer ? Promise.resolve(this.offRecordLoopBuffer) : decode('not_on_record_loop.wav'),
+      this.correctDropBuffer ? Promise.resolve(this.correctDropBuffer) : decode('needle_start_record.wav'),
+      this.wrongDropBuffer ? Promise.resolve(this.wrongDropBuffer) : decode('needle_placed_wrong.wav'),
+    ]).then(([vinyl, offRecord, correctDrop, wrongDrop]) => {
+      if (vinyl) this.vinylLoopBuffer = vinyl;
+      if (offRecord) this.offRecordLoopBuffer = offRecord;
+      if (correctDrop) this.correctDropBuffer = correctDrop;
+      if (wrongDrop) this.wrongDropBuffer = wrongDrop;
+      this.syncRecordSoundLoops();
+
+      // A failed or missing file should be retried on the next asset request,
+      // without re-fetching sounds that have already decoded successfully.
+      if (!this.vinylLoopBuffer || !this.offRecordLoopBuffer ||
+        !this.correctDropBuffer || !this.wrongDropBuffer) {
+        this.recordSoundAssetsPromise = null;
+      }
+    });
+    return this.recordSoundAssetsPromise;
+  }
+
+  private syncRecordSoundLoops(): void {
+    if (this.recordSoundState === 'on-record' && this.vinylLoopBuffer) {
+      this.startRecordLoop('vinyl', this.vinylLoopBuffer, 0.12);
+    } else {
+      this.stopRecordLoop('vinyl');
+    }
+
+    // The label/plinth uses not_on_record_loop.wav after an intentional drop.
+    // The end of the recorded groove loops needle_start_record.wav instead.
+    if (this.recordSoundState === 'off-record' && this.offRecordLoopBuffer) {
+      this.startRecordLoop('off-record', this.offRecordLoopBuffer, 0.15);
+    } else if (this.recordSoundState === 'runout' && this.correctDropBuffer) {
+      this.startRecordLoop('off-record', this.correctDropBuffer, 0.11);
+    } else {
+      this.stopRecordLoop('off-record');
+    }
+  }
+
+  private startRecordLoop(kind: 'vinyl' | 'off-record', buffer: AudioBuffer, target: number): void {
+    const context = this.audioContext;
+    if (!context || context.state === 'closed') return;
+    let source = kind === 'vinyl' ? this.vinylLoopSource : this.offRecordLoopSource;
+    let gain = kind === 'vinyl' ? this.vinylLoopGain : this.offRecordLoopGain;
+    const timer = kind === 'vinyl' ? this.vinylLoopStopTimer : this.offRecordLoopStopTimer;
+    if (timer !== null) {
+      clearTimeout(timer);
+      if (kind === 'vinyl') this.vinylLoopStopTimer = null;
+      else this.offRecordLoopStopTimer = null;
+    }
+    if (!source || !gain) {
+      source = context.createBufferSource();
+      gain = context.createGain();
+      source.buffer = buffer;
+      source.loop = true;
+      gain.gain.value = 0;
+      source.connect(gain);
+      gain.connect(context.destination);
+      source.start(0);
+      if (kind === 'vinyl') {
+        this.vinylLoopSource = source;
+        this.vinylLoopGain = gain;
+      } else {
+        this.offRecordLoopSource = source;
+        this.offRecordLoopGain = gain;
+      }
+    }
+    const now = context.currentTime;
+    try {
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.linearRampToValueAtTime(target, now + 0.08);
+    } catch {
+      gain.gain.value = target;
+    }
+  }
+
+  private stopRecordLoop(kind: 'vinyl' | 'off-record'): void {
+    const source = kind === 'vinyl' ? this.vinylLoopSource : this.offRecordLoopSource;
+    const gain = kind === 'vinyl' ? this.vinylLoopGain : this.offRecordLoopGain;
+    if (!source || !gain || !this.audioContext) return;
+    const oldTimer = kind === 'vinyl' ? this.vinylLoopStopTimer : this.offRecordLoopStopTimer;
+    if (oldTimer !== null) clearTimeout(oldTimer);
+    const now = this.audioContext.currentTime;
+    try {
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.linearRampToValueAtTime(0, now + 0.015);
+    } catch {
+      gain.gain.value = 0;
+    }
+    const timer = setTimeout(() => {
+      try {
+        source.stop();
+        source.disconnect();
+        gain.disconnect();
+      } catch {
+        // The loop may already have been stopped during disposal.
+      }
+      if (kind === 'vinyl' && this.vinylLoopSource === source) {
+        this.vinylLoopSource = null;
+        this.vinylLoopGain = null;
+        this.vinylLoopStopTimer = null;
+      } else if (kind === 'off-record' && this.offRecordLoopSource === source) {
+        this.offRecordLoopSource = null;
+        this.offRecordLoopGain = null;
+        this.offRecordLoopStopTimer = null;
+      }
+    }, 20);
+    if (kind === 'vinyl') this.vinylLoopStopTimer = timer;
+    else this.offRecordLoopStopTimer = timer;
   }
 
   /**
@@ -183,6 +528,7 @@ export class AudioEngine {
       duration: this.duration,
       currentTime,
       playbackState: this.playbackState,
+      isStylusDown: this.isStylusDown,
       error: this.error,
     };
   }
@@ -266,6 +612,8 @@ export class AudioEngine {
       if (this.isDisposed || requestId !== this.loadCounter) return;
 
       const ctx = this.getOrCreateContext();
+      // Preload the four supplied record sounds while the selected track decodes.
+      void this.ensureRecordSoundAssets(ctx);
 
       // Web Audio decodeAudioData handles both Promise-based and callback-based APIs
       const decoded: AudioBuffer = await new Promise<AudioBuffer>((resolve, reject) => {
@@ -315,7 +663,11 @@ export class AudioEngine {
 
       this.applyTerminalEdgeFade(decoded);
       this.audioBuffer = decoded;
-      this.audioBufferReversed = this.createReversedAudioBuffer(decoded, ctx);
+      // Reverse PCM is generated lazily in short background tasks. Loading and
+      // normal forward playback must never synchronously copy an entire track.
+      this.audioBufferReversed = null;
+      this.reversedAudioBufferPromise = null;
+      this.pendingReverseScratch = null;
       this.duration = decoded.duration;
       this.logicalPosition = 0;
       this.playbackState = 'stopped';
@@ -324,6 +676,9 @@ export class AudioEngine {
     } catch (err) {
       if (this.isDisposed || requestId !== this.loadCounter) return;
       this.audioBuffer = null;
+      this.audioBufferReversed = null;
+      this.reversedAudioBufferPromise = null;
+      this.pendingReverseScratch = null;
       this.duration = 0;
       this.logicalPosition = 0;
       this.playbackState = 'idle';
@@ -381,23 +736,117 @@ export class AudioEngine {
    * @param ctx - AudioContext for buffer allocation.
    * @returns Newly allocated reversed AudioBuffer.
    */
-  private createReversedAudioBuffer(buffer: AudioBuffer, ctx: AudioContext): AudioBuffer {
-    const reversed = ctx.createBuffer(
-      buffer.numberOfChannels,
-      buffer.length,
-      buffer.sampleRate,
-    );
-    for (let c = 0; c < buffer.numberOfChannels; c++) {
-      const forwardData = buffer.getChannelData(c);
-      const reversedData = reversed.getChannelData(c);
-      for (let i = 0, j = buffer.length - 1; i < buffer.length; i++, j--) {
-        const sample = forwardData[j];
-        if (sample !== undefined) {
-          reversedData[i] = sample;
-        }
-      }
+  /**
+   * Builds a reversed PCM buffer without monopolizing the main thread.
+   *
+   * Work is split into small native TypedArray copy/reverse operations and
+   * yielded between chunks. This keeps long tracks from blocking rendering,
+   * pointer input, or transport controls. The result is cached per loaded track.
+   */
+  private ensureReversedAudioBuffer(): Promise<AudioBuffer | null> {
+    if (this.audioBufferReversed) {
+      return Promise.resolve(this.audioBufferReversed);
     }
-    return reversed;
+    if (this.reversedAudioBufferPromise) {
+      return this.reversedAudioBufferPromise;
+    }
+
+    const buffer = this.audioBuffer;
+    const context = this.audioContext;
+    const loadId = this.loadCounter;
+    if (!buffer || !context || this.isDisposed) {
+      return Promise.resolve(null);
+    }
+
+    const chunkSamples = 262_144;
+    let reversed: AudioBuffer | null = null;
+    let channel = 0;
+    let sampleOffset = 0;
+
+    const promise = new Promise<AudioBuffer | null>((resolve) => {
+      const finish = (result: AudioBuffer | null): void => {
+        if (this.reversedAudioBufferPromise === promise) {
+          this.reversedAudioBufferPromise = null;
+        }
+        resolve(result);
+      };
+
+      const processChunk = (): void => {
+        // A newer track load or disposal invalidates this background task.
+        if (
+          this.isDisposed ||
+          loadId !== this.loadCounter ||
+          this.audioBuffer !== buffer ||
+          context.state === 'closed'
+        ) {
+          finish(null);
+          return;
+        }
+
+        try {
+          reversed ??= context.createBuffer(
+            buffer.numberOfChannels,
+            buffer.length,
+            buffer.sampleRate,
+          );
+
+          if (buffer.length === 0) {
+            channel = buffer.numberOfChannels;
+          } else {
+            const count = Math.min(chunkSamples, buffer.length - sampleOffset);
+            const sourceData = buffer.getChannelData(channel);
+            const reversedData = reversed.getChannelData(channel);
+            const sourceStart = buffer.length - sampleOffset - count;
+            const targetEnd = sampleOffset + count;
+
+            // Copy a reversed source slice into the corresponding destination
+            // slice. TypedArray operations run natively and avoid per-sample JS.
+            reversedData.set(sourceData.subarray(sourceStart, sourceStart + count), sampleOffset);
+            reversedData.subarray(sampleOffset, targetEnd).reverse();
+            sampleOffset = targetEnd;
+
+            if (sampleOffset >= buffer.length) {
+              channel++;
+              sampleOffset = 0;
+            }
+          }
+
+          if (channel >= buffer.numberOfChannels) {
+            this.audioBufferReversed = reversed;
+            finish(reversed);
+            return;
+          }
+
+          // Yield to the browser between chunks so input and painting can run.
+          setTimeout(processChunk, 0);
+        } catch {
+          // Reverse scratching is optional; a failure must not invalidate the
+          // successfully decoded forward track.
+          finish(null);
+        }
+      };
+
+      setTimeout(processChunk, 0);
+    });
+
+    this.reversedAudioBufferPromise = promise;
+    void promise.then((reversedBuffer) => {
+      const pending = this.pendingReverseScratch;
+      if (!pending || pending.loadId !== loadId) return;
+
+      this.pendingReverseScratch = null;
+      if (reversedBuffer && this.isScratching && !this.isDisposed && this.loadCounter === loadId) {
+        // Use the most recent pointer position, not the stale first request.
+        this.scratch(pending.speed, true, pending.position);
+      } else if (!reversedBuffer && this.isScratching && !this.isDisposed && this.loadCounter === loadId) {
+        this.isScratching = false;
+        this.playbackState = 'paused';
+        this.error = 'Reverse scratch audio could not be prepared for this track.';
+        this.notify();
+      }
+    });
+
+    return promise;
   }
 
   /**
@@ -449,17 +898,25 @@ export class AudioEngine {
   }
 
   private startSourceAt(position: number, reversed: boolean, rampGain = true): void {
-    if (!this.audioBuffer || !this.audioBufferReversed || this.isDisposed) return;
+    if (!this.audioBuffer || this.isDisposed) return;
+    const sourceBuffer = reversed ? this.audioBufferReversed : this.audioBuffer;
+    if (!sourceBuffer) return;
+    if (!reversed) this.pendingReverseScratch = null;
     const ctx = this.getOrCreateContext();
     const gain = this.getOrCreateGainNode();
 
+    const hasOutgoingSource = this.currentSource !== null;
     this.cancelPendingBrake();
-    this.stopCurrentSourceNode();
+    this.fadeOutCurrentSourceNode();
 
     const generation = ++this.sourceGeneration;
     const source = ctx.createBufferSource();
-    source.buffer = reversed ? this.audioBufferReversed : this.audioBuffer;
-    source.connect(gain);
+    const sourceGainNode = ctx.createGain();
+    source.buffer = sourceBuffer;
+    source.connect(sourceGainNode);
+    sourceGainNode.connect(gain);
+    this.sourceGainNodes.set(source, sourceGainNode);
+    this.currentSourceGainNode = sourceGainNode;
 
     source.onended = () => {
       if (this.currentSource === source && this.sourceGeneration === generation && !this.isScratching) {
@@ -478,15 +935,27 @@ export class AudioEngine {
     const now = ctx.currentTime;
     source.playbackRate.cancelScheduledValues(now);
     source.playbackRate.setValueAtTime(this.currentPlaybackRate, now);
+    sourceGainNode.gain.cancelScheduledValues(now);
+    sourceGainNode.gain.setValueAtTime(0, now);
+    sourceGainNode.gain.linearRampToValueAtTime(1, now + 0.015);
+    this.currentSourceGainRamp = {
+      from: 0,
+      to: 1,
+      startTime: now,
+      endTime: now + 0.015,
+    };
 
-    // De-click ramp on start
+    // Fade the deck master only when starting from silence. During a cue or
+    // scratch-direction change, the per-source gains provide a short crossfade.
     if (rampGain) {
-      try {
-        gain.gain.cancelScheduledValues(now);
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(1, now + 0.015);
-      } catch {
-        // mock
+      if (!hasOutgoingSource) {
+        try {
+          gain.gain.cancelScheduledValues(now);
+          gain.gain.setValueAtTime(0, now);
+          gain.gain.linearRampToValueAtTime(1, now + 0.015);
+        } catch {
+          // mock
+        }
       }
     } else {
       try {
@@ -499,6 +968,10 @@ export class AudioEngine {
 
     source.start(0, startOffset);
     this.currentSource = source;
+
+    // Forward playback gives the browser time to prepare reverse PCM in the
+    // background before the user asks for a backward scratch.
+    if (!reversed) void this.ensureReversedAudioBuffer();
   }
 
   /**
@@ -553,6 +1026,22 @@ export class AudioEngine {
     const clampedPos = Math.max(0, Math.min(this.duration, position));
     this.logicalPosition = clampedPos;
 
+    if (reversed && !this.audioBufferReversed) {
+      // Keep only the latest pointer sample while reverse PCM is prepared.
+      // Fade out the forward source rather than letting it play in the wrong
+      // direction, then resume immediately when the cached reverse is ready.
+      this.pendingReverseScratch = {
+        speed,
+        position: clampedPos,
+        loadId: this.loadCounter,
+      };
+      this.fadeOutCurrentSourceNode();
+      this.playbackState = 'playing';
+      void this.ensureReversedAudioBuffer();
+      return;
+    }
+
+    this.pendingReverseScratch = null;
     if (!this.currentSource || reversed !== this.isReversed) {
       this.startSourceAt(clampedPos, reversed);
     }
@@ -579,11 +1068,12 @@ export class AudioEngine {
    * @param resumePlayback - Whether to return to forward playback (true if platter motor is running).
    */
   public endScratch(resumePlayback: boolean): void {
+    this.pendingReverseScratch = null;
     this.isScratching = false;
 
     if (resumePlayback && this.audioBuffer) {
       // Replace the scratch source with clean forward playback at the exact hand position.
-      this.stopCurrentSourceNode();
+      // startSourceAt crossfades the scratch source into the normal transport source.
       this.isReversed = false;
       this.startSourceAt(this.logicalPosition, false);
       this.playbackState = 'playing';
@@ -655,6 +1145,7 @@ export class AudioEngine {
       return;
     }
 
+    this.stopSpinUpTimer();
     this.stopCoastTimer();
 
     const ctx = this.getOrCreateContext();
@@ -829,6 +1320,8 @@ export class AudioEngine {
     this.updateLogicalPositionBeforeStopping();
     const srcToStop = this.currentSource;
     this.currentSource = null;
+    this.currentSourceGainNode = null;
+    this.currentSourceGainRamp = null;
     this.playbackState = 'paused';
 
     if (!srcToStop || !this.gainNode || !this.audioContext) {
@@ -918,6 +1411,17 @@ export class AudioEngine {
     }
   }
 
+  private disconnectSourceGain(source: AudioBufferSourceNode): void {
+    const sourceGainNode = this.sourceGainNodes.get(source);
+    if (!sourceGainNode) return;
+    try {
+      sourceGainNode.disconnect();
+    } catch {
+      // The gain node may already have been disconnected.
+    }
+    this.sourceGainNodes.delete(source);
+  }
+
   private stopSource(source: AudioBufferSourceNode): void {
     try {
       source.onended = null;
@@ -925,6 +1429,8 @@ export class AudioEngine {
       source.disconnect();
     } catch {
       // The source may already have ended or been disconnected.
+    } finally {
+      this.disconnectSourceGain(source);
     }
   }
 
@@ -932,6 +1438,8 @@ export class AudioEngine {
    * Stops playback and resets logical position to 0.
    */
   public stop(): void {
+    this.pendingReverseScratch = null;
+    this.isScratching = false;
     this.stopCoastTimer();
     this.stopSpinUpTimer();
     this.cancelPendingBrake();
@@ -939,6 +1447,8 @@ export class AudioEngine {
 
     const srcToStop = this.currentSource;
     this.currentSource = null;
+    this.currentSourceGainNode = null;
+    this.currentSourceGainRamp = null;
 
     if (this.gainNode && this.audioContext && srcToStop) {
       const now = this.audioContext.currentTime;
@@ -986,6 +1496,8 @@ export class AudioEngine {
     }
 
     this.currentSource = null;
+    this.currentSourceGainNode = null;
+    this.currentSourceGainRamp = null;
     this.sourceGeneration++;
     this.stopTicker();
     this.stopCoastTimer();
@@ -997,6 +1509,7 @@ export class AudioEngine {
     try {
       source.onended = null;
       source.disconnect();
+      this.disconnectSourceGain(source);
     } catch {
       // The source may already have been disconnected by the browser.
     }
@@ -1024,17 +1537,45 @@ export class AudioEngine {
     }
   }
 
-  private stopCurrentSourceNode(): void {
-    if (this.currentSource) {
-      try {
-        this.currentSource.onended = null;
-        this.currentSource.stop();
-        this.currentSource.disconnect();
-      } catch {
-        // Source may already have ended or been stopped
+  private fadeOutCurrentSourceNode(): void {
+    const source = this.currentSource;
+    const sourceGainNode = this.currentSourceGainNode;
+    const ramp = this.currentSourceGainRamp;
+    this.currentSource = null;
+    this.currentSourceGainNode = null;
+    this.currentSourceGainRamp = null;
+    if (!source) return;
+
+    try {
+      source.onended = null;
+      if (!sourceGainNode || !this.audioContext) {
+        this.stopSource(source);
+        return;
       }
-      this.currentSource = null;
+
+      const now = this.audioContext.currentTime;
+      const parameter = sourceGainNode.gain;
+      const currentValue = this.getRampValue(ramp, now, parameter.value);
+      if (typeof parameter.cancelAndHoldAtTime === 'function') {
+        parameter.cancelAndHoldAtTime(now);
+      } else {
+        parameter.cancelScheduledValues(now);
+        parameter.setValueAtTime(currentValue, now);
+      }
+      parameter.linearRampToValueAtTime(0, now + 0.015);
+      // Keep the outgoing source connected until its short fade has completed.
+      setTimeout(() => this.stopSource(source), 20);
+    } catch {
+      this.stopSource(source);
     }
+  }
+
+  private stopCurrentSourceNode(): void {
+    const source = this.currentSource;
+    this.currentSource = null;
+    this.currentSourceGainNode = null;
+    this.currentSourceGainRamp = null;
+    if (source) this.stopSource(source);
   }
 
   /**
@@ -1042,6 +1583,12 @@ export class AudioEngine {
    */
   public dispose(): void {
     this.isDisposed = true;
+    this.invalidatePlacementCue();
+    this.recordSoundState = 'stopped';
+    this.stopRecordLoop('vinyl');
+    this.stopRecordLoop('off-record');
+    if (this.vinylLoopStopTimer !== null) clearTimeout(this.vinylLoopStopTimer);
+    if (this.offRecordLoopStopTimer !== null) clearTimeout(this.offRecordLoopStopTimer);
     this.stopCoastTimer();
     this.loadCounter++;
     this.playCounter++;
@@ -1049,6 +1596,8 @@ export class AudioEngine {
     this.listeners.clear();
     this.audioBuffer = null;
     this.audioBufferReversed = null;
+    this.reversedAudioBufferPromise = null;
+    this.pendingReverseScratch = null;
 
     if (this.metadata?.artworkUrl) {
       try {
