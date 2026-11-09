@@ -40,6 +40,41 @@ describe('useTonearm', () => {
     expect(result.current.armAngle).toBeCloseTo(25, 5);
   });
 
+  it('keeps the physical arm still during reverse scratching, then follows forward playback', () => {
+    const dispatch = vi.fn(() => true);
+    const { result, rerender } = renderHook(
+      ({ currentTime, transportPhase }: {
+        currentTime: number;
+        transportPhase: 'playing' | 'scratching';
+      }) => useTonearm({
+        duration: 100,
+        currentTime,
+        armState: 'needle-down',
+        armInteraction: 'idle',
+        transportPhase,
+        dispatch,
+      }),
+      { initialProps: { currentTime: 35, transportPhase: 'playing' as 'playing' | 'scratching' } },
+    );
+
+    // 35% into the track maps to the physical 22° groove position.
+    expect(result.current.armAngle).toBeCloseTo(22, 5);
+
+    rerender({ currentTime: 15, transportPhase: 'scratching' });
+    expect(result.current.armAngle).toBeCloseTo(22, 5);
+
+    rerender({ currentTime: 5, transportPhase: 'scratching' });
+    expect(result.current.armAngle).toBeCloseTo(22, 5);
+
+    // Ending the scratch re-anchors time but does not fly the arm back to 15°.
+    rerender({ currentTime: 5, transportPhase: 'playing' });
+    expect(result.current.armAngle).toBeCloseTo(22, 5);
+
+    // Subsequent normal forward playback advances the arm through the remaining groove.
+    rerender({ currentTime: 6, transportPhase: 'playing' });
+    expect(result.current.armAngle).toBeCloseTo(22 + (13 / 95), 4);
+  });
+
   it('returns the tonearm to its cradle when a new track is loaded', () => {
     const dispatch = vi.fn(() => true);
     const { result, rerender } = renderHook(
