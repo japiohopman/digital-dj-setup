@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DEFAULT_TONEARM_CONFIG,
+  classifyTonearmLandingSurface,
   type TonearmConfig,
+  type TonearmGrip,
   type TonearmState,
   angleToPlaybackProgress,
   calculateArmPointerBearingFromPointer,
@@ -45,6 +47,7 @@ interface PointerStart {
   grabOffset: number;
   lastPointerBearing: number;
   wasAlreadyNeedleDown: boolean;
+  grip: TonearmGrip;
 }
 
 export function useTonearm({
@@ -113,17 +116,26 @@ export function useTonearm({
   const landAtCurrentPosition = useCallback((
     wasAlreadyNeedleDown: boolean,
     tooFast = false,
+    grip: TonearmGrip = 'arm',
   ) => {
     const angle = currentAngleRef.current;
-    const acceptedGroovePosition = getCuePosition(angle);
+    const surface = classifyTonearmLandingSurface(angle, config);
+    const groovePosition = getCuePosition(angle);
+    // Touching the cartridge itself represents a deliberately imprecise
+    // physical drop: play the wrong-placement cue and land 30s into the track.
+    const position = grip === 'cartridge' && surface === 'record' && duration > 0
+      ? Math.min(30, duration)
+      : groovePosition;
     dispatch({
       type: 'ARM_DROPPED',
       angle,
       wasAlreadyNeedleDown,
-      position: acceptedGroovePosition,
+      position,
       tooFast,
+      grip,
+      surface,
     });
-  }, [dispatch, getCuePosition]);
+  }, [config, dispatch, duration, getCuePosition]);
 
   const lowerArm = useCallback(() => {
     if (armState === 'needle-down' || isDragging) return;
@@ -174,7 +186,7 @@ export function useTonearm({
       parkArm();
       return;
     }
-    landAtCurrentPosition(wasAlreadyNeedleDown, tooFast);
+    landAtCurrentPosition(wasAlreadyNeedleDown, tooFast, start?.grip ?? 'arm');
   }, [config.parkAngle, dispatch, landAtCurrentPosition, parkArm, releaseCapture]);
 
   const abortDrag = useCallback((e: React.PointerEvent<HTMLElement>) => {
@@ -192,6 +204,12 @@ export function useTonearm({
     if (!dispatch({ type: 'ARM_PICKED_UP' })) return;
 
     const point = getBoardPoint(e);
+    const gripTarget = e.target instanceof Element
+      ? e.target.closest<HTMLElement>('[data-tonearm-grip]')
+      : null;
+    const grip: TonearmGrip = gripTarget?.dataset.tonearmGrip === 'cartridge'
+      ? 'cartridge'
+      : 'arm';
     let grabOffset = 0;
     if (point) {
       const pointerAngle = calculateArmPointerBearingFromPointer(
@@ -213,6 +231,7 @@ export function useTonearm({
       grabOffset,
       lastPointerBearing: initialPointerBearing,
       wasAlreadyNeedleDown: armState === 'needle-down',
+      grip,
     };
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
