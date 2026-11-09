@@ -184,7 +184,7 @@ describe('useTonearm', () => {
       expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
         type: 'ARM_DROPPED',
         grip,
-        position: 5,
+        position: grip === 'cartridge' ? 30 : 5,
       }));
     }
   });
