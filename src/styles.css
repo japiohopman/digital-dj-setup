@@ -303,7 +303,7 @@ textarea {
    */
   .dual-deck__turntable {
     position: absolute;
-    top: 50%;
+    top: 55%;
     left: 50%;
     /* Fill vertical space of slot with minimal margin */
     width: min(calc(100% * 1256 / 1010), calc(100vh - 12px), calc(100svh - 12px));

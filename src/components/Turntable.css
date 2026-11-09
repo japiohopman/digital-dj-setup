@@ -286,19 +286,33 @@
 @media (orientation: landscape) {
   .turntable .deck-audio-panel {
     top: 50%;
-    left: 96%;
+    left: 102%;
     right: auto;
-    width: 56%;
+    width: 64%;
+    padding: 4px 8px;
+    gap: 8px;
     transform: translate(-50%, -50%) rotate(90deg);
     transform-origin: center;
   }
 
+  /* Keep the rotated loader clean: the long diagnostic trace is available in
+     portrait mode but would crowd the compact landscape file controls. */
+  .turntable .deck-audio-panel .deck-state-trace {
+    display: none;
+  }
+
+  /* The Technics lockup sits on the right-hand flank, by the cue lamp. */
   .turntable .model-badge {
-    top: 72%;
-    left: 47.5%;
+    top: 70%;
+    left: 77%;
     width: 24%;
     transform: rotate(90deg);
     transform-origin: center;
+  }
+
+  .turntable .model-badge-subtitle {
+    font-size: clamp(5px, 0.6vw, 7px);
+    letter-spacing: 0;
   }
 }
 
