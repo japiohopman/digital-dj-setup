@@ -67,12 +67,12 @@ describe('per-deck Zustand adapter', () => {
     const store = createDeckStore(transport, { initiallyMotorOn: false, trackLoaded: true });
     store.getState().dispatch({ type: 'START_STOP_TOGGLED' });
     store.getState().dispatch({
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 42,
+      type: 'ARM_DROPPED', angle: 22, wasAlreadyNeedleDown: false, position: 35,
     });
 
     await flushMicrotasks();
-    // The first valid lead-in drop always starts the selected track at 0.
-    expect(transport.seek).toHaveBeenCalledWith(0);
+    // The arm angle is the timecode, including on the first drop.
+    expect(transport.seek).toHaveBeenCalledWith(35);
     expect(transport.spinUp).toHaveBeenCalledWith(450);
     expect(vi.mocked(transport.seek).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(transport.spinUp).mock.invocationCallOrder[0] ?? Infinity,
@@ -103,17 +103,17 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
-  it('plays only after an outer-lead-in drop with motor and power active', async () => {
+  it('plays after a valid timecoded needle drop with motor and power active', async () => {
     const transport = makeTransport({ isLoaded: true });
     const store = createDeckStore(transport);
     store.getState().dispatch({
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+      type: 'ARM_DROPPED', angle: 22, wasAlreadyNeedleDown: false, position: 35,
     });
 
     expect(transport.playNeedleDropSound).toHaveBeenCalledWith('correct');
     expect(transport.play).not.toHaveBeenCalled();
     await flushMicrotasks();
-    expect(transport.play).toHaveBeenCalledWith(0);
+    expect(transport.play).toHaveBeenCalledWith(35);
     expect(store.getState().machine.transport).toBe('playing');
     expect(transport.setStylusContact).toHaveBeenLastCalledWith(true);
     store.getState().dispose();
@@ -133,7 +133,7 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
-  it('waits for the needle impact and vinyl loop before starting program audio at zero', async () => {
+  it('waits for the needle impact and vinyl loop before starting at the selected timecode', async () => {
     let finishCue: (() => void) | undefined;
     let finishLoop: (() => void) | undefined;
     const transport = makeTransport({
@@ -147,9 +147,9 @@ describe('per-deck Zustand adapter', () => {
 
     store.getState().dispatch({
       type: 'ARM_DROPPED',
-      angle: 25,
+      angle: 22,
       wasAlreadyNeedleDown: false,
-      position: 18,
+      position: 35,
       grip: 'arm',
       surface: 'record',
     });
@@ -168,8 +168,8 @@ describe('per-deck Zustand adapter', () => {
     finishLoop?.();
     await flushMicrotasks();
 
-    expect(transport.seek).toHaveBeenCalledWith(0);
-    expect(transport.play).toHaveBeenCalledWith(0);
+    expect(transport.seek).toHaveBeenCalledWith(35);
+    expect(transport.play).toHaveBeenCalledWith(35);
     const loopStartOrder = vi.mocked(transport.setRecordSoundState!).mock.invocationCallOrder.at(-1) ?? Infinity;
     const trackStartOrder = vi.mocked(transport.play).mock.invocationCallOrder.at(-1) ?? Infinity;
     expect(loopStartOrder).toBeLessThan(trackStartOrder);
@@ -212,7 +212,7 @@ describe('per-deck Zustand adapter', () => {
 
     store.getState().dispatch({
       type: 'ARM_DROPPED',
-      angle: 25,
+      angle: 15,
       wasAlreadyNeedleDown: false,
       position: 0,
       grip: 'arm',
@@ -227,14 +227,14 @@ describe('per-deck Zustand adapter', () => {
 
     store.getState().dispatch({
       type: 'ARM_DROPPED',
-      angle: 36,
+      angle: 22,
       wasAlreadyNeedleDown: false,
-      position: 52,
+      position: 35,
       grip: 'arm',
       surface: 'record',
     });
     expect(transport.playNeedleDropSound).toHaveBeenCalledTimes(1);
-    expect(transport.seek).toHaveBeenLastCalledWith(52);
+    expect(transport.seek).toHaveBeenLastCalledWith(35);
     store.getState().dispose();
   });
 
@@ -268,13 +268,34 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
+  it('plays the label loop only after a deliberate landing above 38°', () => {
+    const transport = makeTransport({ isLoaded: true });
+    const store = createDeckStore(transport);
+
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 40,
+      wasAlreadyNeedleDown: false,
+      position: 100,
+      surface: 'label',
+    });
+
+    expect(store.getState().machine.tonearm).toBe('off-record');
+    expect(transport.setStylusContact).not.toHaveBeenCalledWith(true);
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('off-record');
+
+    store.getState().dispatch({ type: 'ARM_LIFTED' });
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('stopped');
+    store.getState().dispose();
+  });
+
   it('starts the off-record loop only when the stylus physically lands on the plinth', () => {
     const transport = makeTransport({ isLoaded: true });
     const store = createDeckStore(transport);
 
     store.getState().dispatch({
       type: 'ARM_DROPPED',
-      angle: 16,
+      angle: 14,
       wasAlreadyNeedleDown: false,
       position: 0,
       surface: 'plinth',

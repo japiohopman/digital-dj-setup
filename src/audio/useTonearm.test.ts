@@ -35,9 +35,9 @@ describe('useTonearm', () => {
       { initialProps: { currentTime: 0, armState: 'needle-down' as const } }
     );
 
-    // LP outer: 22.75, inner: 47 -> at 50% (50s) progress = 34.875
+    // LP outer: 22.75, inner: 47 -> at 50% (50s) progress = 25
     rerender({ currentTime: 50, armState: 'needle-down' });
-    expect(result.current.armAngle).toBeCloseTo(34.875, 5);
+    expect(result.current.armAngle).toBeCloseTo(25, 5);
   });
 
   it('returns the tonearm to its cradle when a new track is loaded', () => {
@@ -53,11 +53,82 @@ describe('useTonearm', () => {
       { initialProps: { currentTime: 50, armState: 'needle-down' as 'needle-down' | 'parked' } },
     );
 
-    expect(result.current.armAngle).toBeCloseTo(34.875, 5);
+    expect(result.current.armAngle).toBeCloseTo(25, 5);
 
     // TRACK_LOAD_REQUESTED parks the arm before replacing the record.
     rerender({ currentTime: 0, armState: 'parked' });
     expect(result.current.armAngle).toBe(0);
+  });
+
+  it('keeps the manually selected drop angle until the transport publishes the new timecode', () => {
+    const dispatch = vi.fn(() => true);
+    const { result, rerender } = renderHook(
+      ({ armState, currentTime }) => useTonearm({
+        duration: 100,
+        currentTime,
+        armState,
+        armInteraction: 'idle',
+        dispatch,
+      }),
+      { initialProps: { armState: 'lifted' as 'lifted' | 'needle-down', currentTime: 0 } },
+    );
+
+    act(() => {
+      for (let step = 0; step < 11; step++) {
+        result.current.handleKeyDown({
+          key: 'ArrowRight',
+          preventDefault: vi.fn(),
+        } as unknown as React.KeyboardEvent<HTMLElement>);
+      }
+    });
+    expect(result.current.armAngle).toBe(22);
+
+    rerender({ armState: 'needle-down', currentTime: 0 });
+    expect(result.current.armAngle).toBe(22);
+
+    rerender({ armState: 'needle-down', currentTime: 35 });
+    expect(result.current.armAngle).toBe(22);
+  });
+
+  it('parks the arm at 38° when the programme reaches the run-out state', () => {
+    const dispatch = vi.fn(() => true);
+    const { result } = renderHook(() => useTonearm({
+      duration: 100,
+      currentTime: 100,
+      armState: 'needle-down',
+      armInteraction: 'idle',
+      transportPhase: 'ended',
+      dispatch,
+    }));
+
+    expect(result.current.armAngle).toBe(38);
+  });
+
+  it('uses arm position as a linear timecode when lowering the needle', () => {
+    const dispatch = vi.fn(() => true);
+    const { result } = renderHook(() => useTonearm({
+      duration: 100,
+      currentTime: 0,
+      armState: 'lifted',
+      armInteraction: 'idle',
+      dispatch,
+    }));
+
+    act(() => {
+      for (let step = 0; step < 11; step++) {
+        result.current.handleKeyDown({
+          key: 'ArrowRight',
+          preventDefault: vi.fn(),
+        } as unknown as React.KeyboardEvent<HTMLElement>);
+      }
+      result.current.lowerArm();
+    });
+
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'ARM_DROPPED',
+      angle: 22,
+      position: 35,
+    }));
   });
 
   it('dispatches ARM_LIFTED and ARM_PARKED on lift and park', () => {
@@ -126,7 +197,7 @@ describe('useTonearm', () => {
       } as unknown as React.KeyboardEvent<HTMLElement>);
     });
 
-    expect(result.current.armAngle).toBeCloseTo(27.6, 5);
+    expect(result.current.armAngle).toBeCloseTo(21, 5);
     expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ARM_CUE' }));
   });
 

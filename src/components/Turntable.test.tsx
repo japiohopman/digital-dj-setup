@@ -604,7 +604,7 @@ describe('Turntable interactive controls', () => {
 
     const tonearm = container.querySelector('.tonearm') as HTMLElement;
     await act(async () => {
-      for (let step = 0; step < 12; step++) {
+      for (let step = 0; step < 8; step++) {
         tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
       }
       tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
@@ -675,7 +675,7 @@ describe('Turntable interactive controls', () => {
 
     const tonearm = container.querySelector('.tonearm') as HTMLElement;
     await act(async () => {
-      for (let step = 0; step < 12; step++) {
+      for (let step = 0; step < 8; step++) {
         tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
       }
       tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
@@ -894,7 +894,7 @@ describe('Turntable interactive controls', () => {
     expect(tonearm).not.toBeNull();
 
     await act(async () => {
-      for (let step = 0; step < 12; step++) {
+      for (let step = 0; step < 8; step++) {
         tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
       }
       tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
@@ -944,7 +944,7 @@ describe('Turntable interactive controls', () => {
 
     const tonearm = container.querySelector('.tonearm') as HTMLElement;
     await act(async () => {
-      for (let step = 0; step < 12; step++) {
+      for (let step = 0; step < 8; step++) {
         tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
       }
       tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));

@@ -83,26 +83,44 @@ describe('deck state machine', () => {
     expect(selectIsTrackAudible(state)).toBe(true);
   });
 
-  it('rejects an initial drop outside the outer lead-in but accepts a valid re-drop', () => {
+  it('uses a first drop anywhere in the programme groove as a timecode position', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
-      type: 'ARM_DROPPED', angle: 35, wasAlreadyNeedleDown: false, position: 50,
+      type: 'ARM_DROPPED', angle: 22, wasAlreadyNeedleDown: false, position: 35,
+    });
+    expect(state.tonearm).toBe('needle-down');
+    expect(state.transport).toBe('playing');
+    expect(state.hasStartedCurrentRecord).toBe(true);
+    expect(selectIsTrackAudible(state)).toBe(true);
+
+    state = apply(state, { type: 'ARM_PICKED_UP' });
+    expect(state.hasValidNeedleDrop).toBe(false);
+    expect(state.hasStartedCurrentRecord).toBe(true);
+    state = apply(state, {
+      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 50,
+    });
+    expect(state.tonearm).toBe('needle-down');
+    expect(state.transport).toBe('playing');
+    expect(selectIsTrackAudible(state)).toBe(true);
+  });
+
+  it('rejects a first drop in the 35°–38° run-out but allows it after the track has started', () => {
+    let state = createInitialDeckState({ trackLoaded: true });
+    state = apply(state, {
+      type: 'ARM_DROPPED', angle: 36, wasAlreadyNeedleDown: false, position: 100,
     });
     expect(state.tonearm).toBe('lifted');
     expect(selectIsTrackAudible(state)).toBe(false);
 
     state = apply(state, {
-      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
+      type: 'ARM_DROPPED', angle: 15.5, wasAlreadyNeedleDown: false, position: 2.5,
     });
     state = apply(state, { type: 'ARM_PICKED_UP' });
-    expect(state.hasValidNeedleDrop).toBe(false);
-    expect(state.hasStartedCurrentRecord).toBe(true);
     state = apply(state, {
-      type: 'ARM_DROPPED', angle: 35, wasAlreadyNeedleDown: true, position: 50,
+      type: 'ARM_DROPPED', angle: 36, wasAlreadyNeedleDown: false, position: 100,
     });
     expect(state.tonearm).toBe('needle-down');
     expect(state.transport).toBe('playing');
-    expect(selectIsTrackAudible(state)).toBe(true);
   });
 
   it('allows a valid re-drop after an explicit lift, including away from the outer lead-in', () => {
@@ -177,11 +195,29 @@ describe('deck state machine', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
       type: 'ARM_DROPPED',
-      angle: 16,
+      angle: 14,
       wasAlreadyNeedleDown: false,
       position: 0,
       surface: 'plinth',
     });
+    expect(state.tonearm).toBe('off-record');
+    expect(selectIsTrackAudible(state)).toBe(false);
+    expect(selectRecordSoundState(state)).toBe('off-record');
+
+    state = apply(state, { type: 'ARM_LIFTED' });
+    expect(selectRecordSoundState(state)).toBe('stopped');
+  });
+
+  it('selects the off-record loop only after an intentional landing on the centre label', () => {
+    let state = createInitialDeckState({ trackLoaded: true });
+    state = apply(state, {
+      type: 'ARM_DROPPED',
+      angle: 40,
+      wasAlreadyNeedleDown: false,
+      position: 100,
+      surface: 'label',
+    });
+
     expect(state.tonearm).toBe('off-record');
     expect(selectIsTrackAudible(state)).toBe(false);
     expect(selectRecordSoundState(state)).toBe('off-record');

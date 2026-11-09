@@ -253,7 +253,7 @@ describe('AudioEngine', () => {
     engine.dispose();
   });
 
-  it('uses the off-record loop as an endless run-out groove and stops it on state change', async () => {
+  it('loops needle_start_record.wav for run-out and stops it on state change', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
       arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
@@ -267,11 +267,32 @@ describe('AudioEngine', () => {
     const runoutSource = mockContext.createdSources[0];
     expect(runoutSource).toBeDefined();
     expect((runoutSource as unknown as { loop?: boolean }).loop).toBe(true);
+    const correctDropBuffer = (engine as unknown as { correctDropBuffer: AudioBuffer | null }).correctDropBuffer;
+    expect(runoutSource?.buffer).toBe(correctDropBuffer);
     expect(mockContext.createdSources).toHaveLength(1);
 
     engine.setRecordSoundState('stopped');
     await vi.advanceTimersByTimeAsync(110);
     expect(runoutSource?.stop).toHaveBeenCalledOnce();
+    engine.dispose();
+  });
+
+  it('uses not_on_record_loop.wav for an intentional off-record landing', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    })));
+    const engine = createEngine();
+
+    engine.setRecordSoundState('off-record');
+    await vi.waitFor(() => expect(mockContext.createdSources).toHaveLength(1));
+    await Promise.resolve();
+
+    const labelSource = mockContext.createdSources[0];
+    const offRecordBuffer = (engine as unknown as { offRecordLoopBuffer: AudioBuffer | null }).offRecordLoopBuffer;
+    expect(labelSource?.buffer).toBe(offRecordBuffer);
+    expect(labelSource?.loop).toBe(true);
+
     engine.dispose();
   });
 
