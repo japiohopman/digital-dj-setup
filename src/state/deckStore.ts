@@ -258,6 +258,10 @@ export function createDeckStore(
           transport?.setPlaybackRate(event.rate);
           break;
 
+        case 'SCRATCH_STARTED':
+          transport?.beginScratch?.();
+          break;
+
         case 'SCRATCH_MOVED':
           if (next.transport === 'scratching') {
             transport?.scratch(event.speed, event.reversed, event.position);
