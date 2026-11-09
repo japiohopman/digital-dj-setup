@@ -424,6 +424,16 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
 
     case 'ENGINE_PLAYBACK_SYNC': {
       if (state.track === 'loading') return reject(state, 'Playback sync ignored while a track is loading');
+      // A render snapshot can lag behind a just-accepted needle drop. The
+      // explicit deck event owns the start; a stale stopped/paused snapshot
+      // must not cancel the pending needle-impact -> programme-audio sequence.
+      if (
+        state.transport === 'playing' &&
+        event.playbackState !== 'playing' &&
+        !event.endedNaturally
+      ) {
+        return reject(state, 'Ignored stale engine pause while the deck is starting playback');
+      }
       if (event.playbackState === 'playing') {
         if (!canRunMotor(state) || !state.hasRecord || state.track !== 'ready') {
           return reject(state, 'Engine playback blocked: power, motor or track state is not ready');
