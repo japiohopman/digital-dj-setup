@@ -1006,6 +1006,26 @@ export class AudioEngine {
   }
 
   /**
+   * Anchors the live transport time before the user starts moving the platter.
+   * This also protects a quick tap-and-release: it must resume at the current
+   * playhead even when no SCRATCH_MOVED animation frame was emitted.
+   */
+  public beginScratch(): void {
+    if (!this.audioBuffer || this.isDisposed || this.isScratching) return;
+
+    this.stopCoastTimer();
+    const livePosition = this.getState().currentTime;
+    this.logicalPosition = Math.max(0, Math.min(this.duration, livePosition));
+    this.isScratching = true;
+
+    if (this.playbackState === 'playing' && this.currentSource && this.audioContext) {
+      const now = this.audioContext.currentTime;
+      this.currentSource.playbackRate.cancelScheduledValues(now);
+      this.currentSource.playbackRate.setValueAtTime(0.001, now);
+    }
+  }
+
+  /**
    * Realtime scratching handler matching vinyl motion.
    * Modulates playback speed and switches between forward and reverse buffers.
    *
