@@ -26,7 +26,6 @@ function makeTransport(overrides: Partial<DeckTransport> = {}): DeckTransport {
     pause: vi.fn(),
     stop: vi.fn(),
     togglePlayPause: vi.fn().mockResolvedValue(undefined),
-    beginScratch: vi.fn(),
     scratch: vi.fn(),
     endScratch: vi.fn(),
     seek: vi.fn(),
@@ -331,7 +330,6 @@ describe('per-deck Zustand adapter', () => {
 
     expect(store.getState().machine.transport).toBe('playing');
     expect(store.getState().dispatch({ type: 'SCRATCH_STARTED' })).toBe(true);
-    expect(transport.beginScratch).toHaveBeenCalledTimes(1);
     expect(store.getState().machine.transport).toBe('scratching');
     expect(transport.setStylusContact).toHaveBeenLastCalledWith(false);
     expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('stopped');
