@@ -1,5 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { getTonearmPivot } from './tonearmGeometry';
 import { useTonearm } from './useTonearm';
 
 describe('useTonearm', () => {
@@ -398,4 +399,156 @@ describe('useTonearm', () => {
     });
     expect(dispatch).toHaveBeenCalledWith({ type: 'ARM_DRAG_CANCELLED' });
   });
+
+  it('keeps a dragged 22° physical drop while playback advances during pointer ownership', () => {
+    const dispatch = vi.fn(() => true);
+    const { result, rerender } = renderHook(
+      ({ currentTime, armState, armInteraction }) => useTonearm({
+        duration: 100,
+        currentTime,
+        armState,
+        armInteraction,
+        dispatch,
+      }),
+      {
+        initialProps: {
+          currentTime: 0,
+          armState: 'lifted' as 'lifted' | 'needle-down',
+          armInteraction: 'idle' as 'idle' | 'dragging',
+        },
+      },
+    );
+
+    act(() => {
+      for (let step = 0; step < 11; step++) {
+        result.current.handleKeyDown({
+          key: 'ArrowRight',
+          preventDefault: vi.fn(),
+        } as unknown as React.KeyboardEvent<HTMLElement>);
+      }
+    });
+    expect(result.current.armAngle).toBe(22);
+
+    const board = document.createElement('div');
+    board.className = 'bd';
+    board.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 500, bottom: 500, width: 500, height: 500,
+      x: 0, y: 0, toJSON: () => ({}),
+    }) as DOMRect;
+    const pivot = getTonearmPivot(500, 500);
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn().mockReturnValue(false),
+      releasePointerCapture: vi.fn(),
+    });
+    target.dataset.tonearmGrip = 'arm';
+    board.appendChild(target);
+    document.body.appendChild(board);
+
+    let now = 0;
+    const dateNow = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const pointerDown = {
+      button: 0,
+      isPrimary: true,
+      pointerId: 91,
+      clientX: pivot.x + 100,
+      clientY: pivot.y,
+      target,
+      currentTarget: target,
+      stopPropagation: vi.fn(),
+    } as unknown as React.PointerEvent<HTMLElement>;
+    act(() => result.current.handlePointerDown(pointerDown));
+    rerender({ currentTime: 50, armState: 'lifted', armInteraction: 'dragging' });
+
+    const pointerMove = {
+      pointerId: 91,
+      clientX: pivot.x + 110,
+      clientY: pivot.y,
+      target,
+      currentTarget: target,
+    } as unknown as React.PointerEvent<HTMLElement>;
+    act(() => result.current.handlePointerMove(pointerMove));
+    expect(result.current.armAngle).toBeCloseTo(22, 5);
+
+    now = 500;
+    act(() => result.current.handlePointerUp(pointerMove));
+    rerender({ currentTime: 35, armState: 'needle-down', armInteraction: 'idle' });
+    expect(result.current.armAngle).toBeCloseTo(22, 5);
+
+    rerender({ currentTime: 36, armState: 'needle-down', armInteraction: 'idle' });
+    expect(result.current.armAngle).toBeGreaterThan(22);
+    expect(result.current.armAngle).toBeLessThan(23);
+
+    dateNow.mockRestore();
+    board.remove();
+  });
+
+  it('preserves a 30° cartridge drop when the transport publishes its 30-second cue offset', () => {
+    const dispatch = vi.fn(() => true);
+    const { result, rerender } = renderHook(
+      ({ currentTime, armState, transportPhase }) => useTonearm({
+        duration: 300,
+        currentTime,
+        armState,
+        armInteraction: 'idle',
+        transportPhase,
+        dispatch,
+      }),
+      { initialProps: { currentTime: 0, armState: 'lifted' as 'lifted' | 'needle-down', transportPhase: 'idle' as 'idle' | 'playing' } },
+    );
+
+    act(() => {
+      for (let step = 0; step < 15; step++) {
+        result.current.handleKeyDown({
+          key: 'ArrowRight',
+          preventDefault: vi.fn(),
+        } as unknown as React.KeyboardEvent<HTMLElement>);
+      }
+    });
+    expect(result.current.armAngle).toBe(30);
+
+    const board = document.createElement('div');
+    board.className = 'bd';
+    board.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 500, bottom: 500, width: 500, height: 500,
+      x: 0, y: 0, toJSON: () => ({}),
+    }) as DOMRect;
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn().mockReturnValue(false),
+      releasePointerCapture: vi.fn(),
+    });
+    target.dataset.tonearmGrip = 'cartridge';
+    board.appendChild(target);
+    document.body.appendChild(board);
+    const pointer = {
+      button: 0,
+      isPrimary: true,
+      pointerId: 92,
+      clientX: 100,
+      clientY: 100,
+      target,
+      currentTarget: target,
+      stopPropagation: vi.fn(),
+    } as unknown as React.PointerEvent<HTMLElement>;
+
+    act(() => result.current.handlePointerDown(pointer));
+    act(() => result.current.handlePointerUp(pointer));
+
+    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'ARM_DROPPED',
+      angle: 30,
+      position: 30,
+      grip: 'cartridge',
+    }));
+
+    rerender({ currentTime: 30.5, armState: 'needle-down', transportPhase: 'playing' });
+    expect(result.current.armAngle).toBeCloseTo(30, 5);
+
+    rerender({ currentTime: 31.5, armState: 'needle-down', transportPhase: 'playing' });
+    expect(result.current.armAngle).toBeGreaterThan(30);
+    expect(result.current.armAngle).toBeLessThan(31);
+    board.remove();
+  });
+
 });

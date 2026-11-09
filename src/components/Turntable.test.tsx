@@ -986,10 +986,10 @@ describe('Turntable interactive controls', () => {
 
     const tonearm = container.querySelector('.tonearm') as HTMLElement;
     const startButton = document.body.querySelector(
-      'button[aria-label="MEASURE Capture groove start angle"]',
+      'button[aria-label="Capture groove start angle"]',
     ) as HTMLButtonElement;
     const endButton = document.body.querySelector(
-      'button[aria-label="MEASURE Capture groove end angle"]',
+      'button[aria-label="Capture groove end angle"]',
     ) as HTMLButtonElement;
     expect(container.querySelector('[data-dev-widget="tonearm-angle-meter"]')).toBeNull();
     expect(document.body.querySelector('[data-dev-widget="tonearm-angle-meter"]')).not.toBeNull();

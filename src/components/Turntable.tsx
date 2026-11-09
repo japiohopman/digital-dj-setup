@@ -732,7 +732,7 @@ export function Turntable({
             <div
               className="tonearm-meter-scale"
               role="img"
-              aria-label={`Arm angle ${armAngle.toFixed(2)} degrees on a scale from 0 to 49 degrees`
+              aria-label={`Arm angle ${armAngle.toFixed(2)} degrees on a scale from 0 to 49 degrees`}
             >
               <div className="tonearm-meter-track" />
               {measuredGrooveStart !== null && (

@@ -79,7 +79,8 @@ describe('tonearmGeometry', () => {
     expect(classifyTonearmLandingSurface(13.3)).toBe('record');
     expect(classifyTonearmLandingSurface(22)).toBe('record');
     expect(classifyTonearmLandingSurface(37.99)).toBe('record');
-    expect(classifyTonearmLandingSurface(38)).toBe('label');
+    expect(classifyTonearmLandingSurface(38)).toBe('record');
+    expect(classifyTonearmLandingSurface(38.01)).toBe('label');
     expect(classifyTonearmLandingSurface(49)).toBe('label');
   });
 

@@ -6,6 +6,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
   calculateScratchSpeedMagnitude,
   calculateScratchTrackPosition,
+  calculateScratchTrackPositionFromGesture,
   resolveScratchDirection,
   useVinylMotion,
 } from './useVinylMotion';
@@ -37,17 +38,16 @@ describe('vinyl scratch motion helpers', () => {
     expect(calculateScratchSpeedMagnitude(0.02, 0)).toBe(0);
   });
 
-  it('uses absolute platter angle as the only track timecode, in both directions', () => {
+  it('maps gesture-relative platter movement to timecode in both directions', () => {
     const rps = 33.3333 / 60;
-    const angleFor42Seconds = 42 * 2 * Math.PI * rps;
-    const angleFor52Seconds = 52 * 2 * Math.PI * rps;
-    const angleFor32Seconds = 32 * 2 * Math.PI * rps;
-
-    expect(calculateScratchTrackPosition(angleFor42Seconds, rps, 100)).toBeCloseTo(42);
-    expect(calculateScratchTrackPosition(angleFor52Seconds, rps, 100)).toBeCloseTo(52);
-    expect(calculateScratchTrackPosition(angleFor32Seconds, rps, 100)).toBeCloseTo(32);
-    expect(calculateScratchTrackPosition(120 * 2 * Math.PI * rps, rps, 100)).toBe(100);
-    expect(calculateScratchTrackPosition(-2 * Math.PI * rps, rps, 100)).toBe(0);
+    const secondsPerRotation = 2 * Math.PI * rps;
+    expect(calculateScratchTrackPosition(42 * secondsPerRotation, rps, 100)).toBeCloseTo(42);
+    expect(calculateScratchTrackPositionFromGesture(42, 0.5, 0, rps, 100))
+      .toBeCloseTo(42 + 0.5 / secondsPerRotation);
+    expect(calculateScratchTrackPositionFromGesture(42, -0.5, 0, rps, 100))
+      .toBeCloseTo(42 - 0.5 / secondsPerRotation);
+    expect(calculateScratchTrackPositionFromGesture(99.9, 2, 0, rps, 100)).toBe(100);
+    expect(calculateScratchTrackPositionFromGesture(0.1, -2, 0, rps, 100)).toBe(0);
   });
 });
 
@@ -108,7 +108,7 @@ describe('useVinylMotion physical platter input', () => {
     unmount();
   });
 
-  it('anchors the physical platter angle to the live audio playhead on pointer down', () => {
+  it('anchors scratch timecode to the live playhead without jumping the visible platter on pointer down', () => {
     const dispatch = vi.fn(() => true);
     const transport = {
       isLoaded: true,
@@ -146,7 +146,7 @@ describe('useVinylMotion physical platter input', () => {
 
     const expectedAngle = 42 * (33.3333 / 60) * Math.PI * 2;
     expect(transport.getCurrentTime).toHaveBeenCalledTimes(1);
-    expect(result.current.angle).toBeCloseTo(expectedAngle, 6);
+    expect(result.current.angle).toBe(0);
     expect(dispatch).toHaveBeenCalledWith({ type: 'SCRATCH_STARTED' });
     expect(dispatch).toHaveBeenCalledWith({
       type: 'SCRATCH_MOVED',

@@ -204,6 +204,80 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
+  it('keeps a cartridge re-drop muted until its cue, vinyl loop and programme start finish', async () => {
+    let finishCue: (() => void) | undefined;
+    let finishLoop: (() => void) | undefined;
+    let finishPlay: (() => void) | undefined;
+    const transport = makeTransport({
+      isLoaded: true,
+      isPlaying: true,
+      playbackState: 'playing',
+      playNeedleDropSound: vi.fn(() => new Promise<void>((resolve) => { finishCue = resolve; })),
+      setRecordSoundState: vi.fn((state) => state === 'on-record'
+        ? new Promise<void>((resolve) => { finishLoop = resolve; })
+        : Promise.resolve()),
+      play: vi.fn(() => new Promise<void>((resolve) => { finishPlay = resolve; })),
+    });
+    const store = createDeckStore(transport);
+
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 30,
+      wasAlreadyNeedleDown: true,
+      position: 30,
+      grip: 'cartridge',
+      surface: 'record',
+    });
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(false);
+
+    finishCue?.();
+    await flushMicrotasks();
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('on-record');
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(false);
+
+    finishLoop?.();
+    await flushMicrotasks();
+    expect(transport.seek).toHaveBeenCalledWith(30);
+    expect(transport.play).toHaveBeenCalledWith(30);
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(false);
+
+    finishPlay?.();
+    await flushMicrotasks();
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(true);
+    store.getState().dispose();
+  });
+
+  it('records on-record before awaiting the vinyl loop so a lift stops a late loop start', async () => {
+    let finishLoop: (() => void) | undefined;
+    const transport = makeTransport({
+      isLoaded: true,
+      setRecordSoundState: vi.fn((state) => state === 'on-record'
+        ? new Promise<void>((resolve) => { finishLoop = resolve; })
+        : Promise.resolve()),
+    });
+    const store = createDeckStore(transport);
+
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 15,
+      wasAlreadyNeedleDown: false,
+      position: 0,
+      grip: 'arm',
+      surface: 'record',
+    });
+    await flushMicrotasks();
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('on-record');
+
+    store.getState().dispatch({ type: 'ARM_LIFTED' });
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('stopped');
+    finishLoop?.();
+    await flushMicrotasks();
+
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('stopped');
+    expect(transport.play).not.toHaveBeenCalled();
+    store.getState().dispose();
+  });
+
   it('cancels a pending needle cue when the tonearm is lifted before the cue finishes', async () => {
     let finishCue: (() => void) | undefined;
     const transport = makeTransport({
@@ -292,6 +366,45 @@ describe('per-deck Zustand adapter', () => {
     expect(transport.play).toHaveBeenCalledWith(30);
     expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('on-record');
     expect(transport.setStylusContact).toHaveBeenLastCalledWith(true);
+    store.getState().dispose();
+  });
+
+  it('keeps an exact 38° re-drop in the run-out loop after playback ends', async () => {
+    const transport = makeTransport({ isLoaded: true, isPlaying: true, playbackState: 'playing' });
+    const store = createDeckStore(transport);
+
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 35,
+      wasAlreadyNeedleDown: false,
+      position: 100,
+      grip: 'arm',
+      surface: 'record',
+    });
+    await flushMicrotasks();
+    const playCallsBeforeRunout = vi.mocked(transport.play).mock.calls.length;
+
+    store.getState().dispatch({
+      type: 'ENGINE_PLAYBACK_SYNC',
+      playbackState: 'stopped',
+      endedNaturally: true,
+    });
+    expect(store.getState().machine.transport).toBe('ended');
+
+    store.getState().dispatch({ type: 'ARM_LIFTED' });
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 38,
+      wasAlreadyNeedleDown: false,
+      position: 100,
+      grip: 'arm',
+      surface: 'record',
+    });
+
+    expect(store.getState().machine.transport).toBe('ended');
+    expect(store.getState().machine.tonearm).toBe('needle-down');
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('runout');
+    expect(vi.mocked(transport.play).mock.calls.length).toBe(playCallsBeforeRunout);
     store.getState().dispose();
   });
 
