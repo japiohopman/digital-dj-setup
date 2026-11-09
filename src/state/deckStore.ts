@@ -113,18 +113,26 @@ export function createDeckStore(
         const current = get().machine;
         if (current.track !== 'ready' || current.tonearm !== 'needle-down') return;
 
-        // Seek only after the one-shot has finished. This also replaces a
-        // still-running, muted source after the user lifted and re-dropped the
-        // needle, so a cartridge drop really starts at its 30s offset.
-        transport?.seek(position);
-        if (current.transport === 'playing' && canRunMotor(current)) {
+        // Start the record layer only after the needle-impact sample ends.
+        // Seek after the cue so an old muted source cannot leak into the new
+        // position. If the user is already scratching, the next platter sample
+        // will start the transport through the same state-machine route.
+        if (
+          (current.transport === 'playing' || current.transport === 'scratching') &&
+          canRunMotor(current)
+        ) {
           transport?.setRecordSoundState?.('on-record');
           lastSoundState = 'on-record';
-          if (current.motorPhase === 'spinning-up') {
-            startSpinUp(current);
-          } else if (transport?.playbackState !== 'playing') {
-            void transport?.play(position);
+          transport?.seek(position);
+          if (current.transport === 'playing') {
+            if (current.motorPhase === 'spinning-up') {
+              startSpinUp(current);
+            } else if (transport?.playbackState !== 'playing') {
+              void transport?.play(position);
+            }
           }
+        } else {
+          transport?.seek(position);
         }
       })();
     };
