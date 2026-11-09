@@ -25,6 +25,14 @@ The mixer reference has not been selected yet. Keep mixer design and implementat
 - UI components and interaction hooks must dispatch typed deck events. They must not call transport play/pause/stop/seek/scratch/stylus-contact commands directly; keep those side effects inside the per-deck Zustand adapter.
 - Keep Web Audio objects inside AudioEngine. Keep pointer ownership, coordinates and animation-frame physics local to interaction hooks, never in Zustand.
 
+## Reference-first research (token-efficient)
+
+- Before external research or re-deriving known behaviour, read [docs/reference/README.md](docs/reference/README.md).
+- Use [docs/reference/turntable-baseline.md](docs/reference/turntable-baseline.md) for current arm rotation, pivot geometry, groove mapping, SL-1200MK2 facts and simulation timings.
+- Do not search again for facts already documented and sourced unless a source is disputed, the hardware/version changes, or the implementation question needs new evidence.
+- When a new verified fact or calibration is found, add it once to the reference and link to it from the issue. Keep issue bodies focused on task scope and acceptance criteria.
+- Clearly label manufacturer facts, app calibration and simulation choices; never silently convert a simulation value into a hardware specification.
+
 ## Collaboration style
 
 - Work from GitHub Issues, not from large untracked task lists.
