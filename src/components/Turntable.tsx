@@ -84,10 +84,19 @@ export function Turntable({
 
   useEffect(() => () => deckStore.getState().dispose(), [deckStore]);
 
+  const transportEndedNaturally = !!transport &&
+    transport.playbackState === 'stopped' &&
+    transport.duration > 0 &&
+    transport.currentTime >= transport.duration - 0.05;
+
   useEffect(() => {
     if (!transport) return;
-    dispatch({ type: 'ENGINE_PLAYBACK_SYNC', playbackState: transport.playbackState });
-  }, [dispatch, transport?.playbackState]);
+    dispatch({
+      type: 'ENGINE_PLAYBACK_SYNC',
+      playbackState: transport.playbackState,
+      endedNaturally: transportEndedNaturally,
+    });
+  }, [dispatch, transport?.playbackState, transportEndedNaturally]);
 
   const {
     angle: vinylAngle,
