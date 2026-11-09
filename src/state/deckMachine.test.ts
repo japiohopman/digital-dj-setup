@@ -169,7 +169,7 @@ describe('deck state machine', () => {
     });
     expect(state.tonearm).toBe('off-record');
     expect(selectIsTrackAudible(state)).toBe(false);
-    expect(selectRecordSoundState(state)).toBe('stopped');
+    expect(selectRecordSoundState(state)).toBe('off-record');
 
     state = apply(state, { type: 'ARM_LIFTED' });
     expect(selectRecordSoundState(state)).toBe('stopped');
