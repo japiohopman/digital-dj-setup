@@ -224,9 +224,9 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         scratchResumeTransport: null,
         hasValidNeedleDrop: false,
         hasRecord: false,
-        tonearm: 'lifted',
+        tonearm: state.tonearm === 'parked' ? 'parked' : 'lifted',
         armInteraction: 'idle',
-      }, 'Track loading: slipmat shown, arm lifted and output muted; autoplay disabled');
+      }, 'Track loading: slipmat shown, arm kept stable and output muted; autoplay disabled');
 
     case 'TRACK_LOAD_SUCCEEDED':
       if (state.track !== 'loading') return reject(state, 'Ignored track-ready event without an active load');
@@ -288,7 +288,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       const inGroove = isAngleInPlayableRecord(event.angle);
       const isPhysicalCartridgeDrop = event.grip === 'cartridge';
       const isWrongGrooveDrop = state.hasRecord && inGroove &&
-        isFiniteNonNegative(event.position) && (isPhysicalCartridgeDrop || event.tooFast);
+        isFiniteNonNegative(event.position) && isPhysicalCartridgeDrop;
       if (isWrongGrooveDrop) {
         const next: DeckMachineState = {
           ...state,
