@@ -1590,7 +1590,7 @@ export class AudioEngine {
   }
 
   /**
-   * Disposes the engine and closes the AudioContext.
+   * Disposes this deck; closes the AudioContext only when the engine owns it.
    */
   public dispose(): void {
     this.isDisposed = true;
