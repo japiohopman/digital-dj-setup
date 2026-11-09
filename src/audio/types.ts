@@ -56,7 +56,7 @@ export interface DeckTransport {
   isLoaded: boolean;
   isStylusDown: boolean;
   setStylusContact: (isContact: boolean) => void;
-  setRecordSoundState?: (state: RecordSoundState) => void;
+  setRecordSoundState?: (state: RecordSoundState) => void | Promise<void>;
   playNeedleDropSound?: (kind: NeedleDropSound) => Promise<void>;
   error: string | null;
   loadTrack: (file: File) => Promise<void>;
