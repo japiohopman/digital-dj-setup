@@ -41,7 +41,7 @@ Add tests with each feature where practical. The initial bootstrap may have no t
 - Do not add a global state-management library until a concrete requirement justifies it.
 - Do not add PWA/offline support, account systems, remote track storage or streaming integrations without a dedicated issue.
 - Do not build mixer features before they have a dedicated issue and agreed reference.
-- Prefer native browser APIs and a small dependency footprint. Explain any new runtime dependency in the PR.
+- Prefer native browser APIs and small dependencies. Explain any new runtime dependency in the PR.
 
 ## Assets and references
 
