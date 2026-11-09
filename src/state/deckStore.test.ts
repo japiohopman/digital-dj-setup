@@ -159,7 +159,7 @@ describe('per-deck Zustand adapter', () => {
     expect(transport.seek).toHaveBeenCalledWith(0);
     expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('on-record');
     expect(transport.play).toHaveBeenCalledWith(0);
-    const loopStartOrder = vi.mocked(transport.setRecordSoundState).mock.invocationCallOrder.at(-1) ?? Infinity;
+    const loopStartOrder = vi.mocked(transport.setRecordSoundState!).mock.invocationCallOrder.at(-1) ?? Infinity;
     const trackStartOrder = vi.mocked(transport.play).mock.invocationCallOrder.at(-1) ?? Infinity;
     expect(loopStartOrder).toBeLessThan(trackStartOrder);
     store.getState().dispose();
