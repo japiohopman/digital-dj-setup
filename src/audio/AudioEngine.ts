@@ -31,6 +31,9 @@ interface PendingReverseScratch {
 export class AudioEngine {
   private audioContext: AudioContext | null = null;
   private readonly contextFactory: () => AudioContext;
+  private readonly audioContextProvider: (() => AudioContext) | undefined;
+  private readonly outputNodeProvider: ((context: AudioContext) => AudioNode) | undefined;
+  private readonly closeAudioContextOnDispose: boolean;
 
   private audioBuffer: AudioBuffer | null = null;
   private audioBufferReversed: AudioBuffer | null = null;
@@ -99,6 +102,9 @@ export class AudioEngine {
   private readonly listeners = new Set<AudioEngineListener>();
 
   constructor(options: AudioEngineOptions = {}) {
+    this.audioContextProvider = options.audioContextProvider;
+    this.outputNodeProvider = options.outputNodeProvider;
+    this.closeAudioContextOnDispose = options.closeAudioContextOnDispose ?? !options.audioContextProvider;
     this.contextFactory =
       options.audioContextFactory ??
       (() => {
@@ -119,15 +125,20 @@ export class AudioEngine {
    */
   private getOrCreateContext(): AudioContext {
     if (!this.audioContext) {
-      this.audioContext = this.contextFactory();
+      this.audioContext = this.audioContextProvider?.() ?? this.contextFactory();
       this.gainNode = this.audioContext.createGain();
       this.stylusGainNode = this.audioContext.createGain();
       // Default to muted (stylus lifted/parked)
       this.stylusGainNode.gain.value = this.isStylusDown ? 1.0 : 0.0;
       this.gainNode.connect(this.stylusGainNode);
-      this.stylusGainNode.connect(this.audioContext.destination);
+      this.stylusGainNode.connect(this.getDeckOutputNode(this.audioContext));
     }
     return this.audioContext;
+  }
+
+  /** Returns the app-owned deck channel input, or the native destination for standalone engines. */
+  private getDeckOutputNode(context: AudioContext): AudioNode {
+    return this.outputNodeProvider?.(context) ?? context.destination;
   }
 
   private getOrCreateGainNode(): GainNode {
@@ -137,7 +148,7 @@ export class AudioEngine {
       this.stylusGainNode = ctx.createGain();
       this.stylusGainNode.gain.value = this.isStylusDown ? 1.0 : 0.0;
       this.gainNode.connect(this.stylusGainNode);
-      this.stylusGainNode.connect(ctx.destination);
+      this.stylusGainNode.connect(this.getDeckOutputNode(ctx));
     }
     return this.gainNode;
   }
@@ -282,7 +293,7 @@ export class AudioEngine {
         source.buffer = buffer;
         voiceGain.gain.value = kind === 'correct' ? 0.62 : 0.7;
         source.connect(voiceGain);
-        voiceGain.connect(context.destination);
+        voiceGain.connect(this.getDeckOutputNode(context));
         this.placementCueSource = source;
         this.placementCueGain = voiceGain;
         source.onended = () => {
@@ -386,7 +397,7 @@ export class AudioEngine {
       source.loop = true;
       gain.gain.value = 0;
       source.connect(gain);
-      gain.connect(context.destination);
+      gain.connect(this.getDeckOutputNode(context));
       source.start(0);
       if (kind === 'vinyl') {
         this.vinylLoopSource = source;
@@ -1608,13 +1619,14 @@ export class AudioEngine {
       this.metadata = null;
     }
 
-    if (this.audioContext && this.audioContext.state !== 'closed') {
+    if (this.audioContext && this.closeAudioContextOnDispose && this.audioContext.state !== 'closed') {
       try {
         void this.audioContext.close();
       } catch {
         // Ignore errors during close
       }
-      this.audioContext = null;
     }
+    // Shared contexts are owned by MixerAudioGraph, not by this deck engine.
+    this.audioContext = null;
   }
 }
