@@ -13,7 +13,7 @@ describe('App dual-deck workspace', () => {
     expect(markup).toContain('DECK B Technics-inspired turntable');
     expect(markup).toContain('WEB AUDIO ENGINE CONNECTED');
     expect(markup).toContain('INDEPENDENT DUAL TRANSPORT');
-    expect(markup.match(/class="turntable power-on motor-on has-record"/g)).toHaveLength(2);
+    expect(markup.match(/class="turntable power-on motor-on has-slipmat"/g)).toHaveLength(2);
   });
 
   it('provides an accessible portrait deck selector', () => {
