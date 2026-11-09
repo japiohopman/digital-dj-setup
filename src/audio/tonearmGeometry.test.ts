@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_TONEARM_CONFIG,
   angleToPlaybackProgress,
+  classifyTonearmLandingSurface,
   calculateArmPointerBearingFromPointer,
   getTonearmPivot,
   isAngleAtOuterLeadIn,
@@ -81,6 +82,13 @@ describe('tonearmGeometry', () => {
     expect(isAngleAtOuterLeadIn(27)).toBe(false);
     expect(isAngleAtOuterLeadIn(35)).toBe(false);
     expect(isAngleAtOuterLeadIn(DEFAULT_TONEARM_CONFIG.outerGrooveAngle - 1)).toBe(false);
+  });
+
+  it('distinguishes the parked cradle, Technics plinth and vinyl surface', () => {
+    expect(classifyTonearmLandingSurface(0)).toBe('air');
+    expect(classifyTonearmLandingSurface(16)).toBe('plinth');
+    expect(classifyTonearmLandingSurface(22)).toBe('record');
+    expect(classifyTonearmLandingSurface(25)).toBe('record');
   });
 
   it('unwraps pointer bearings continuously across the 180 degree boundary', () => {
