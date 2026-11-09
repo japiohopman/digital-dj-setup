@@ -17,6 +17,8 @@ This folder contains developer-only diagnostics. It is imported from `App.tsx` o
 4. Keep the tool read-only with respect to product state: diagnostics may receive props/callbacks for measurements, but must not mutate deck transport, tonearm, motor or audio state.
 5. Add tests for default-hidden state, toggle behaviour and any widget-specific measurements.
 
-The existing **Arm angle meter** receives only the active deck label and its live arm angle. Its groove-start/end captures are diagnostic measurements local to the widget. Hiding it preserves those measurements until the widget is unmounted.
+The **Arm angle meter** receives only the active deck label and its live arm angle. Its groove-start/end captures are diagnostic measurements local to the widget. Hiding it preserves those measurements until the widget is unmounted.
+
+The **Deck state trace** receives a read-only snapshot of the active deck state and the most recent accepted/rejected transitions. It cannot dispatch events or change product state.
 
 Do not place developer UI or widget styling inside `Turntable.tsx` or `Turntable.css`.
