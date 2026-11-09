@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect, type CSSProperties, type PointerEvent, type KeyboardEvent, type ChangeEvent, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
+import { useState, useRef, useEffect, type CSSProperties, type PointerEvent, type KeyboardEvent, type ChangeEvent } from 'react';
 import { useStore } from 'zustand';
 import type { DeckTransport } from '../audio/types';
 import { useVinylMotion } from '../audio/useVinylMotion';
@@ -36,8 +35,8 @@ export interface TurntableProps {
   initiallyHasSlipmat?: boolean;
   /** Optional DeckTransport instance connected to the deck's audio engine. */
   transport?: DeckTransport;
-  /** Whether this deck currently owns the floating tonearm calibration dev widget. */
-  showTonearmMeter?: boolean;
+  /** Reports the live screen-space arm angle to development-only diagnostics. */
+  onArmAngleChange?: (angle: number) => void;
 }
 
 /**
@@ -46,21 +45,11 @@ export interface TurntableProps {
  * Provides realistic visual styling, spinning animations, speed selection,
  * power dial, target light toggle, and an interactive draggable pitch slider.
  */
-/** Mounts development-only calibration controls outside the clipped turntable artwork. */
-function TonearmMeterPortal({ children }: { children: ReactNode }) {
-  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    setPortalTarget(document.body);
-  }, []);
-
-  return portalTarget ? createPortal(children, portalTarget) : null;
-}
 
 export function Turntable({
   id,
   transport,
-  showTonearmMeter = true,
+  onArmAngleChange,
   deckLabel = 'DECK 01',
   modelName = 'SL-1200 MK2',
   initialSpeed = 33,
@@ -90,8 +79,6 @@ export function Turntable({
   const hasSlipmat = !hasRecord || initiallyHasSlipmat;
   const [speed, setSpeed] = useState<TurntableSpeed>(initialSpeed);
   const [isLightOn, setIsLightOn] = useState(false);
-  const [measuredGrooveStart, setMeasuredGrooveStart] = useState<number | null>(null);
-  const [measuredGrooveEnd, setMeasuredGrooveEnd] = useState<number | null>(null);
   const [pitch, setPitch] = useState<number>(0);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [isDragOverRecord, setIsDragOverRecord] = useState<boolean>(false);
@@ -165,6 +152,10 @@ export function Turntable({
     isBattleMode: isLandscape,
     hasRecord,
   });
+
+  useEffect(() => {
+    onArmAngleChange?.(armAngle);
+  }, [armAngle, onArmAngleChange]);
 
   const updatePitchFromPointer = (clientY: number, clientX: number) => {
     if (!trackRef.current) return;
@@ -305,26 +296,6 @@ export function Turntable({
   const handleResetPitch = () => {
     setPitch(0);
   };
-
-  const handleCaptureGrooveStart = () => {
-    setMeasuredGrooveStart(Number(armAngle.toFixed(2)));
-    // Never combine a newly captured start with a stale end from another try.
-    setMeasuredGrooveEnd(null);
-  };
-
-  const handleCaptureGrooveEnd = () => {
-    setMeasuredGrooveEnd(Number(armAngle.toFixed(2)));
-  };
-
-  const handleClearArmMeasurement = () => {
-    setMeasuredGrooveStart(null);
-    setMeasuredGrooveEnd(null);
-  };
-
-  const armMeterPercent = (angle: number) => Math.max(0, Math.min(100, (angle / 49) * 100));
-  const measuredGrooveReach = measuredGrooveStart !== null && measuredGrooveEnd !== null
-    ? measuredGrooveEnd - measuredGrooveStart
-    : null;
 
   const isSpinning = selectIsSpinning(machine);
 
@@ -708,111 +679,6 @@ export function Turntable({
           </details>
         </div>
 
-      {import.meta.env.DEV && showTonearmMeter && (
-        <TonearmMeterPortal>
-          <section
-            className="tonearm-meter-panel"
-            data-dev-widget="tonearm-angle-meter"
-            aria-label={`${deckLabel} tonearm measurement`}
-          >
-            <div className="tonearm-meter-heading">
-              <div>
-                <span className="tonearm-meter-title">{deckLabel} · TONEARM DEV</span>
-                <span className="tonearm-meter-subtitle">0° = arm in the rest cradle</span>
-              </div>
-              <output
-                className="tonearm-meter-live"
-                data-testid="tonearm-angle-readout"
-                aria-label="Current tonearm angle"
-                aria-live="polite"
-              >
-                {armAngle.toFixed(2)}°
-              </output>
-            </div>
-
-            <div
-              className="tonearm-meter-scale"
-              role="img"
-              aria-label={`Arm angle ${armAngle.toFixed(2)} degrees on a scale from 0 to 49 degrees`}
-            >
-              <div className="tonearm-meter-track" />
-              {measuredGrooveStart !== null && (
-                <span
-                  className="tonearm-meter-marker start"
-                  style={{ left: `${armMeterPercent(measuredGrooveStart)}%` }}
-                  title={`Beginpunt: ${measuredGrooveStart.toFixed(2)}°`}
-                />
-              )}
-              {measuredGrooveEnd !== null && (
-                <span
-                  className="tonearm-meter-marker end"
-                  style={{ left: `${armMeterPercent(measuredGrooveEnd)}%` }}
-                  title={`Eindpunt: ${measuredGrooveEnd.toFixed(2)}°`}
-                />
-              )}
-              <span
-                className="tonearm-meter-marker current"
-                style={{ left: `${armMeterPercent(armAngle)}%` }}
-              />
-            </div>
-
-            <div className="tonearm-meter-ticks" aria-hidden="true">
-              {[0, 10, 20, 30, 40, 49].map((degree) => (
-                <span key={degree} style={{ left: `${armMeterPercent(degree)}%` }}>{degree}°</span>
-              ))}
-            </div>
-
-            <div className="tonearm-meter-readings">
-              <div>
-                <span>Groove start</span>
-                <output data-testid="tonearm-start-readout">
-                  {measuredGrooveStart === null ? '—' : `${measuredGrooveStart.toFixed(2)}°`}
-                </output>
-              </div>
-              <div>
-                <span>Groove end</span>
-                <output data-testid="tonearm-end-readout">
-                  {measuredGrooveEnd === null ? '—' : `${measuredGrooveEnd.toFixed(2)}°`}
-                </output>
-              </div>
-              <div className="tonearm-meter-reach">
-                <span>Arm reach</span>
-                <output data-testid="tonearm-reach-readout">
-                  {measuredGrooveReach === null ? '—' : `${measuredGrooveReach.toFixed(2)}°`}
-                </output>
-              </div>
-            </div>
-
-            <div className="tonearm-meter-actions">
-              <button
-                type="button"
-                className="tonearm-meter-button"
-                onClick={handleCaptureGrooveStart}
-                aria-label="Capture groove start angle"
-              >
-                Capture groove start angle
-              </button>
-              <button
-                type="button"
-                className="tonearm-meter-button"
-                onClick={handleCaptureGrooveEnd}
-                aria-label="Capture groove end angle"
-              >
-                Capture groove end angle
-              </button>
-              <button
-                type="button"
-                className="tonearm-meter-clear"
-                onClick={handleClearArmMeasurement}
-                aria-label="Clear measurement"
-                disabled={measuredGrooveStart === null && measuredGrooveEnd === null}
-              >
-                Clear measurement
-              </button>
-            </div>
-          </section>
-        </TonearmMeterPortal>
-      )}
     </div>
   );
 }
