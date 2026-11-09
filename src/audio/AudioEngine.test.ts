@@ -543,6 +543,27 @@ describe('AudioEngine', () => {
     deckB.dispose();
   });
 
+  it('keeps the live playhead when a platter touch ends before the first movement frame', async () => {
+    const engine = createEngine();
+    await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'scratch-tap.wav');
+    await engine.play(24);
+
+    // The audio source has progressed since its last logical anchor.
+    mockContext.currentTime = 5;
+    expect(engine.getState().currentTime).toBe(29);
+
+    engine.beginScratch();
+    expect(engine.getState().currentTime).toBe(29);
+
+    // A short touch with no SCRATCH_MOVED event still resumes at the live point.
+    engine.endScratch(true);
+    const resumedSource = mockContext.createdSources[1];
+    expect(resumedSource?.startedAtOffset).toBe(29);
+    expect(engine.getState().playbackState).toBe('playing');
+
+    engine.dispose();
+  });
+
   it('supports bidirectional scratching and playbackRate modulation', async () => {
     const engine = createEngine();
     await engine.loadTrack(new Uint8Array([1, 2]).buffer, 'scratch-cue.wav');
