@@ -357,12 +357,12 @@ export class AudioEngine {
       this.stopRecordLoop('vinyl');
     }
 
-    // The supplied off-record sample also serves as the endless run-out groove
-    // until the user lifts the needle or stops the motor.
-    if (this.offRecordLoopBuffer && this.recordSoundState === 'off-record') {
+    // The label/plinth uses not_on_record_loop.wav after an intentional drop.
+    // The end of the recorded groove loops needle_start_record.wav instead.
+    if (this.recordSoundState === 'off-record' && this.offRecordLoopBuffer) {
       this.startRecordLoop('off-record', this.offRecordLoopBuffer, 0.15);
-    } else if (this.offRecordLoopBuffer && this.recordSoundState === 'runout') {
-      this.startRecordLoop('off-record', this.offRecordLoopBuffer, 0.11);
+    } else if (this.recordSoundState === 'runout' && this.correctDropBuffer) {
+      this.startRecordLoop('off-record', this.correctDropBuffer, 0.11);
     } else {
       this.stopRecordLoop('off-record');
     }

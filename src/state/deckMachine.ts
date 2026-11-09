@@ -1,7 +1,6 @@
 import type { AudioPlaybackState } from '../audio/types';
 import {
   DEFAULT_TONEARM_CONFIG,
-  isAngleAtOuterLeadIn,
   isAngleInPlayableRecord,
   type TonearmState,
 } from '../audio/tonearmGeometry';
@@ -57,7 +56,7 @@ export type DeckEvent =
       position: number;
       tooFast?: boolean;
       grip?: 'arm' | 'cartridge';
-      surface?: 'record' | 'plinth' | 'air';
+      surface?: 'record' | 'plinth' | 'label' | 'air';
     }
   | { type: 'ARM_LIFTED' }
   | { type: 'ARM_PARKED' }
@@ -283,13 +282,15 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         }, 'Tonearm returned to its cradle');
       }
 
-      if (event.surface === 'plinth' && state.hasRecord) {
+      if ((event.surface === 'plinth' || event.surface === 'label') && state.hasRecord) {
         return accept({
           ...state,
           hasValidNeedleDrop: false,
           tonearm: 'off-record',
           armInteraction: 'idle',
-        }, 'Stylus landed on the Technics plinth: program audio stays muted');
+        }, event.surface === 'label'
+          ? 'Stylus deliberately landed on the centre label: off-record loop only'
+          : 'Stylus landed on the Technics plinth: program audio stays muted');
       }
 
       const inGroove = isAngleInPlayableRecord(event.angle);
@@ -308,8 +309,12 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         return accept(next, 'Incorrect cartridge/fast drop on vinyl: use wrong-drop cue and offset start');
       }
 
+      // The programme groove is a physical timecode: a first drop at 22°
+      // starts partway through the track. The run-out beyond 35° is only
+      // available after the record has already started.
       const validStart = state.hasStartedCurrentRecord || event.wasAlreadyNeedleDown ||
-        (isAngleAtOuterLeadIn(event.angle) && !event.tooFast && !isPhysicalCartridgeDrop);
+        (event.angle <= DEFAULT_TONEARM_CONFIG.innerGrooveAngle &&
+          !event.tooFast && !isPhysicalCartridgeDrop);
       const validDrop = state.hasRecord && inGroove &&
         isFiniteNonNegative(event.position) && validStart && !event.tooFast && !isPhysicalCartridgeDrop;
       if (!validDrop) {

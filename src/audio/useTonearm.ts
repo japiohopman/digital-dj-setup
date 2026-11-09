@@ -66,6 +66,8 @@ export function useTonearm({
   const pointerStartRef = useRef<PointerStart | null>(null);
   const activePointerElementRef = useRef<HTMLElement | null>(null);
   const currentAngleRef = useRef(config.parkAngle);
+  const lastPlaybackTimeRef = useRef<number | null>(null);
+  const wasDraggingRef = useRef(false);
 
   const isDragging = armInteraction === 'dragging';
   const isNeedleDown = armState === 'needle-down';
@@ -92,16 +94,56 @@ export function useTonearm({
   }, [armInteraction]);
 
   useEffect(() => {
-    if (armState !== 'needle-down' || isDragging || duration <= 0) return;
+    if (armInteraction === 'dragging' || isDragging) {
+      wasDraggingRef.current = true;
+      return;
+    }
+
+    // Preserve the exact physical drop angle until the transport publishes its
+    // new playhead. Syncing stale currentTime here used to snap the arm back.
+    if (wasDraggingRef.current) {
+      wasDraggingRef.current = false;
+      lastPlaybackTimeRef.current = currentTime;
+      if (transportPhase === 'ended' && armState === 'needle-down') {
+        setArmPosition(config.runoutAngle);
+      }
+      return;
+    }
+
+    if (armState === 'parked') {
+      lastPlaybackTimeRef.current = currentTime;
+      setArmPosition(config.parkAngle);
+      return;
+    }
+
+    if (armState !== 'needle-down' || duration <= 0) {
+      lastPlaybackTimeRef.current = currentTime;
+      return;
+    }
+
+    if (transportPhase === 'ended') {
+      lastPlaybackTimeRef.current = currentTime;
+      setArmPosition(config.runoutAngle);
+      return;
+    }
+
+    const hasFreshPlaybackTime =
+      lastPlaybackTimeRef.current === null || currentTime !== lastPlaybackTimeRef.current;
+    lastPlaybackTimeRef.current = currentTime;
+    if (!hasFreshPlaybackTime) return;
+
     const progress = Math.max(0, Math.min(1, currentTime / duration));
     setArmPosition(playbackProgressToAngle(progress, config));
-  }, [armState, isDragging, currentTime, duration, config, setArmPosition]);
-
-  useEffect(() => {
-    if (armState === 'parked' && !isDragging) {
-      setArmPosition(config.parkAngle);
-    }
-  }, [armState, isDragging, config.parkAngle, setArmPosition]);
+  }, [
+    armState,
+    armInteraction,
+    isDragging,
+    currentTime,
+    duration,
+    transportPhase,
+    config,
+    setArmPosition,
+  ]);
 
   const getCuePosition = useCallback((angle: number) => {
     const progress = angleToPlaybackProgress(angle, config);

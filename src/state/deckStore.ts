@@ -221,9 +221,9 @@ export function createDeckStore(
             if (wrongDrop) {
               sequenceNeedleDrop('wrong', event.position);
             } else if (firstDrop) {
-              // The correct lead-in sound must finish before the MP3/WAV and
-              // vinyl crackle start together from the beginning of the track.
-              sequenceNeedleDrop('correct', 0);
+              // The impact cue finishes before programme audio and vinyl
+              // crackle start together at the actual needle's timecode position.
+              sequenceNeedleDrop('correct', event.position);
             } else if (previous.transport === 'playing') {
               transport?.seek(event.position);
             } else if (next.transport === 'playing') {
