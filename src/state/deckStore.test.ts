@@ -119,6 +119,34 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
+  it('starts the selected timecode even when the rendered transport snapshot already says playing', async () => {
+    const transport = makeTransport({
+      isLoaded: true,
+      isPlaying: true,
+      playbackState: 'playing',
+    });
+    const store = createDeckStore(transport);
+
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 22,
+      wasAlreadyNeedleDown: false,
+      position: 35,
+      grip: 'arm',
+      surface: 'record',
+    });
+
+    expect(transport.playNeedleDropSound).toHaveBeenCalledWith('correct');
+    await flushMicrotasks();
+
+    // seek() repositions an active source; play() is still issued so a stale
+    // React snapshot cannot leave a stopped engine silent.
+    expect(transport.seek).toHaveBeenCalledWith(35);
+    expect(transport.play).toHaveBeenCalledWith(35);
+    expect(store.getState().machine.transport).toBe('playing');
+    store.getState().dispose();
+  });
+
   it('rejects a wrong needle drop without opening the stylus gate', () => {
     const transport = makeTransport({ isLoaded: true });
     const store = createDeckStore(transport);
