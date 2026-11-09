@@ -35,9 +35,9 @@ describe('useTonearm', () => {
       { initialProps: { currentTime: 0, armState: 'needle-down' as const } }
     );
 
-    // outer: 24, inner: 47 -> at 50% (50s) progress = 35.5
+    // LP outer: 22.75, inner: 47 -> at 50% (50s) progress = 34.875
     rerender({ currentTime: 50, armState: 'needle-down' });
-    expect(result.current.armAngle).toBe(35.5);
+    expect(result.current.armAngle).toBeCloseTo(34.875, 5);
   });
 
   it('dispatches ARM_LIFTED and ARM_PARKED on lift and park', () => {
@@ -106,7 +106,7 @@ describe('useTonearm', () => {
       } as unknown as React.KeyboardEvent<HTMLElement>);
     });
 
-    expect(result.current.armAngle).toBeCloseTo(28.6);
+    expect(result.current.armAngle).toBeCloseTo(27.6, 5);
     expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ARM_CUE' }));
   });
 
