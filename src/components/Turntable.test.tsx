@@ -8,7 +8,8 @@ describe('Turntable deck configuration and isolation', () => {
   it('renders a fully powered and spinning deck by default', () => {
     const markup = renderToStaticMarkup(<Turntable deckLabel="DECK 01" />);
 
-    expect(markup).toContain('class="turntable power-on motor-on has-record"');
+    expect(markup).toContain('class="turntable power-on motor-on has-slipmat"');
+    expect(markup).not.toContain('has-record');
     expect(markup).toContain('aria-pressed="true"');
     expect(markup).toContain('aria-label="DECK 01 Start / Stop" aria-pressed="true"');
   });
@@ -31,7 +32,8 @@ describe('Turntable deck configuration and isolation', () => {
       <Turntable deckLabel="DECK 01" initiallyPowered initiallyMotorOn={false} />,
     );
 
-    expect(markup).toContain('class="turntable power-on has-record"');
+    expect(markup).toContain('class="turntable power-on has-slipmat"');
+    expect(markup).not.toContain('has-record');
     expect(markup).not.toContain('motor-on');
   });
 
@@ -42,6 +44,16 @@ describe('Turntable deck configuration and isolation', () => {
 
     expect(markup).toContain('has-slipmat');
     expect(markup).not.toContain('has-record');
+  });
+
+  it('shows the slipmat by default when no track is loaded', () => {
+    const markup = renderToStaticMarkup(<Turntable deckLabel="DECK 01" />);
+
+    expect(markup).toContain('has-slipmat');
+    expect(markup).not.toContain('has-record');
+    expect(markup).toContain('tonearm-tube-target');
+    expect(markup).toContain('data-tonearm-grip="arm"');
+    expect(markup).toContain('data-tonearm-grip="cartridge"');
   });
 
   it('isolates initial configuration between independent deck instances', () => {
