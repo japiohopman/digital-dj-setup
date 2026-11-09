@@ -62,7 +62,7 @@ describe('tonearmGeometry', () => {
     expect(isAngleAtOuterLeadIn(16.5)).toBe(true);
     expect(isAngleAtOuterLeadIn(16.51)).toBe(false);
     expect(isAngleAtOuterLeadIn(22)).toBe(false);
-    expect(DEFAULT_TONEARM_CONFIG.needleDropMinAngle).toBe(14.7);
+    expect(DEFAULT_TONEARM_CONFIG.needleDropMinAngle).toBe(13.3);
     expect(DEFAULT_TONEARM_CONFIG.needleDropMaxAngle).toBe(16.5);
   });
 
