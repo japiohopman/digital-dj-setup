@@ -169,7 +169,7 @@ describe('deck state machine', () => {
     });
     expect(state.tonearm).toBe('off-record');
     expect(selectIsTrackAudible(state)).toBe(false);
-    expect(selectRecordSoundState(state)).toBe('off-record');
+    expect(selectRecordSoundState(state)).toBe('stopped');
 
     state = apply(state, { type: 'ARM_LIFTED' });
     expect(selectRecordSoundState(state)).toBe('stopped');
@@ -297,12 +297,12 @@ describe('deck state machine', () => {
     expect(state.transport).toBe('scratching');
     expect(state.scratchResumeTransport).toBe('playing');
     expect(selectIsTrackAudible(state)).toBe(false);
-    expect(selectRecordSoundState(state)).toBe('off-record');
+    expect(selectRecordSoundState(state)).toBe('stopped');
 
     const ended = apply(state, { type: 'SCRATCH_ENDED' });
     expect(ended.transport).toBe('playing');
     expect(selectIsTrackAudible(ended)).toBe(false);
-    expect(selectRecordSoundState(ended)).toBe('off-record');
+    expect(selectRecordSoundState(ended)).toBe('stopped');
   });
 
   it('does not turn a paused track into playback when scratch ends', () => {
