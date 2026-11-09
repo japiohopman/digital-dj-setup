@@ -97,6 +97,12 @@ export function useTonearm({
     setArmPosition(playbackProgressToAngle(progress, config));
   }, [armState, isDragging, currentTime, duration, config, setArmPosition]);
 
+  useEffect(() => {
+    if (armState === 'parked' && !isDragging) {
+      setArmPosition(config.parkAngle);
+    }
+  }, [armState, isDragging, config.parkAngle, setArmPosition]);
+
   const getCuePosition = useCallback((angle: number) => {
     const progress = angleToPlaybackProgress(angle, config);
     return progress !== null && duration > 0
