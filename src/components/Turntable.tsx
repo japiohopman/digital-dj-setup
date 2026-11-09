@@ -547,7 +547,7 @@ export function Turntable({
         <div className="model-badge" aria-hidden="true">
           <span className="model-badge-brand">Technics</span>
           <span className="model-badge-subtitle">
-            direct drive turntable system · {modelName === 'SL-1200 MK2' ? 'SL-1200SP' : modelName}
+            direct drive turntable system {modelName === 'SL-1200 MK2' ? 'SL-1200SP' : modelName}
           </span>
         </div>
 
