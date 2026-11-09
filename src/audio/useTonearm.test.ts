@@ -40,6 +40,26 @@ describe('useTonearm', () => {
     expect(result.current.armAngle).toBeCloseTo(34.875, 5);
   });
 
+  it('returns the tonearm to its cradle when a new track is loaded', () => {
+    const dispatch = vi.fn(() => true);
+    const { result, rerender } = renderHook(
+      ({ currentTime, armState }) => useTonearm({
+        duration: 100,
+        currentTime,
+        armState,
+        armInteraction: 'idle',
+        dispatch,
+      }),
+      { initialProps: { currentTime: 50, armState: 'needle-down' as const } },
+    );
+
+    expect(result.current.armAngle).toBeCloseTo(34.875, 5);
+
+    // TRACK_LOAD_REQUESTED parks the arm before replacing the record.
+    rerender({ currentTime: 0, armState: 'parked' });
+    expect(result.current.armAngle).toBe(0);
+  });
+
   it('dispatches ARM_LIFTED and ARM_PARKED on lift and park', () => {
     const dispatch = vi.fn(() => true);
 
