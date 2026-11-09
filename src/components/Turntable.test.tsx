@@ -90,11 +90,8 @@ describe('Turntable static markup', () => {
     expect(markup).toContain('aria-label="DECK 01 Target light"');
     expect(markup).toContain('aria-label="DECK 01 Pitch Control"');
     expect(markup).toContain('aria-label="DECK 01 pitch slider"');
-    expect(markup).toContain('aria-label="DECK 01 tonearm measurement"');
-    expect(markup).toContain('aria-live="polite">0.00°</output>');
-    expect(markup).toContain('aria-label="DECK 01 Capture groove start angle"');
-    expect(markup).toContain('aria-label="DECK 01 Capture groove end angle"');
-    expect(markup).toContain('data-testid="tonearm-reach-readout">—</output>');
+    // The calibration meter is mounted in a body portal, not in the deck's static markup.
+    expect(markup).not.toContain('tonearm-meter-panel');
     expect(markup).toContain('aria-label="DECK 01 Reset pitch to 0%"');
     expect(markup).toContain('class="pitch-track"');
     expect(markup).toContain('class="pitch-knob"');
@@ -954,6 +951,23 @@ describe('Turntable interactive controls', () => {
     });
 
     expect(mockTransport.setStylusContact).toHaveBeenCalledWith(true);
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it('does not mount the floating calibration widget for an inactive deck', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Turntable deckLabel="INACTIVE" showTonearmMeter={false} />);
+    });
+
+    expect(document.body.querySelector('[data-dev-widget="tonearm-angle-meter"]')).toBeNull();
 
     await act(async () => {
       root.unmount();
