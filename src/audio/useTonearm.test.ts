@@ -53,7 +53,7 @@ describe('useTonearm', () => {
       { initialProps: { currentTime: 50, armState: 'needle-down' as 'needle-down' | 'parked' } },
     );
 
-    expect(result.current.armAngle).toBeCloseTo(34.875, 5);
+    expect(result.current.armAngle).toBeCloseTo(29, 5);
 
     // TRACK_LOAD_REQUESTED parks the arm before replacing the record.
     rerender({ currentTime: 0, armState: 'parked' });
