@@ -1,0 +1,56 @@
+.deck-state-trace-panel {
+  position: fixed;
+  left: max(10px, env(safe-area-inset-left));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 10980;
+  width: min(320px, calc(100vw - 20px));
+  max-height: min(45vh, 320px);
+  overflow: auto;
+  padding: 7px 9px;
+  border: 1px solid rgba(197, 154, 88, 0.4);
+  border-radius: 5px;
+  color: rgba(235, 235, 235, 0.86);
+  background: rgba(13, 16, 18, 0.94);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(9px);
+  font: 0.62rem/1.35 'SF Mono', Monaco, Consolas, monospace;
+}
+
+.deck-state-trace summary {
+  cursor: pointer;
+  user-select: none;
+  letter-spacing: 0.04em;
+  color: #d5ad70;
+}
+
+.deck-state-trace dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.8rem;
+  margin: 0.35rem 0;
+}
+
+.deck-state-trace dl div {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.deck-state-trace dt {
+  opacity: 0.6;
+}
+
+.deck-state-trace dd {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.deck-state-trace ol {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.deck-state-trace li[data-accepted="false"] {
+  color: #f0a27b;
+}
