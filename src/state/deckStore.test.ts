@@ -26,6 +26,7 @@ function makeTransport(overrides: Partial<DeckTransport> = {}): DeckTransport {
     pause: vi.fn(),
     stop: vi.fn(),
     togglePlayPause: vi.fn().mockResolvedValue(undefined),
+    beginScratch: vi.fn(),
     scratch: vi.fn(),
     endScratch: vi.fn(),
     seek: vi.fn(),
@@ -238,25 +239,32 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
-  it('treats the cartridge as a normal pickup grip, not a wrong needle drop', async () => {
-    const transport = makeTransport({ isLoaded: true });
+  it('uses the wrong-drop cue and calibrated offset when the cartridge is grabbed', async () => {
+    let finishCue: (() => void) | undefined;
+    const transport = makeTransport({
+      isLoaded: true,
+      playNeedleDropSound: vi.fn(() => new Promise<void>((resolve) => { finishCue = resolve; })),
+    });
     const store = createDeckStore(transport);
 
     store.getState().dispatch({
       type: 'ARM_DROPPED',
       angle: 25,
       wasAlreadyNeedleDown: false,
-      position: 50,
+      position: 30,
       grip: 'cartridge',
       surface: 'record',
     });
 
     expect(store.getState().machine.tonearm).toBe('needle-down');
-    expect(transport.playNeedleDropSound).toHaveBeenCalledWith('correct');
+    expect(transport.playNeedleDropSound).toHaveBeenCalledWith('wrong');
+    expect(transport.play).not.toHaveBeenCalled();
+
+    finishCue?.();
     await flushMicrotasks();
-    expect(transport.play).toHaveBeenCalledWith(50);
+    expect(transport.play).toHaveBeenCalledWith(30);
+    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('on-record');
     expect(transport.setStylusContact).toHaveBeenLastCalledWith(true);
-    expect(store.getState().machine.transport).toBe('playing');
     store.getState().dispose();
   });
 
@@ -323,6 +331,7 @@ describe('per-deck Zustand adapter', () => {
 
     expect(store.getState().machine.transport).toBe('playing');
     expect(store.getState().dispatch({ type: 'SCRATCH_STARTED' })).toBe(true);
+    expect(transport.beginScratch).toHaveBeenCalledTimes(1);
     expect(store.getState().machine.transport).toBe('scratching');
     expect(transport.setStylusContact).toHaveBeenLastCalledWith(false);
     expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('stopped');
