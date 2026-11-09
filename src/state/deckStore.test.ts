@@ -238,33 +238,25 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
-  it('plays the wrong-drop cue before restarting at 30 seconds when the cartridge is grabbed', async () => {
-    let finishCue: (() => void) | undefined;
-    const transport = makeTransport({
-      isLoaded: true,
-      playNeedleDropSound: vi.fn(() => new Promise<void>((resolve) => { finishCue = resolve; })),
-    });
+  it('treats the cartridge as a normal pickup grip, not a wrong needle drop', async () => {
+    const transport = makeTransport({ isLoaded: true });
     const store = createDeckStore(transport);
 
     store.getState().dispatch({
       type: 'ARM_DROPPED',
       angle: 25,
       wasAlreadyNeedleDown: false,
-      position: 30,
+      position: 50,
       grip: 'cartridge',
       surface: 'record',
     });
 
     expect(store.getState().machine.tonearm).toBe('needle-down');
-    expect(transport.playNeedleDropSound).toHaveBeenCalledWith('wrong');
-    expect(transport.play).not.toHaveBeenCalled();
-
-    finishCue?.();
+    expect(transport.playNeedleDropSound).toHaveBeenCalledWith('correct');
     await flushMicrotasks();
-
-    expect(transport.seek).toHaveBeenCalledWith(30);
-    expect(transport.play).toHaveBeenCalledWith(30);
-    expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('on-record');
+    expect(transport.play).toHaveBeenCalledWith(50);
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(true);
+    expect(store.getState().machine.transport).toBe('playing');
     store.getState().dispose();
   });
 
