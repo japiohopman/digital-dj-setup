@@ -971,24 +971,26 @@ describe('Turntable interactive controls', () => {
     });
 
     const tonearm = container.querySelector('.tonearm') as HTMLElement;
-    const startButton = container.querySelector(
+    const startButton = document.body.querySelector(
       'button[aria-label="MEASURE Capture groove start angle"]',
     ) as HTMLButtonElement;
-    const endButton = container.querySelector(
+    const endButton = document.body.querySelector(
       'button[aria-label="MEASURE Capture groove end angle"]',
     ) as HTMLButtonElement;
+    expect(container.querySelector('[data-dev-widget="tonearm-angle-meter"]')).toBeNull();
+    expect(document.body.querySelector('[data-dev-widget="tonearm-angle-meter"]')).not.toBeNull();
 
     await act(async () => {
       for (let step = 0; step < 6; step++) {
         tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
       }
     });
-    expect(container.querySelector('[data-testid="tonearm-angle-readout"]')?.textContent).toBe('12.00°');
+    expect(document.body.querySelector('[data-testid="tonearm-angle-readout"]')?.textContent).toBe('12.00°');
 
     await act(async () => {
       startButton.click();
     });
-    expect(container.querySelector('[data-testid="tonearm-start-readout"]')?.textContent).toBe('12.00°');
+    expect(document.body.querySelector('[data-testid="tonearm-start-readout"]')?.textContent).toBe('12.00°');
 
     await act(async () => {
       for (let step = 0; step < 5; step++) {
@@ -999,9 +1001,9 @@ describe('Turntable interactive controls', () => {
       endButton.click();
     });
 
-    expect(container.querySelector('[data-testid="tonearm-angle-readout"]')?.textContent).toBe('22.00°');
-    expect(container.querySelector('[data-testid="tonearm-end-readout"]')?.textContent).toBe('22.00°');
-    expect(container.querySelector('[data-testid="tonearm-reach-readout"]')?.textContent).toBe('10.00°');
+    expect(document.body.querySelector('[data-testid="tonearm-angle-readout"]')?.textContent).toBe('22.00°');
+    expect(document.body.querySelector('[data-testid="tonearm-end-readout"]')?.textContent).toBe('22.00°');
+    expect(document.body.querySelector('[data-testid="tonearm-reach-readout"]')?.textContent).toBe('10.00°');
 
     await act(async () => {
       root.unmount();
