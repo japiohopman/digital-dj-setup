@@ -1052,12 +1052,12 @@
   left: 50%;
   z-index: 10000;
   display: grid;
-  gap: 6px;
-  width: min(290px, calc(100vw - 20px));
+  gap: 4px;
+  width: min(286px, calc(100vw - 16px));
   max-height: calc(100vh - 20px);
   box-sizing: border-box;
   margin: 0;
-  padding: 8px 10px;
+  padding: 7px 8px;
   overflow-y: auto;
   transform: translate(-50%, -50%);
   color: #e5e7eb;
@@ -1074,33 +1074,32 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
 }
 
 .tonearm-meter-heading > div {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .tonearm-meter-title {
   color: #d5ad70;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 800;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
 }
 
-.tonearm-meter-subtitle,
-.tonearm-meter-hint {
+.tonearm-meter-subtitle {
   color: rgba(229, 231, 235, 0.68);
-  font-size: 8px;
-  line-height: 1.35;
+  font-size: 7px;
+  line-height: 1.2;
 }
 
 .tonearm-meter-live {
-  min-width: 78px;
+  min-width: 72px;
   color: #f8fafc;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.06em;
   text-align: right;
@@ -1109,13 +1108,13 @@
 
 .tonearm-meter-scale {
   position: relative;
-  height: 15px;
+  height: 13px;
   margin: 0 2px;
 }
 
 .tonearm-meter-track {
   position: absolute;
-  top: 6px;
+  top: 5px;
   left: 0;
   right: 0;
   height: 4px;
@@ -1129,7 +1128,7 @@
   top: 1px;
   z-index: 2;
   width: 2px;
-  height: 14px;
+  height: 12px;
   transform: translateX(-50%);
   border-radius: 2px;
 }
@@ -1153,10 +1152,10 @@
 
 .tonearm-meter-ticks {
   position: relative;
-  height: 10px;
+  height: 8px;
   margin: -5px 2px 0;
   color: rgba(229, 231, 235, 0.58);
-  font-size: 8px;
+  font-size: 7px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1176,15 +1175,15 @@
 .tonearm-meter-readings {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 5px;
+  gap: 4px;
 }
 
 .tonearm-meter-readings > div {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 2px;
-  padding: 5px 6px;
+  gap: 1px;
+  padding: 3px 5px;
   background: rgba(255, 255, 255, 0.055);
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 4px;
@@ -1192,14 +1191,14 @@
 
 .tonearm-meter-readings span {
   color: rgba(229, 231, 235, 0.64);
-  font-size: 8px;
+  font-size: 7px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
 }
 
 .tonearm-meter-readings output {
   color: #f3f4f6;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -1210,18 +1209,19 @@
 
 .tonearm-meter-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 4px;
 }
 
 .tonearm-meter-button,
 .tonearm-meter-clear {
-  min-height: 28px;
-  padding: 5px 6px;
+  min-height: 26px;
+  padding: 4px 5px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 4px;
   color: #e5e7eb;
-  font: 700 9px/1.2 'SF Mono', Monaco, Consolas, monospace;
+  font: 700 8px/1.15 'SF Mono', Monaco, Consolas, monospace;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -1235,7 +1235,6 @@
 }
 
 .tonearm-meter-clear {
-  grid-column: 1 / -1;
   background: rgba(50, 50, 50, 0.82);
 }
 
@@ -1244,28 +1243,11 @@
   cursor: not-allowed;
 }
 
-.tonearm-meter-hint {
-  margin: 0;
-}
-
-@media (max-width: 480px) {
+@media (orientation: portrait) {
   .tonearm-meter-panel {
-    width: min(280px, calc(100vw - 16px));
-    padding: 7px 8px;
-    gap: 5px;
-  }
-
-  .tonearm-meter-live {
-    font-size: 20px;
-  }
-
-  .tonearm-meter-readings > div {
-    padding: 4px;
-  }
-
-  .tonearm-meter-button,
-  .tonearm-meter-clear {
-    min-height: 30px;
-    font-size: 8px;
+    top: auto;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
   }
 }
