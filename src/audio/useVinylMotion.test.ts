@@ -37,13 +37,17 @@ describe('vinyl scratch motion helpers', () => {
     expect(calculateScratchSpeedMagnitude(0.02, 0)).toBe(0);
   });
 
-  it('keeps scratch position relative to the track position at gesture start', () => {
+  it('uses absolute platter angle as the only track timecode, in both directions', () => {
     const rps = 33.3333 / 60;
-    const radiansForTenSeconds = 10 * 2 * Math.PI * rps;
-    expect(calculateScratchTrackPosition(42, radiansForTenSeconds, rps, 100)).toBeCloseTo(52);
-    expect(calculateScratchTrackPosition(42, -radiansForTenSeconds, rps, 100)).toBeCloseTo(32);
-    expect(calculateScratchTrackPosition(98, radiansForTenSeconds, rps, 100)).toBe(100);
-    expect(calculateScratchTrackPosition(2, -radiansForTenSeconds, rps, 100)).toBe(0);
+    const angleFor42Seconds = 42 * 2 * Math.PI * rps;
+    const angleFor52Seconds = 52 * 2 * Math.PI * rps;
+    const angleFor32Seconds = 32 * 2 * Math.PI * rps;
+
+    expect(calculateScratchTrackPosition(angleFor42Seconds, rps, 100)).toBeCloseTo(42);
+    expect(calculateScratchTrackPosition(angleFor52Seconds, rps, 100)).toBeCloseTo(52);
+    expect(calculateScratchTrackPosition(angleFor32Seconds, rps, 100)).toBeCloseTo(32);
+    expect(calculateScratchTrackPosition(120 * 2 * Math.PI * rps, rps, 100)).toBe(100);
+    expect(calculateScratchTrackPosition(-2 * Math.PI * rps, rps, 100)).toBe(0);
   });
 });
 
@@ -143,6 +147,13 @@ describe('useVinylMotion physical platter input', () => {
     const expectedAngle = 42 * (33.3333 / 60) * Math.PI * 2;
     expect(transport.getCurrentTime).toHaveBeenCalledTimes(1);
     expect(result.current.angle).toBeCloseTo(expectedAngle, 6);
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SCRATCH_STARTED' });
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'SCRATCH_MOVED',
+      speed: 0,
+      reversed: false,
+      position: 42,
+    });
 
     const pointerUp = new Event('pointerup') as Event & { pointerId: number };
     Object.defineProperty(pointerUp, 'pointerId', { value: 10 });
