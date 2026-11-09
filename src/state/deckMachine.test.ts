@@ -226,6 +226,22 @@ describe('deck state machine', () => {
     expect(selectRecordSoundState(state)).toBe('stopped');
   });
 
+  it('accepts a correct groove drop when the cartridge is the pickup grip', () => {
+    const state = createInitialDeckState({ trackLoaded: true });
+    const result = transitionDeck(state, {
+      type: 'ARM_DROPPED',
+      angle: 25,
+      wasAlreadyNeedleDown: false,
+      position: 50,
+      grip: 'cartridge',
+      surface: 'record',
+    });
+
+    expect(result.state.tonearm).toBe('needle-down');
+    expect(result.state.transport).toBe('playing');
+    expect(result.state.hasValidNeedleDrop).toBe(true);
+  });
+
   it('keeps the run-out loop playing after the track ends until the needle lifts', () => {
     let state = createInitialDeckState({ trackLoaded: true });
     state = apply(state, {
