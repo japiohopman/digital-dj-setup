@@ -162,11 +162,8 @@ export function createDeckStore(
         !previous.hasStartedCurrentRecord &&
         !event.wasAlreadyNeedleDown &&
         !event.tooFast;
-      const isWrongNeedleDrop = event.type === 'ARM_DROPPED' &&
-        next.tonearm === 'needle-down' &&
-        event.tooFast === true;
       if (!isHighFrequencyEvent(event)) {
-        syncAudioGates(next, isFirstCorrectDrop || isWrongNeedleDrop);
+        syncAudioGates(next, isFirstCorrectDrop);
       }
 
       switch (event.type) {
