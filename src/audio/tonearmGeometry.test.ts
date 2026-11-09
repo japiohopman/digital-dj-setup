@@ -3,11 +3,7 @@ import {
   DEFAULT_TONEARM_CONFIG,
   LP_OUTER_GROOVE_ANGLE,
   LP_RECORD_EDGE_ANGLE,
-  LP_TONEARM_CONFIG,
   SEVEN_INCH_OUTER_GROOVE_ANGLE,
-  SEVEN_INCH_RECORD_EDGE_ANGLE,
-  SEVEN_INCH_TONEARM_CONFIG,
-  getTonearmConfig,
   angleToPlaybackProgress,
   classifyTonearmLandingSurface,
   calculateArmPointerBearingFromPointer,
@@ -21,10 +17,8 @@ import {
 describe('tonearmGeometry', () => {
   it('identifies the playable groove range', () => {
     expect(isAngleInPlayableRecord(0)).toBe(false);
-    expect(isAngleInPlayableRecord(10.9)).toBe(false);
-    expect(isAngleInPlayableRecord(11)).toBe(true);
-    expect(isAngleInPlayableRecord(20)).toBe(true);
-    expect(isAngleInPlayableRecord(22.5)).toBe(true);
+    expect(isAngleInPlayableRecord(20)).toBe(false);
+    expect(isAngleInPlayableRecord(22.5)).toBe(false);
     expect(isAngleInPlayableRecord(LP_OUTER_GROOVE_ANGLE)).toBe(true);
     expect(isAngleInPlayableRecord(24)).toBe(true);
     expect(isAngleInPlayableRecord(35)).toBe(true);
@@ -35,8 +29,8 @@ describe('tonearmGeometry', () => {
   it('maps playback progress to the complete arm travel and back', () => {
     expect(playbackProgressToAngle(0)).toBe(LP_OUTER_GROOVE_ANGLE);
     expect(angleToPlaybackProgress(LP_OUTER_GROOVE_ANGLE)).toBeCloseTo(0, 5);
-    expect(playbackProgressToAngle(0.5)).toBeCloseTo(29, 5);
-    expect(angleToPlaybackProgress(29)).toBeCloseTo(0.5, 5);
+    expect(playbackProgressToAngle(0.5)).toBeCloseTo(34.875, 5);
+    expect(angleToPlaybackProgress(34.875)).toBeCloseTo(0.5, 5);
     expect(playbackProgressToAngle(1)).toBe(47);
     expect(angleToPlaybackProgress(47)).toBeCloseTo(1, 5);
     expect(angleToPlaybackProgress(0)).toBeNull();
@@ -87,38 +81,26 @@ describe('tonearmGeometry', () => {
     expect(landscapeBearing).toBeCloseTo(portraitBearing, 5);
   });
 
-  it('uses 11 degrees for LP and preserves 24 degrees for seven-inch records', () => {
-    expect(LP_OUTER_GROOVE_ANGLE).toBe(11);
-    expect(LP_RECORD_EDGE_ANGLE).toBe(8.5);
-    expect(DEFAULT_TONEARM_CONFIG).toBe(LP_TONEARM_CONFIG);
-    expect(DEFAULT_TONEARM_CONFIG.outerGrooveAngle).toBe(11);
-    expect(DEFAULT_TONEARM_CONFIG.recordEdgeAngle).toBe(8.5);
-    expect(isAngleAtOuterLeadIn(11)).toBe(true);
-    expect(isAngleAtOuterLeadIn(13.5)).toBe(true);
-    expect(isAngleAtOuterLeadIn(13.5001)).toBe(false);
-
+  it('uses an LP lead-in halfway between the existing vinyl edge and 7-inch start', () => {
     expect(SEVEN_INCH_OUTER_GROOVE_ANGLE).toBe(24);
-    expect(SEVEN_INCH_RECORD_EDGE_ANGLE).toBe(21.5);
-    expect(SEVEN_INCH_TONEARM_CONFIG.outerGrooveAngle).toBe(24);
-    expect(SEVEN_INCH_TONEARM_CONFIG.recordEdgeAngle).toBe(21.5);
-    expect(getTonearmConfig('7-inch')).toBe(SEVEN_INCH_TONEARM_CONFIG);
-    expect(isAngleAtOuterLeadIn(24, SEVEN_INCH_TONEARM_CONFIG)).toBe(true);
-    expect(isAngleAtOuterLeadIn(26.5, SEVEN_INCH_TONEARM_CONFIG)).toBe(true);
-    expect(isAngleAtOuterLeadIn(26.5001, SEVEN_INCH_TONEARM_CONFIG)).toBe(false);
-    expect(getTonearmConfig('lp')).toBe(LP_TONEARM_CONFIG);
+    expect(LP_RECORD_EDGE_ANGLE).toBe(21.5);
+    expect(LP_OUTER_GROOVE_ANGLE).toBe(22.75);
+    expect(DEFAULT_TONEARM_CONFIG.outerGrooveAngle).toBe(22.75);
+    expect(DEFAULT_TONEARM_CONFIG.recordEdgeAngle).toBe(21.5);
+    expect(isAngleAtOuterLeadIn(22.75)).toBe(true);
+    expect(isAngleAtOuterLeadIn(24)).toBe(true);
+    expect(isAngleAtOuterLeadIn(25.25)).toBe(true);
+    expect(isAngleAtOuterLeadIn(25.5)).toBe(false);
+    expect(isAngleAtOuterLeadIn(35)).toBe(false);
   });
 
-  it('classifies the physical vinyl edge separately for LP and seven-inch records', () => {
+  it('distinguishes the parked cradle, Technics plinth and vinyl surface', () => {
     expect(classifyTonearmLandingSurface(0)).toBe('air');
-    expect(classifyTonearmLandingSurface(8.49)).toBe('plinth');
-    expect(classifyTonearmLandingSurface(8.5)).toBe('record');
-    expect(classifyTonearmLandingSurface(16)).toBe('record');
-    expect(classifyTonearmLandingSurface(21.49)).toBe('record');
+    expect(classifyTonearmLandingSurface(16)).toBe('plinth');
+    expect(classifyTonearmLandingSurface(21.49)).toBe('plinth');
     expect(classifyTonearmLandingSurface(21.5)).toBe('record');
-
-    expect(classifyTonearmLandingSurface(16, SEVEN_INCH_TONEARM_CONFIG)).toBe('plinth');
-    expect(classifyTonearmLandingSurface(21.49, SEVEN_INCH_TONEARM_CONFIG)).toBe('plinth');
-    expect(classifyTonearmLandingSurface(21.5, SEVEN_INCH_TONEARM_CONFIG)).toBe('record');
+    expect(classifyTonearmLandingSurface(22)).toBe('record');
+    expect(classifyTonearmLandingSurface(25)).toBe('record');
   });
 
   it('unwraps pointer bearings continuously across the 180 degree boundary', () => {

@@ -3,7 +3,6 @@ import {
   DEFAULT_TONEARM_CONFIG,
   isAngleAtOuterLeadIn,
   isAngleInPlayableRecord,
-  type TonearmConfig,
   type TonearmState,
 } from '../audio/tonearmGeometry';
 
@@ -152,11 +151,7 @@ const reject = (state: DeckMachineState, reason: string): DeckTransition => ({
 
 const isFiniteNonNegative = (value: number) => Number.isFinite(value) && value >= 0;
 
-export function transitionDeck(
-  state: DeckMachineState,
-  event: DeckEvent,
-  tonearmConfig: TonearmConfig = DEFAULT_TONEARM_CONFIG,
-): DeckTransition {
+export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckTransition {
   switch (event.type) {
     case 'POWER_TOGGLED': {
       if (state.power === 'on') {
@@ -260,10 +255,9 @@ export function transitionDeck(
       if (state.armInteraction === 'dragging') return reject(state, 'Tonearm already has an active pointer');
       return accept({
         ...state,
-        hasValidNeedleDrop: false,
         tonearm: 'lifted',
         armInteraction: 'dragging',
-      }, 'Tonearm picked up: initial-drop eligibility reset and stylus gate closes');
+      }, 'Tonearm picked up: stylus gate closes; motor state is unchanged');
 
     case 'ARM_DRAG_CANCELLED':
       if (state.armInteraction !== 'dragging') return reject(state, 'No active tonearm drag to cancel');
@@ -274,26 +268,24 @@ export function transitionDeck(
       }, 'Tonearm drag cancelled safely; stylus remains lifted');
 
     case 'ARM_DROPPED': {
-      const atRest = event.angle <= tonearmConfig.parkAngle + 2;
+      const atRest = event.angle <= DEFAULT_TONEARM_CONFIG.parkAngle + 2;
       if (atRest || event.surface === 'air') {
         return accept({
           ...state,
-          hasValidNeedleDrop: false,
           tonearm: 'parked',
           armInteraction: 'idle',
-        }, 'Tonearm returned to its cradle; drop eligibility reset');
+        }, 'Tonearm returned to its cradle');
       }
 
       if (event.surface === 'plinth' && state.hasRecord) {
         return accept({
           ...state,
-          hasValidNeedleDrop: false,
           tonearm: 'off-record',
           armInteraction: 'idle',
-        }, 'Stylus landed on the Technics plinth: drop eligibility reset and program audio stays muted');
+        }, 'Stylus landed on the Technics plinth: program audio stays muted');
       }
 
-      const inGroove = isAngleInPlayableRecord(event.angle, tonearmConfig);
+      const inGroove = isAngleInPlayableRecord(event.angle);
       const isPhysicalCartridgeDrop = event.grip === 'cartridge';
       const isWrongGrooveDrop = state.hasRecord && inGroove &&
         isFiniteNonNegative(event.position) && isPhysicalCartridgeDrop;
@@ -308,14 +300,13 @@ export function transitionDeck(
         return accept(next, 'Incorrect cartridge/fast drop on vinyl: use wrong-drop cue and offset start');
       }
 
-      const validStart = state.hasValidNeedleDrop ||
-        (isAngleAtOuterLeadIn(event.angle, tonearmConfig) && !event.tooFast && !isPhysicalCartridgeDrop);
+      const validStart = state.hasValidNeedleDrop || event.wasAlreadyNeedleDown ||
+        (isAngleAtOuterLeadIn(event.angle) && !event.tooFast && !isPhysicalCartridgeDrop);
       const validDrop = state.hasRecord && inGroove &&
         isFiniteNonNegative(event.position) && validStart && !event.tooFast && !isPhysicalCartridgeDrop;
       if (!validDrop) {
         return accept({
           ...state,
-          hasValidNeedleDrop: false,
           tonearm: 'lifted',
           armInteraction: 'idle',
         }, state.hasRecord
@@ -336,25 +327,23 @@ export function transitionDeck(
     case 'ARM_LIFTED':
       return accept({
         ...state,
-        hasValidNeedleDrop: false,
         tonearm: 'lifted',
         armInteraction: 'idle',
-      }, 'Tonearm lifted: drop eligibility reset and audio muted without changing motor state');
+      }, 'Tonearm lifted: audio muted without changing motor state');
 
     case 'ARM_PARKED':
       return accept({
         ...state,
-        hasValidNeedleDrop: false,
         tonearm: 'parked',
         armInteraction: 'idle',
-      }, 'Tonearm parked: drop eligibility reset');
+      }, 'Tonearm parked in its cradle');
 
     case 'ARM_CUE':
       if (state.transport === 'scratching') {
         return reject(state, 'Cue movement is ignored during an active scratch gesture');
       }
       if (state.tonearm !== 'needle-down') return reject(state, 'Cue movement requires the stylus to be down');
-      if (!isAngleInPlayableRecord(event.angle, tonearmConfig)) {
+      if (!isAngleInPlayableRecord(event.angle)) {
         return accept({
           ...state,
           tonearm: 'lifted',

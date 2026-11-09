@@ -67,7 +67,7 @@ describe('per-deck Zustand adapter', () => {
     const store = createDeckStore(transport, { initiallyMotorOn: false, trackLoaded: true });
     store.getState().dispatch({ type: 'START_STOP_TOGGLED' });
     store.getState().dispatch({
-      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 42,
+      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 42,
     });
 
     await flushMicrotasks();
@@ -107,7 +107,7 @@ describe('per-deck Zustand adapter', () => {
     const transport = makeTransport({ isLoaded: true });
     const store = createDeckStore(transport);
     store.getState().dispatch({
-      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 0,
+      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
     });
 
     expect(transport.playNeedleDropSound).toHaveBeenCalledWith('correct');
@@ -147,7 +147,7 @@ describe('per-deck Zustand adapter', () => {
 
     store.getState().dispatch({
       type: 'ARM_DROPPED',
-      angle: 11,
+      angle: 25,
       wasAlreadyNeedleDown: false,
       position: 18,
       grip: 'arm',
@@ -186,7 +186,7 @@ describe('per-deck Zustand adapter', () => {
 
     store.getState().dispatch({
       type: 'ARM_DROPPED',
-      angle: 11,
+      angle: 25,
       wasAlreadyNeedleDown: false,
       position: 30,
       grip: 'cartridge',
@@ -212,7 +212,7 @@ describe('per-deck Zustand adapter', () => {
 
     store.getState().dispatch({
       type: 'ARM_DROPPED',
-      angle: 5,
+      angle: 16,
       wasAlreadyNeedleDown: false,
       position: 0,
       surface: 'plinth',
@@ -231,7 +231,7 @@ describe('per-deck Zustand adapter', () => {
     const transport = makeTransport({ isLoaded: true, isPlaying: true, playbackState: 'playing' });
     const store = createDeckStore(transport);
     store.getState().dispatch({
-      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 0,
+      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
     });
     store.getState().dispatch({ type: 'ARM_LIFTED' });
 
@@ -295,7 +295,7 @@ describe('per-deck Zustand adapter', () => {
 
     store.getState().dispatch({
       type: 'ARM_DROPPED',
-      angle: 11,
+      angle: 25,
       wasAlreadyNeedleDown: false,
       position: 0,
     });
@@ -322,7 +322,7 @@ describe('per-deck Zustand adapter', () => {
 
     store.getState().dispatch({
       type: 'ARM_DROPPED',
-      angle: 11,
+      angle: 25,
       wasAlreadyNeedleDown: false,
       position: 0,
       grip: 'arm',
@@ -345,7 +345,7 @@ describe('per-deck Zustand adapter', () => {
 
     store.getState().dispatch({
       type: 'ARM_DROPPED',
-      angle: 11,
+      angle: 25,
       wasAlreadyNeedleDown: false,
       position: 0,
       grip: 'arm',
@@ -373,7 +373,7 @@ describe('per-deck Zustand adapter', () => {
     const transport = makeTransport({ isLoaded: true, isPlaying: true, playbackState: 'playing' });
     const store = createDeckStore(transport);
     store.getState().dispatch({
-      type: 'ARM_DROPPED', angle: 11, wasAlreadyNeedleDown: false, position: 0,
+      type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
     });
     store.getState().dispatch({ type: 'POWER_TOGGLED' });
 

@@ -35,9 +35,9 @@ describe('useTonearm', () => {
       { initialProps: { currentTime: 0, armState: 'needle-down' as const } }
     );
 
-    // LP outer: 11, inner: 47 -> at 50% (50s) progress = 29
+    // LP outer: 22.75, inner: 47 -> at 50% (50s) progress = 34.875
     rerender({ currentTime: 50, armState: 'needle-down' });
-    expect(result.current.armAngle).toBeCloseTo(29, 5);
+    expect(result.current.armAngle).toBeCloseTo(34.875, 5);
   });
 
   it('returns the tonearm to its cradle when a new track is loaded', () => {
@@ -53,7 +53,7 @@ describe('useTonearm', () => {
       { initialProps: { currentTime: 50, armState: 'needle-down' as 'needle-down' | 'parked' } },
     );
 
-    expect(result.current.armAngle).toBeCloseTo(29, 5);
+    expect(result.current.armAngle).toBeCloseTo(34.875, 5);
 
     // TRACK_LOAD_REQUESTED parks the arm before replacing the record.
     rerender({ currentTime: 0, armState: 'parked' });
@@ -126,7 +126,7 @@ describe('useTonearm', () => {
       } as unknown as React.KeyboardEvent<HTMLElement>);
     });
 
-    expect(result.current.armAngle).toBeCloseTo(18.2, 5);
+    expect(result.current.armAngle).toBeCloseTo(27.6, 5);
     expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ARM_CUE' }));
   });
 
