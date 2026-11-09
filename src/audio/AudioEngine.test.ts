@@ -181,6 +181,54 @@ describe('AudioEngine', () => {
     engine.dispose();
   });
 
+  it('resolves a needle placement cue only after its one-shot source ends', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    })));
+    const engine = createEngine();
+
+    let resolved = false;
+    const cuePromise = engine.playNeedleDropSound('correct').then(() => {
+      resolved = true;
+    });
+
+    await vi.waitFor(() => expect(mockContext.createdSources).toHaveLength(1));
+    const cueSource = mockContext.createdSources[0];
+    expect(cueSource).toBeDefined();
+    await Promise.resolve();
+    expect(resolved).toBe(false);
+
+    cueSource?.onended?.();
+    await cuePromise;
+    expect(resolved).toBe(true);
+    expect(cueSource?.disconnect).toHaveBeenCalled();
+
+    engine.dispose();
+  });
+
+  it('uses the off-record loop as an endless run-out groove and stops it on state change', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    })));
+    const engine = createEngine();
+
+    engine.setRecordSoundState('runout');
+    await vi.waitFor(() => expect(mockContext.createdSources).toHaveLength(1));
+    await Promise.resolve();
+
+    const runoutSource = mockContext.createdSources[0];
+    expect(runoutSource).toBeDefined();
+    expect((runoutSource as unknown as { loop?: boolean }).loop).toBe(true);
+    expect(mockContext.createdSources).toHaveLength(1);
+
+    engine.setRecordSoundState('stopped');
+    await vi.advanceTimersByTimeAsync(110);
+    expect(runoutSource?.stop).toHaveBeenCalledOnce();
+    engine.dispose();
+  });
+
   it('initializes with default idle state', () => {
     const engine = createEngine();
     const state = engine.getState();
