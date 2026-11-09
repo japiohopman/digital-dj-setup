@@ -123,7 +123,7 @@ describe('per-deck Zustand adapter', () => {
     const transport = makeTransport({ isLoaded: true });
     const store = createDeckStore(transport);
     store.getState().dispatch({
-      type: 'ARM_DROPPED', angle: 22, wasAlreadyNeedleDown: false, position: 35, tooFast: true, surface: 'record',
+      type: 'ARM_DROPPED', angle: 36, wasAlreadyNeedleDown: false, position: 50, surface: 'record',
     });
 
     expect(transport.play).not.toHaveBeenCalled();
