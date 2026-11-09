@@ -518,6 +518,11 @@ export function Turntable({
             aria-valuemax={49}
             aria-valuenow={Math.round(armAngle)}
             aria-valuetext={`Tonearm ${armState}, ${Math.round(armAngle)} degrees`}
+            onPointerDown={onArmPointerDown}
+            onPointerMove={onArmPointerMove}
+            onPointerUp={onArmPointerUp}
+            onPointerCancel={onArmPointerCancel}
+            onLostPointerCapture={onArmLostPointerCapture}
             onKeyDown={onArmKeyDown}
           >
             {/* Separate touch targets preserve the difference between the arm tube and cartridge. */}
@@ -525,21 +530,11 @@ export function Turntable({
               className="tonearm-tube-target"
               data-tonearm-grip="arm"
               aria-hidden="true"
-              onPointerDown={onArmPointerDown}
-              onPointerMove={onArmPointerMove}
-              onPointerUp={onArmPointerUp}
-              onPointerCancel={onArmPointerCancel}
-              onLostPointerCapture={onArmLostPointerCapture}
             />
             <div
               className="tonearm-headshell-target"
               data-tonearm-grip="cartridge"
               aria-hidden="true"
-              onPointerDown={onArmPointerDown}
-              onPointerMove={onArmPointerMove}
-              onPointerUp={onArmPointerUp}
-              onPointerCancel={onArmPointerCancel}
-              onLostPointerCapture={onArmLostPointerCapture}
             />
           </div>
         </div>
