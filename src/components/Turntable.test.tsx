@@ -90,8 +90,6 @@ describe('Turntable static markup', () => {
     expect(markup).toContain('aria-label="DECK 01 Target light"');
     expect(markup).toContain('aria-label="DECK 01 Pitch Control"');
     expect(markup).toContain('aria-label="DECK 01 pitch slider"');
-    // The calibration meter is mounted in a body portal, not in the deck's static markup.
-    expect(markup).not.toContain('tonearm-meter-panel');
     expect(markup).toContain('aria-label="DECK 01 Reset pitch to 0%"');
     expect(markup).toContain('class="pitch-track"');
     expect(markup).toContain('class="pitch-knob"');
@@ -958,66 +956,29 @@ describe('Turntable interactive controls', () => {
     container.remove();
   });
 
-  it('does not mount the floating calibration widget for an inactive deck', async () => {
+  it('reports live arm angles without rendering developer tools inside the deck', async () => {
+    const reportedAngles: number[] = [];
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
 
     await act(async () => {
-      root.render(<Turntable deckLabel="INACTIVE" showTonearmMeter={false} />);
+      root.render(
+        <Turntable deckLabel="MEASURE" onArmAngleChange={(angle) => reportedAngles.push(angle)} />,
+      );
     });
 
     expect(document.body.querySelector('[data-dev-widget="tonearm-angle-meter"]')).toBeNull();
-
-    await act(async () => {
-      root.unmount();
-    });
-    container.remove();
-  });
-
-  it('captures live tonearm angles and calculates the measured groove reach', async () => {
-    const container = document.createElement('div');
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(<Turntable deckLabel="MEASURE" />);
-    });
+    expect(reportedAngles.at(-1)).toBe(0);
 
     const tonearm = container.querySelector('.tonearm') as HTMLElement;
-    const startButton = document.body.querySelector(
-      'button[aria-label="Capture groove start angle"]',
-    ) as HTMLButtonElement;
-    const endButton = document.body.querySelector(
-      'button[aria-label="Capture groove end angle"]',
-    ) as HTMLButtonElement;
-    expect(container.querySelector('[data-dev-widget="tonearm-angle-meter"]')).toBeNull();
-    expect(document.body.querySelector('[data-dev-widget="tonearm-angle-meter"]')).not.toBeNull();
-
     await act(async () => {
       for (let step = 0; step < 6; step++) {
         tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
       }
     });
-    expect(document.body.querySelector('[data-testid="tonearm-angle-readout"]')?.textContent).toBe('12.00°');
 
-    await act(async () => {
-      startButton.click();
-    });
-    expect(document.body.querySelector('[data-testid="tonearm-start-readout"]')?.textContent).toBe('12.00°');
-
-    await act(async () => {
-      for (let step = 0; step < 5; step++) {
-        tonearm.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-      }
-    });
-    await act(async () => {
-      endButton.click();
-    });
-
-    expect(document.body.querySelector('[data-testid="tonearm-angle-readout"]')?.textContent).toBe('22.00°');
-    expect(document.body.querySelector('[data-testid="tonearm-end-readout"]')?.textContent).toBe('22.00°');
-    expect(document.body.querySelector('[data-testid="tonearm-reach-readout"]')?.textContent).toBe('10.00°');
+    expect(reportedAngles.at(-1)).toBe(12);
 
     await act(async () => {
       root.unmount();

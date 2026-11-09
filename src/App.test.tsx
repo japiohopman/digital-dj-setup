@@ -14,6 +14,9 @@ describe('App dual-deck workspace', () => {
     expect(markup).toContain('WEB AUDIO ENGINE CONNECTED');
     expect(markup).toContain('INDEPENDENT DUAL TRANSPORT');
     expect(markup.match(/class="turntable power-on motor-on has-slipmat"/g)).toHaveLength(2);
+    expect(markup).toContain('aria-label="Developer tools"');
+    expect(markup).toContain('DEVKIT');
+    expect(markup).not.toContain('tonearm-meter-panel');
   });
 
   it('provides an accessible portrait deck selector', () => {
