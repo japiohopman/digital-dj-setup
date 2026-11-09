@@ -10,7 +10,7 @@ export type DeckPowerState = 'on' | 'off';
 export type MotorSwitchState = 'on' | 'off';
 export type MotorPhase = 'stopped' | 'spinning-up' | 'running' | 'coasting';
 export type TrackPhase = 'empty' | 'loading' | 'ready' | 'error';
-export type TransportPhase = 'idle' | 'paused' | 'playing' | 'scratching';
+export type TransportPhase = 'idle' | 'paused' | 'playing' | 'scratching' | 'ended';
 export type ScratchResumePhase = Exclude<TransportPhase, 'scratching'>;
 export type ArmInteraction = 'idle' | 'dragging';
 
@@ -54,6 +54,8 @@ export type DeckEvent =
       wasAlreadyNeedleDown: boolean;
       position: number;
       tooFast?: boolean;
+      grip?: 'arm' | 'cartridge';
+      surface?: 'record' | 'plinth' | 'air';
     }
   | { type: 'ARM_LIFTED' }
   | { type: 'ARM_PARKED' }
@@ -63,7 +65,7 @@ export type DeckEvent =
   | { type: 'SCRATCH_STARTED' }
   | { type: 'SCRATCH_MOVED'; speed: number; reversed: boolean; position: number }
   | { type: 'SCRATCH_ENDED' }
-  | { type: 'ENGINE_PLAYBACK_SYNC'; playbackState: AudioPlaybackState };
+  | { type: 'ENGINE_PLAYBACK_SYNC'; playbackState: AudioPlaybackState; endedNaturally?: boolean };
 
 export interface DeckTransition {
   state: DeckMachineState;
@@ -103,17 +105,36 @@ export function selectIsSpinning(state: DeckMachineState): boolean {
 }
 
 export function selectIsTrackAudible(state: DeckMachineState): boolean {
-  return canPlayTrack(state) &&
+  // Switching the power dial off starts a physical coast-down. Keep the
+  // stylus path open until the platter reaches rest; muting here would cut
+  // the music at the start of the visual coast animation.
+  const motorStillTurning = state.motorSwitch === 'on' &&
+    state.motorPhase !== 'stopped' &&
+    (state.power === 'on' || state.motorPhase === 'coasting');
+  return motorStillTurning &&
+    state.track === 'ready' &&
+    state.hasRecord &&
     state.tonearm === 'needle-down' &&
     (state.transport === 'playing' || state.transport === 'scratching');
 }
 
-export function selectRecordSoundState(state: DeckMachineState): 'stopped' | 'on-record' | 'off-record' {
-  if (!canRunMotor(state) || !state.hasRecord || state.track !== 'ready' ||
-    (state.transport !== 'playing' && state.transport !== 'scratching')) {
-    return 'stopped';
-  }
-  return state.tonearm === 'needle-down' ? 'on-record' : 'off-record';
+export function selectRecordSoundState(
+  state: DeckMachineState,
+): 'stopped' | 'on-record' | 'off-record' | 'runout' {
+  const motorStillTurning = state.motorSwitch === 'on' &&
+    state.motorPhase !== 'stopped' &&
+    (state.power === 'on' || state.motorPhase === 'coasting');
+  if (!motorStillTurning || !state.hasRecord || state.track !== 'ready') return 'stopped';
+
+  // A needle resting on the plinth gets the off-record sound. A lifted or
+  // parked arm is silent; hovering above the vinyl is not surface contact.
+  if (state.tonearm === 'off-record') return 'off-record';
+
+  if (state.tonearm === 'needle-down' && state.transport === 'ended') return 'runout';
+  if (state.tonearm === 'needle-down' &&
+    (state.transport === 'playing' || state.transport === 'scratching')) return 'on-record';
+
+  return 'stopped';
 }
 
 const accept = (state: DeckMachineState, reason: string): DeckTransition => ({
@@ -202,9 +223,10 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         transport: 'paused',
         scratchResumeTransport: null,
         hasValidNeedleDrop: false,
+        hasRecord: false,
         tonearm: 'lifted',
         armInteraction: 'idle',
-      }, 'Track loading: arm lifted and output muted; autoplay disabled');
+      }, 'Track loading: slipmat shown, arm lifted and output muted; autoplay disabled');
 
     case 'TRACK_LOAD_SUCCEEDED':
       if (state.track !== 'loading') return reject(state, 'Ignored track-ready event without an active load');
@@ -212,8 +234,10 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         ...state,
         track: 'ready',
         trackError: null,
+        hasRecord: true,
+        trackError: null,
         transport: 'paused',
-      }, 'Track ready: remains paused until a valid needle drop');
+      }, 'Track ready: vinyl shown; remains paused until a valid needle drop');
 
     case 'TRACK_LOAD_FAILED':
       if (state.track !== 'loading') return reject(state, 'Ignored track failure without an active load');
@@ -221,6 +245,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         ...state,
         track: 'error',
         trackError: event.error,
+        hasRecord: false,
         transport: 'idle',
         scratchResumeTransport: null,
         tonearm: 'lifted',
@@ -245,7 +270,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
 
     case 'ARM_DROPPED': {
       const atRest = event.angle <= DEFAULT_TONEARM_CONFIG.parkAngle + 2;
-      if (atRest) {
+      if (atRest || event.surface === 'air') {
         return accept({
           ...state,
           tonearm: 'parked',
@@ -253,17 +278,41 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         }, 'Tonearm returned to its cradle');
       }
 
+      if (event.surface === 'plinth' && state.hasRecord) {
+        return accept({
+          ...state,
+          tonearm: 'off-record',
+          armInteraction: 'idle',
+        }, 'Stylus landed on the Technics plinth: program audio stays muted');
+      }
+
       const inGroove = isAngleInPlayableRecord(event.angle);
+      const isPhysicalCartridgeDrop = event.grip === 'cartridge';
+      const isWrongGrooveDrop = state.hasRecord && inGroove &&
+        isFiniteNonNegative(event.position) && (isPhysicalCartridgeDrop || event.tooFast);
+      if (isWrongGrooveDrop) {
+        const next: DeckMachineState = {
+          ...state,
+          hasValidNeedleDrop: true,
+          tonearm: 'needle-down',
+          armInteraction: 'idle',
+        };
+        if (canPlayTrack(next) && state.transport !== 'scratching') next.transport = 'playing';
+        return accept(next, 'Incorrect cartridge/fast drop on vinyl: use wrong-drop cue and offset start');
+      }
+
       const validStart = state.hasValidNeedleDrop || event.wasAlreadyNeedleDown ||
-        (isAngleAtOuterLeadIn(event.angle) && !event.tooFast);
+        (isAngleAtOuterLeadIn(event.angle) && !event.tooFast && !isPhysicalCartridgeDrop);
       const validDrop = state.hasRecord && inGroove &&
-        isFiniteNonNegative(event.position) && validStart && !event.tooFast;
+        isFiniteNonNegative(event.position) && validStart && !event.tooFast && !isPhysicalCartridgeDrop;
       if (!validDrop) {
         return accept({
           ...state,
           tonearm: 'lifted',
           armInteraction: 'idle',
-        }, state.hasRecord ? 'Rejected needle drop: outside the lead-in or playable groove' : 'Rejected needle drop: no record on platter');
+        }, state.hasRecord
+          ? 'Rejected needle drop: outside the lead-in or playable groove'
+          : 'Rejected needle drop: no record on platter');
       }
 
       const next: DeckMachineState = {
@@ -367,6 +416,9 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         return accept({ ...state, transport: 'playing' }, 'Engine confirms playback');
       }
       if (state.transport === 'scratching') return reject(state, 'Playback sync ignored during active scratch');
+      if (event.playbackState === 'stopped' && event.endedNaturally && state.tonearm === 'needle-down') {
+        return accept({ ...state, transport: 'ended' }, 'Track ended: stylus remains in the run-out groove');
+      }
       if (event.playbackState === 'idle') {
         return accept({ ...state, transport: state.track === 'ready' ? 'paused' : 'idle' }, 'Engine is idle');
       }
