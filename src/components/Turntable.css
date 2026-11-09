@@ -788,8 +788,9 @@
   height: 100%;
   background: transparent url(/turntable/landscape/tt_arm.png) no-repeat 0 0;
   background-size: contain;
-  pointer-events: none;
-  cursor: default;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
   user-select: none;
   -webkit-user-select: none;
 }
