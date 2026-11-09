@@ -328,6 +328,8 @@ export function createDeckStore(
         }
       },
       dispose: () => {
+        needleDropSequence++;
+        isNeedleCuePending = false;
         clearSpinTimer();
         clearCoastTimer();
         if (get().machine.transport === 'scratching') transport?.endScratch(false);
