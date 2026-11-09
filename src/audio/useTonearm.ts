@@ -161,7 +161,12 @@ export function useTonearm({
 
     const previousTime = lastPlaybackTimeRef.current;
     lastPlaybackTimeRef.current = currentTime;
-    if (previousTime === null || currentTime === previousTime) return;
+    if (previousTime === null) {
+      const progress = Math.max(0, Math.min(1, currentTime / duration));
+      setArmPosition(playbackProgressToAngle(progress, config));
+      return;
+    }
+    if (currentTime === previousTime) return;
 
     const timeDelta = currentTime - previousTime;
     if (timeDelta < 0 || Math.abs(timeDelta) > 1.5) {
