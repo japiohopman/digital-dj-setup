@@ -7,15 +7,29 @@
 
 export interface TonearmConfig {
   parkAngle: number;
+  /** Beginning of the playable groove for the selected record format. */
   outerGrooveAngle: number;
+  /** Physical outer edge of the vinyl; angles below this land on the plinth. */
+  recordEdgeAngle: number;
   innerGrooveAngle: number;
   maxAngle: number;
   minAngle: number;
 }
 
+/**
+ * Keep the current 24° start as the reference for future seven-inch support.
+ * A standard LP begins farther out; its current target is halfway between
+ * the 7-inch lead-in point and the existing vinyl/plinth boundary (21.5°).
+ */
+export const SEVEN_INCH_OUTER_GROOVE_ANGLE = 24;
+export const LP_RECORD_EDGE_ANGLE = SEVEN_INCH_OUTER_GROOVE_ANGLE - 2.5;
+export const LP_OUTER_GROOVE_ANGLE =
+  (SEVEN_INCH_OUTER_GROOVE_ANGLE + LP_RECORD_EDGE_ANGLE) / 2;
+
 export const DEFAULT_TONEARM_CONFIG: TonearmConfig = {
   parkAngle: 0,
-  outerGrooveAngle: 24,
+  outerGrooveAngle: LP_OUTER_GROOVE_ANGLE,
+  recordEdgeAngle: LP_RECORD_EDGE_ANGLE,
   innerGrooveAngle: 47,
   maxAngle: 49,
   minAngle: 0,
@@ -143,7 +157,7 @@ export function classifyTonearmLandingSurface(
   config: TonearmConfig = DEFAULT_TONEARM_CONFIG,
 ): TonearmLandingSurface {
   if (!Number.isFinite(angleDeg) || angleDeg <= config.parkAngle + 2) return 'air';
-  return angleDeg < config.outerGrooveAngle - 2.5 ? 'plinth' : 'record';
+  return angleDeg < config.recordEdgeAngle ? 'plinth' : 'record';
 }
 
 export function playbackProgressToAngle(
