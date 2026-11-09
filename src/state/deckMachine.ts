@@ -116,7 +116,8 @@ export function selectIsSpinning(state: DeckMachineState): boolean {
 export function selectIsTrackAudible(state: DeckMachineState): boolean {
   return state.track === 'ready' &&
     state.hasRecord &&
-    state.tonearm === 'needle-down';
+    state.tonearm === 'needle-down' &&
+    state.transport !== 'ended';
 }
 
 export function selectRecordSoundState(
