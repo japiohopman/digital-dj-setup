@@ -294,9 +294,8 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       }
 
       const inGroove = isAngleInPlayableRecord(event.angle);
-      const isPhysicalCartridgeDrop = event.grip === 'cartridge';
       const isWrongGrooveDrop = state.hasRecord && inGroove &&
-        isFiniteNonNegative(event.position) && isPhysicalCartridgeDrop;
+        isFiniteNonNegative(event.position) && event.tooFast === true;
       if (isWrongGrooveDrop) {
         const next: DeckMachineState = {
           ...state,
@@ -313,10 +312,9 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       // starts partway through the track. The run-out beyond 35° is only
       // available after the record has already started.
       const validStart = state.hasStartedCurrentRecord || event.wasAlreadyNeedleDown ||
-        (event.angle <= DEFAULT_TONEARM_CONFIG.innerGrooveAngle &&
-          !event.tooFast && !isPhysicalCartridgeDrop);
+        (event.angle <= DEFAULT_TONEARM_CONFIG.innerGrooveAngle && !event.tooFast);
       const validDrop = state.hasRecord && inGroove &&
-        isFiniteNonNegative(event.position) && validStart && !event.tooFast && !isPhysicalCartridgeDrop;
+        isFiniteNonNegative(event.position) && validStart && !event.tooFast;
       if (!validDrop) {
         return accept({
           ...state,
