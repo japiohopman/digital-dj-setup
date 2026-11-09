@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useDeckTransport } from './audio/useDeckTransport';
+import { MixerAudioGraph } from './audio/MixerAudioGraph';
 import { Turntable } from './components/Turntable';
 import { DevKit } from './components/devkit/DevKit';
 import type { DeckDiagnosticsSnapshot } from './components/devkit/types';
@@ -27,8 +28,13 @@ export function App() {
   const updateDeckBDiagnostics = useCallback((snapshot: DeckDiagnosticsSnapshot) => {
     setDeckDiagnostics((current) => ({ ...current, b: snapshot }));
   }, []);
-  const transportA = useDeckTransport();
-  const transportB = useDeckTransport();
+  const [mixerAudioGraph] = useState(() => new MixerAudioGraph());
+  const [deckAAudioOptions] = useState(() => mixerAudioGraph.createDeckAudioOptions('a'));
+  const [deckBAudioOptions] = useState(() => mixerAudioGraph.createDeckAudioOptions('b'));
+  const transportA = useDeckTransport(deckAAudioOptions);
+  const transportB = useDeckTransport(deckBAudioOptions);
+
+  useEffect(() => () => mixerAudioGraph.dispose(), [mixerAudioGraph]);
 
   const isAudioActive = transportA.isPlaying || transportB.isPlaying;
 

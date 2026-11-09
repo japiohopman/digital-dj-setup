@@ -39,8 +39,14 @@ export type AudioEngineListener = (state: AudioEngineState) => void;
  * Constructor options for the audio engine.
  */
 export interface AudioEngineOptions {
-  /** Optional custom AudioContext factory for testing or environments with specific policies. */
+  /** Optional custom AudioContext factory for standalone engines and tests. */
   audioContextFactory?: (() => AudioContext) | undefined;
+  /** Supplies an app-owned shared AudioContext instead of creating a deck-owned context. */
+  audioContextProvider?: (() => AudioContext) | undefined;
+  /** Supplies the deck's input node in the shared mixer graph. All deck sound layers route here. */
+  outputNodeProvider?: ((context: AudioContext) => AudioNode) | undefined;
+  /** Whether this engine closes its context on dispose. Defaults to false for a shared provider. */
+  closeAudioContextOnDispose?: boolean | undefined;
 }
 
 /**
