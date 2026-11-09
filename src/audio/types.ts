@@ -61,6 +61,8 @@ export interface DeckTransport {
   error: string | null;
   loadTrack: (file: File) => Promise<void>;
   play: (offset?: number) => Promise<void>;
+  /** Returns the live engine playhead, without waiting for a React render. */
+  getCurrentTime?: () => number;
   pause: (durationMs?: number) => void;
   stop: () => void;
   togglePlayPause: () => Promise<void>;
