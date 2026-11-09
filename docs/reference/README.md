@@ -5,6 +5,7 @@ Use this folder as the compact source-of-truth index for recurring hardware fact
 ## Read first
 
 - [Turntable and tonearm baseline](turntable-baseline.md) — arm rotation, pivot geometry, LP angle mapping, motor/brake facts, groove standards and implementation-only timings.
+- [Shared mixer audio routing](audio-routing.md) — the app-owned AudioContext, per-deck audio paths, sound-layer routing, analyser points and lifecycle.
 
 ## Working rules
 
