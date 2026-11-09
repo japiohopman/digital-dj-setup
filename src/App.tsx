@@ -53,7 +53,7 @@ export function App() {
             id="deck-a-panel"
           >
             <div className="dual-deck__turntable">
-              <Turntable deckLabel="DECK A" modelName="SL-1200 MK2" transport={transportA} />
+              <Turntable deckLabel="DECK A" modelName="SL-1200 MK2" transport={transportA} showTonearmMeter={activeDeck === 'a'} />
             </div>
           </div>
 
@@ -64,7 +64,7 @@ export function App() {
             id="deck-b-panel"
           >
             <div className="dual-deck__turntable">
-              <Turntable deckLabel="DECK B" modelName="SL-1200 MK2" transport={transportB} />
+              <Turntable deckLabel="DECK B" modelName="SL-1200 MK2" transport={transportB} showTonearmMeter={activeDeck === 'b'} />
             </div>
           </div>
         </div>
