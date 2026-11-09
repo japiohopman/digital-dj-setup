@@ -117,10 +117,7 @@ export function createDeckStore(
         let current = get().machine;
         if (current.track !== 'ready' || current.tonearm !== 'needle-down') return;
 
-        if (
-          (current.transport === 'playing' || current.transport === 'scratching') &&
-          canRunMotor(current)
-        ) {
+        if (current.transport !== 'scratching' && canRunMotor(current)) {
           // Wait until the vinyl loop is actually scheduled, not merely requested.
           // This makes the loop and program audio enter together after the impact.
           await transport?.setRecordSoundState?.('on-record');
@@ -137,14 +134,15 @@ export function createDeckStore(
           }
           lastSoundState = 'on-record';
 
-          // A pending needle drop should never replace an active scratch source.
-          if (current.transport === 'playing') {
-            transport?.seek(position);
-            if (current.motorPhase === 'spinning-up') {
-              startSpinUp(current);
-            } else if (transport?.playbackState !== 'playing') {
-              void transport?.play(position);
-            }
+          // Always restore the chosen timecode first. seek() restarts an
+          // already-running source; play() starts it when the engine snapshot
+          // was stopped/paused. AudioEngine safely treats the second call as
+          // a no-op when seek() has already restarted live playback.
+          transport?.seek(position);
+          if (current.motorPhase === 'spinning-up') {
+            startSpinUp(current);
+          } else {
+            void transport?.play(position);
           }
         } else {
           transport?.seek(position);
@@ -226,6 +224,7 @@ export function createDeckStore(
               sequenceNeedleDrop('correct', event.position);
             } else if (previous.transport === 'playing') {
               transport?.seek(event.position);
+              void transport?.play(event.position);
             } else if (next.transport === 'playing') {
               if (next.motorPhase === 'spinning-up') {
                 transport?.seek(event.position);
@@ -244,8 +243,10 @@ export function createDeckStore(
         case 'ARM_CUE':
           if (previous.transport === 'scratching') break;
           if (next.tonearm === 'needle-down') {
-            if (previous.transport === 'playing') transport?.seek(event.position);
-            else if (next.transport === 'playing') {
+            if (previous.transport === 'playing') {
+              transport?.seek(event.position);
+              void transport?.play(event.position);
+            } else if (next.transport === 'playing') {
               if (next.motorPhase === 'spinning-up') {
                 transport?.seek(event.position);
                 startSpinUp(next);
