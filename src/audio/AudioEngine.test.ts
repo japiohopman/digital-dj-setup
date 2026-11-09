@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { AudioEngine } from './AudioEngine';
+import { MixerAudioGraph } from './MixerAudioGraph';
 
 class MockAudioParam {
   value = 1;
@@ -40,6 +41,7 @@ class MockAudioContext {
   destination = {};
   createdSources: MockAudioBufferSourceNode[] = [];
   createdGainParams: MockAudioParam[] = [];
+  createdGainNodes: Array<{ gain: MockAudioParam; connect: ReturnType<typeof vi.fn>; disconnect: ReturnType<typeof vi.fn> }> = [];
 
   resume = vi.fn(async () => {
     this.state = 'running';
@@ -92,12 +94,20 @@ class MockAudioContext {
   createGain = vi.fn(() => {
     const gain = new MockAudioParam();
     this.createdGainParams.push(gain);
-    return {
+    const node = {
       gain,
       connect: vi.fn(),
       disconnect: vi.fn(),
-    } as unknown as GainNode;
+    };
+    this.createdGainNodes.push(node);
+    return node as unknown as GainNode;
   });
+
+  createAnalyser = vi.fn(() => ({
+    fftSize: 2048,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  }) as unknown as AnalyserNode);
 }
 
 describe('AudioEngine', () => {
@@ -1009,4 +1019,44 @@ describe('AudioEngine', () => {
 
     engine.dispose();
   });
+  it('routes programme audio, vinyl loops and needle cues through the shared deck channel', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    })));
+    const graph = new MixerAudioGraph({
+      audioContextFactory: () => mockContext as unknown as AudioContext,
+    });
+    const engine = new AudioEngine(graph.createDeckAudioOptions('a'));
+
+    await engine.loadTrack(new Uint8Array([1, 2, 3]).buffer, 'shared-route.wav');
+    await engine.play();
+    await engine.setRecordSoundState('on-record');
+
+    const needleCue = engine.playNeedleDropSound('correct');
+    await vi.waitFor(() => expect(mockContext.createdSources).toHaveLength(3));
+    mockContext.createdSources[2]?.onended?.();
+    await needleCue;
+
+    const deckInput = graph.getDeckInputNode('a');
+    const [deckProgramGain, stylusGate, programSourceGain, vinylLoopGain, needleCueGain] =
+      mockContext.createdGainNodes;
+
+    // Programme path: source -> source gain -> deck gain -> stylus gate -> channel input.
+    expect(deckProgramGain?.connect).toHaveBeenCalledWith(stylusGate);
+    expect(programSourceGain?.connect).toHaveBeenCalledWith(deckProgramGain);
+    expect(stylusGate?.connect).toHaveBeenCalledWith(deckInput);
+
+    // Surface loops and needle one-shots also enter the same deck channel path.
+    expect(vinylLoopGain?.connect).toHaveBeenCalledWith(deckInput);
+    expect(needleCueGain?.connect).toHaveBeenCalledWith(deckInput);
+
+    engine.dispose();
+    await vi.advanceTimersByTimeAsync(25);
+    expect(mockContext.close).not.toHaveBeenCalled();
+
+    graph.dispose();
+    expect(mockContext.close).toHaveBeenCalledOnce();
+  });
+
 });
