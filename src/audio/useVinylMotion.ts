@@ -26,18 +26,20 @@ export function calculateScratchSpeedMagnitude(deltaAngle: number, expectedAngle
   return expectedAngleDelta > 0 ? Math.abs(deltaAngle / expectedAngleDelta) : 0;
 }
 
+/**
+ * Mirrors the CodePen's single-source-of-truth timecode:
+ * elapsed seconds = absolute platter angle / (2π × platter rotations per second).
+ */
 export function calculateScratchTrackPosition(
-  startPosition: number,
-  accumulatedAngle: number,
+  platterAngle: number,
   effectiveRps: number,
   duration: number,
 ): number {
-  if (!Number.isFinite(startPosition) || !Number.isFinite(accumulatedAngle) ||
-    !Number.isFinite(effectiveRps) || effectiveRps <= 0 || !Number.isFinite(duration) || duration < 0) {
+  if (!Number.isFinite(platterAngle) || !Number.isFinite(effectiveRps) ||
+    effectiveRps <= 0 || !Number.isFinite(duration) || duration < 0) {
     return 0;
   }
-  const position = startPosition + accumulatedAngle / (TWO_PI * effectiveRps);
-  return Math.max(0, Math.min(duration, position));
+  return Math.max(0, Math.min(duration, platterAngle / (TWO_PI * effectiveRps)));
 }
 
 /**
@@ -62,8 +64,6 @@ export function useVinylMotion({
   const isScratchingRef = useRef(false);
   const activePointerIdRef = useRef<number | null>(null);
   const draggingFromRef = useRef<{ x: number; y: number } | null>(null);
-  const scratchStartAngleRef = useRef(0);
-  const scratchStartPositionRef = useRef(0);
   const cleanupScratchRef = useRef<((dispatchEnd: boolean, updateState?: boolean) => void) | null>(null);
   const centerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const rafIdRef = useRef<number | null>(null);
@@ -164,10 +164,8 @@ export function useVinylMotion({
           Math.max(1, draggingSpeedsRef.current.length);
         const reversed = resolveScratchDirection(deltaAngle, lastScratchDirectionRef.current);
         lastScratchDirectionRef.current = reversed;
-        const scratchAngleDelta = angleRef.current - scratchStartAngleRef.current;
         const currentSeconds = calculateScratchTrackPosition(
-          scratchStartPositionRef.current,
-          scratchAngleDelta,
+          angleRef.current,
           effectiveRps,
           transport?.duration ?? 0,
         );
@@ -203,6 +201,17 @@ export function useVinylMotion({
     if (activePointerIdRef.current !== null) return;
     if (!dispatch({ type: 'SCRATCH_STARTED' })) return;
 
+    // Like the reference CodePen, the platter angle is the one authoritative
+    // timecode. Re-anchor it to the live audio position at the start of a drag.
+    const duration = transport.duration;
+    const livePosition = transport.getCurrentTime?.() ?? transport.currentTime;
+    const startPosition = Number.isFinite(duration)
+      ? Math.max(0, Math.min(duration, livePosition))
+      : 0;
+    angleRef.current = startPosition * effectiveRps * TWO_PI;
+    anglePreviousRef.current = angleRef.current;
+    setAngle(angleRef.current);
+
     const centerTarget = centerElementRef?.current ?? discRef.current;
     if (centerTarget) {
       const rect = centerTarget.getBoundingClientRect();
@@ -211,21 +220,19 @@ export function useVinylMotion({
 
     activePointerIdRef.current = e.pointerId;
     draggingFromRef.current = { x: e.clientX, y: e.clientY };
-    const duration = transport.duration;
-    const livePosition = transport.getCurrentTime?.() ?? transport.currentTime;
-    scratchStartPositionRef.current = Number.isFinite(duration)
-      ? Math.max(0, Math.min(duration, livePosition))
-      : 0;
-    // The platter's absolute angular position is the timecode, just like the
-    // reference scratch deck: one accumulated vinyl rotation advances audio.
-    scratchStartAngleRef.current = scratchStartPositionRef.current * effectiveRps * TWO_PI;
-    angleRef.current = scratchStartAngleRef.current;
-    anglePreviousRef.current = angleRef.current;
-    setAngle(angleRef.current);
     isScratchingRef.current = true;
     setIsScratching(true);
     draggingSpeedsRef.current = [];
     lastScratchDirectionRef.current = false;
+
+    // Freeze the engine at the same timecode immediately, even if this is a
+    // quick tap that ends before the next animation-frame callback.
+    dispatch({
+      type: 'SCRATCH_MOVED',
+      speed: 0,
+      reversed: false,
+      position: startPosition,
+    });
 
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -277,7 +284,21 @@ export function useVinylMotion({
       if (updateState) setIsScratching(false);
       draggingFromRef.current = null;
       cleanupScratchRef.current = null;
-      if (dispatchEnd) dispatch({ type: 'SCRATCH_ENDED' });
+      if (dispatchEnd) {
+        // Include the final pointer position even when pointerup lands between
+        // animation frames; endScratch must resume at the visible platter timecode.
+        dispatch({
+          type: 'SCRATCH_MOVED',
+          speed: 0,
+          reversed: lastScratchDirectionRef.current,
+          position: calculateScratchTrackPosition(
+            angleRef.current,
+            effectiveRps,
+            transport?.duration ?? 0,
+          ),
+        });
+        dispatch({ type: 'SCRATCH_ENDED' });
+      }
     };
 
     const onPointerUp = (upEvent: PointerEvent) => {
