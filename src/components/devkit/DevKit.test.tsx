@@ -7,7 +7,7 @@ describe('DevKit', () => {
   it('starts closed with the arm angle meter hidden', () => {
     render(<DevKit activeDeckLabel="DECK A" activeArmAngle={12.5} />);
 
-    expect(screen.getByRole('button', { name: 'DEVKIT' })).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('button', { name: 'DEVKIT' }).getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByRole('region', { name: 'Developer toolkit' })).toBeNull();
     expect(screen.queryByTestId('tonearm-angle-readout')).toBeNull();
   });
@@ -20,7 +20,7 @@ describe('DevKit', () => {
 
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('region', { name: 'Developer toolkit' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'DEVKIT' })).toHaveFocus();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'DEVKIT' }));
   });
 
   it('supports Alt+Shift+D as a fallback shortcut', () => {
