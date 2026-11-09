@@ -81,7 +81,7 @@ describe('DevKit', () => {
 
     expect(screen.getByRole('region', { name: 'DECK B state trace' })).toBeTruthy();
     fireEvent.click(screen.getByText(/DECK B STATE/));
-    expect(screen.getByText('valid lead-in drop')).toBeTruthy();
+    expect(document.body.querySelector('[data-dev-widget="deck-state-trace"]')?.textContent).toContain('valid lead-in drop');
   });
 
 });
