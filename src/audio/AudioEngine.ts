@@ -213,17 +213,20 @@ export class AudioEngine {
     void this.ensureRecordSoundAssets(context).then(() => this.syncRecordSoundLoops());
   }
 
-  /** Plays a needle placement cue as a separate audio voice over the track. */
-  public playNeedleDropSound(kind: NeedleDropSound): void {
+  /** Plays a single needle cue and resolves only when the sample has finished. */
+  public async playNeedleDropSound(kind: NeedleDropSound): Promise<void> {
     if (this.isDisposed) return;
     const cueGeneration = this.placementCueGeneration;
     const context = this.getOrCreateContext();
-    void this.ensureContextRunning()
-      .then(() => this.ensureRecordSoundAssets(context))
-      .then(() => {
-        if (this.isDisposed || cueGeneration !== this.placementCueGeneration) return;
-        const buffer = kind === 'correct' ? this.correctDropBuffer : this.wrongDropBuffer;
-        if (!buffer) return;
+
+    try {
+      await this.ensureContextRunning();
+      await this.ensureRecordSoundAssets(context);
+      if (this.isDisposed || cueGeneration !== this.placementCueGeneration) return;
+      const buffer = kind === 'correct' ? this.correctDropBuffer : this.wrongDropBuffer;
+      if (!buffer) return;
+
+      await new Promise<void>((resolve) => {
         const source = context.createBufferSource();
         const voiceGain = context.createGain();
         source.buffer = buffer;
@@ -237,12 +240,23 @@ export class AudioEngine {
           } catch {
             // One-shot nodes may already have been disconnected.
           }
+          resolve();
         };
-        source.start(0);
-      })
-      .catch(() => {
-        // Placement cues must never break normal deck playback.
+        try {
+          source.start(0);
+        } catch {
+          try {
+            source.disconnect();
+            voiceGain.disconnect();
+          } catch {
+            // Ignore cleanup errors after a failed start.
+          }
+          resolve();
+        }
       });
+    } catch {
+      // Placement cues must never break normal deck playback.
+    }
   }
 
   private ensureRecordSoundAssets(context: AudioContext): Promise<void> {
@@ -286,8 +300,13 @@ export class AudioEngine {
     } else {
       this.stopRecordLoop('vinyl');
     }
-    if (this.recordSoundState === 'off-record' && this.offRecordLoopBuffer) {
+
+    // The supplied off-record sample also serves as the endless run-out groove
+    // until the user lifts the needle or stops the motor.
+    if (this.offRecordLoopBuffer && this.recordSoundState === 'off-record') {
       this.startRecordLoop('off-record', this.offRecordLoopBuffer, 0.15);
+    } else if (this.offRecordLoopBuffer && this.recordSoundState === 'runout') {
+      this.startRecordLoop('off-record', this.offRecordLoopBuffer, 0.11);
     } else {
       this.stopRecordLoop('off-record');
     }
