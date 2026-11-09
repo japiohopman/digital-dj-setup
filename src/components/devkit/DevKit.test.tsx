@@ -57,4 +57,31 @@ describe('DevKit', () => {
     expect(screen.getByTestId('tonearm-start-readout').textContent).toBe('12.00°');
     expect(screen.getByTestId('tonearm-end-readout').textContent).toBe('22.00°');
   });
+
+  it('shows the active deck state trace only when its widget toggle is enabled', () => {
+    const snapshot = {
+      power: 'on' as const,
+      motorPhase: 'running' as const,
+      tonearm: 'needle-down' as const,
+      track: 'ready' as const,
+      transport: 'playing' as const,
+      isAudible: true,
+      trace: [{
+        at: 1,
+        event: 'ARM_DROPPED' as const,
+        accepted: true,
+        reason: 'valid lead-in drop',
+      }],
+    };
+    render(<DevKit activeDeckLabel="DECK B" activeArmAngle={18} activeDeckDiagnostics={snapshot} />);
+
+    expect(screen.queryByTestId('deck-state-trace')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'DEVKIT' }));
+    fireEvent.click(screen.getByLabelText('Deck state trace'));
+
+    expect(screen.getByLabelText('DECK B state trace')).toBeTruthy();
+    fireEvent.click(screen.getByText(/DECK B STATE/));
+    expect(screen.getByText('valid lead-in drop')).toBeTruthy();
+  });
+
 });
