@@ -67,6 +67,8 @@ export function useTonearm({
   const activePointerElementRef = useRef<HTMLElement | null>(null);
   const currentAngleRef = useRef(config.parkAngle);
   const lastPlaybackTimeRef = useRef<number | null>(null);
+  const pendingPlaybackPositionRef = useRef<number | null>(null);
+  const previousTransportPhaseRef = useRef(transportPhase);
   const wasDraggingRef = useRef(false);
 
   const isDragging = armInteraction === 'dragging';
@@ -94,46 +96,85 @@ export function useTonearm({
   }, [armInteraction]);
 
   useEffect(() => {
+    const wasScratching = previousTransportPhaseRef.current === 'scratching';
+    previousTransportPhaseRef.current = transportPhase;
+
     if (armInteraction === 'dragging' || isDragging) {
       wasDraggingRef.current = true;
       return;
     }
 
-    // Preserve the exact physical drop angle until the transport publishes its
-    // new playhead. Syncing stale currentTime here used to snap the arm back.
-    if (wasDraggingRef.current) {
-      wasDraggingRef.current = false;
+    // A vinyl scratch moves the record under a stationary stylus. Never derive
+    // tonearm position from the backwards/forwards scratch playhead.
+    if (transportPhase === 'scratching') return;
+
+    // Re-anchor the playhead after scratching without moving the physical arm.
+    // Normal forward playback will then advance the arm from its current radius.
+    if (wasScratching) {
       lastPlaybackTimeRef.current = currentTime;
-      if (transportPhase === 'ended' && armState === 'needle-down') {
-        setArmPosition(config.runoutAngle);
-      }
+      pendingPlaybackPositionRef.current = null;
+      wasDraggingRef.current = false;
       return;
     }
 
     if (armState === 'parked') {
       lastPlaybackTimeRef.current = currentTime;
+      pendingPlaybackPositionRef.current = null;
+      wasDraggingRef.current = false;
       setArmPosition(config.parkAngle);
       return;
     }
 
     if (armState !== 'needle-down' || duration <= 0) {
       lastPlaybackTimeRef.current = currentTime;
+      pendingPlaybackPositionRef.current = null;
+      wasDraggingRef.current = false;
       return;
     }
 
     if (transportPhase === 'ended') {
       lastPlaybackTimeRef.current = currentTime;
+      pendingPlaybackPositionRef.current = null;
+      wasDraggingRef.current = false;
       setArmPosition(config.runoutAngle);
       return;
     }
 
-    const hasFreshPlaybackTime =
-      lastPlaybackTimeRef.current === null || currentTime !== lastPlaybackTimeRef.current;
-    lastPlaybackTimeRef.current = currentTime;
-    if (!hasFreshPlaybackTime) return;
+    // A physical drop or tonearm cue causes a deliberate transport seek.
+    // Wait for the engine to publish that exact destination, then establish
+    // the baseline. Do not mistake the seek itself for groove-following motion.
+    const pendingPosition = pendingPlaybackPositionRef.current;
+    if (pendingPosition !== null) {
+      if (Math.abs(currentTime - pendingPosition) <= 0.25) {
+        lastPlaybackTimeRef.current = currentTime;
+        pendingPlaybackPositionRef.current = null;
+        wasDraggingRef.current = false;
+      }
+      return;
+    }
 
-    const progress = Math.max(0, Math.min(1, currentTime / duration));
-    setArmPosition(playbackProgressToAngle(progress, config));
+    if (wasDraggingRef.current) {
+      wasDraggingRef.current = false;
+      lastPlaybackTimeRef.current = currentTime;
+      return;
+    }
+
+    const previousTime = lastPlaybackTimeRef.current;
+    lastPlaybackTimeRef.current = currentTime;
+    if (previousTime === null || currentTime === previousTime) return;
+
+    const timeDelta = currentTime - previousTime;
+    if (timeDelta < 0 || Math.abs(timeDelta) > 1.5) {
+      // An explicit seek outside a platter-scratch gesture re-cues the arm.
+      const progress = Math.max(0, Math.min(1, currentTime / duration));
+      setArmPosition(playbackProgressToAngle(progress, config));
+      return;
+    }
+
+    // Spiral the arm forward only as programme audio advances. It stays put
+    // during reverse scratches instead of flying back to the lead-in groove.
+    const grooveSpan = config.innerGrooveAngle - config.outerGrooveAngle;
+    setArmPosition(currentAngleRef.current + (timeDelta / duration) * grooveSpan);
   }, [
     armState,
     armInteraction,
@@ -174,7 +215,8 @@ export function useTonearm({
     const position = grip === 'cartridge' && surface === 'record' && duration > 0
       ? Math.min(30, duration)
       : groovePosition;
-    dispatch({
+    pendingPlaybackPositionRef.current = surface === 'record' ? position : null;
+    const accepted = dispatch({
       type: 'ARM_DROPPED',
       angle,
       wasAlreadyNeedleDown,
@@ -183,6 +225,7 @@ export function useTonearm({
       grip,
       surface,
     });
+    if (!accepted) pendingPlaybackPositionRef.current = null;
   }, [config, dispatch, duration, getCuePosition]);
 
   const lowerArm = useCallback(() => {
@@ -320,7 +363,10 @@ export function useTonearm({
       if (armState === 'needle-down') {
         const progress = angleToPlaybackProgress(target, config);
         if (progress !== null && duration > 0) {
-          dispatch({ type: 'ARM_CUE', angle: target, position: progress * duration });
+          pendingPlaybackPositionRef.current = progress * duration;
+          if (!dispatch({ type: 'ARM_CUE', angle: target, position: progress * duration })) {
+            pendingPlaybackPositionRef.current = null;
+          }
         } else {
           liftArm();
         }
@@ -334,7 +380,10 @@ export function useTonearm({
       else if (armState === 'needle-down') {
         const progress = angleToPlaybackProgress(target, config);
         if (progress !== null && duration > 0) {
-          dispatch({ type: 'ARM_CUE', angle: target, position: progress * duration });
+          pendingPlaybackPositionRef.current = progress * duration;
+          if (!dispatch({ type: 'ARM_CUE', angle: target, position: progress * duration })) {
+            pendingPlaybackPositionRef.current = null;
+          }
         } else {
           liftArm();
         }
