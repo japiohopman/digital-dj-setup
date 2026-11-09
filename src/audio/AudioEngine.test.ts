@@ -144,6 +144,34 @@ describe('AudioEngine', () => {
     engine.dispose();
   });
 
+  it('stops an already-playing needle one-shot when stylus contact is lifted', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+    })));
+    const engine = createEngine();
+
+    engine.setStylusContact(true);
+    const cuePromise = engine.playNeedleDropSound('correct');
+    await vi.waitFor(() => expect(mockContext.createdSources).toHaveLength(1));
+
+    const cueSource = mockContext.createdSources[0];
+    const cueGain = mockContext.createdGainParams.at(-1);
+    expect(cueSource).toBeDefined();
+
+    engine.setStylusContact(false);
+
+    expect(cueSource?.stop).toHaveBeenCalled();
+    expect(cueGain?.linearRampToValueAtTime).toHaveBeenCalledWith(0, expect.any(Number));
+
+    // The mock stop() does not dispatch onended automatically.
+    cueSource?.onended?.();
+    await cuePromise;
+
+    expect(cueSource?.disconnect).toHaveBeenCalled();
+    engine.dispose();
+  });
+
   it('resolves on-record activation only after the vinyl loop source has started', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,

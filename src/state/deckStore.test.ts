@@ -176,6 +176,68 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
+  it('cancels a pending needle cue when the tonearm is lifted before the cue finishes', async () => {
+    let finishCue: (() => void) | undefined;
+    const transport = makeTransport({
+      isLoaded: true,
+      playNeedleDropSound: vi.fn(() => new Promise<void>((resolve) => { finishCue = resolve; })),
+    });
+    const store = createDeckStore(transport);
+
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 25,
+      wasAlreadyNeedleDown: false,
+      position: 0,
+      grip: 'arm',
+      surface: 'record',
+    });
+    expect(transport.playNeedleDropSound).toHaveBeenCalledWith('correct');
+    expect(transport.play).not.toHaveBeenCalled();
+
+    store.getState().dispatch({ type: 'ARM_LIFTED' });
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(false);
+
+    finishCue?.();
+    await flushMicrotasks();
+
+    expect(transport.setRecordSoundState).not.toHaveBeenCalledWith('on-record');
+    expect(transport.play).not.toHaveBeenCalled();
+    store.getState().dispose();
+  });
+
+  it('does not replay the first-drop cue after lifting and placing the stylus at another groove position', async () => {
+    const transport = makeTransport({ isLoaded: true });
+    const store = createDeckStore(transport);
+
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 25,
+      wasAlreadyNeedleDown: false,
+      position: 0,
+      grip: 'arm',
+      surface: 'record',
+    });
+    await flushMicrotasks();
+    expect(transport.playNeedleDropSound).toHaveBeenCalledTimes(1);
+
+    store.getState().dispatch({ type: 'ARM_LIFTED' });
+    expect(store.getState().machine.hasValidNeedleDrop).toBe(false);
+    expect(store.getState().machine.hasStartedCurrentRecord).toBe(true);
+
+    store.getState().dispatch({
+      type: 'ARM_DROPPED',
+      angle: 36,
+      wasAlreadyNeedleDown: false,
+      position: 52,
+      grip: 'arm',
+      surface: 'record',
+    });
+    expect(transport.playNeedleDropSound).toHaveBeenCalledTimes(1);
+    expect(transport.seek).toHaveBeenLastCalledWith(52);
+    store.getState().dispose();
+  });
+
   it('plays the wrong-drop cue before restarting at 30 seconds when the cartridge is grabbed', async () => {
     let finishCue: (() => void) | undefined;
     const transport = makeTransport({
@@ -364,7 +426,9 @@ describe('per-deck Zustand adapter', () => {
 
     expect(store.getState().machine.motorPhase).toBe('stopped');
     expect(transport.pause).toHaveBeenLastCalledWith(0);
-    expect(transport.setStylusContact).toHaveBeenLastCalledWith(false);
+    // Motor stop removes rotational surface noise, but does not disconnect
+    // the cartridge from the external phono amplifier.
+    expect(transport.setStylusContact).toHaveBeenLastCalledWith(true);
     expect(transport.setRecordSoundState).toHaveBeenLastCalledWith('stopped');
     store.getState().dispose();
   });

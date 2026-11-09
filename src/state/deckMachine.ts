@@ -22,8 +22,10 @@ export interface DeckMachineState {
   transport: TransportPhase;
   /** Transport phase to restore after a physical scratch gesture ends. */
   scratchResumeTransport: ScratchResumePhase | null;
-  /** Whether this track has already had a valid initial needle drop. */
+  /** Whether the current stylus placement is valid and down on the record. */
   hasValidNeedleDrop: boolean;
+  /** Whether this loaded record has already received its first valid lead-in drop. */
+  hasStartedCurrentRecord: boolean;
   tonearm: TonearmState;
   armInteraction: ArmInteraction;
   hasRecord: boolean;
@@ -85,6 +87,7 @@ export function createInitialDeckState(options: InitialDeckState = {}): DeckMach
     transport: options.isPlaying ? 'playing' : trackLoaded ? 'paused' : 'idle',
     scratchResumeTransport: null,
     hasValidNeedleDrop: false,
+    hasStartedCurrentRecord: false,
     tonearm: 'parked',
     armInteraction: 'idle',
     hasRecord: options.hasRecord ?? trackLoaded,
@@ -104,18 +107,16 @@ export function selectIsSpinning(state: DeckMachineState): boolean {
   return state.motorPhase !== 'stopped';
 }
 
+/**
+ * Indicates that the cartridge is physically connected to the phono signal
+ * path. This is independent of platter motor power and transport state: the
+ * motor drives the platter, while the amplifier path remains available until
+ * the stylus is lifted from the record.
+ */
 export function selectIsTrackAudible(state: DeckMachineState): boolean {
-  // Switching the power dial off starts a physical coast-down. Keep the
-  // stylus path open until the platter reaches rest; muting here would cut
-  // the music at the start of the visual coast animation.
-  const motorStillTurning = state.motorSwitch === 'on' &&
-    state.motorPhase !== 'stopped' &&
-    (state.power === 'on' || state.motorPhase === 'coasting');
-  return motorStillTurning &&
-    state.track === 'ready' &&
+  return state.track === 'ready' &&
     state.hasRecord &&
-    state.tonearm === 'needle-down' &&
-    (state.transport === 'playing' || state.transport === 'scratching');
+    state.tonearm === 'needle-down';
 }
 
 export function selectRecordSoundState(
@@ -223,6 +224,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         transport: 'paused',
         scratchResumeTransport: null,
         hasValidNeedleDrop: false,
+        hasStartedCurrentRecord: false,
         hasRecord: false,
         tonearm: 'parked',
         armInteraction: 'idle',
@@ -255,23 +257,26 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       if (state.armInteraction === 'dragging') return reject(state, 'Tonearm already has an active pointer');
       return accept({
         ...state,
+        hasValidNeedleDrop: false,
         tonearm: 'lifted',
         armInteraction: 'dragging',
-      }, 'Tonearm picked up: stylus gate closes; motor state is unchanged');
+      }, 'Tonearm picked up: placement state resets; per-record lead-in history is preserved');
 
     case 'ARM_DRAG_CANCELLED':
       if (state.armInteraction !== 'dragging') return reject(state, 'No active tonearm drag to cancel');
       return accept({
         ...state,
+        hasValidNeedleDrop: false,
         tonearm: 'lifted',
         armInteraction: 'idle',
-      }, 'Tonearm drag cancelled safely; stylus remains lifted');
+      }, 'Tonearm drag cancelled safely; placement state resets and stylus remains lifted');
 
     case 'ARM_DROPPED': {
       const atRest = event.angle <= DEFAULT_TONEARM_CONFIG.parkAngle + 2;
       if (atRest || event.surface === 'air') {
         return accept({
           ...state,
+          hasValidNeedleDrop: false,
           tonearm: 'parked',
           armInteraction: 'idle',
         }, 'Tonearm returned to its cradle');
@@ -280,6 +285,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       if (event.surface === 'plinth' && state.hasRecord) {
         return accept({
           ...state,
+          hasValidNeedleDrop: false,
           tonearm: 'off-record',
           armInteraction: 'idle',
         }, 'Stylus landed on the Technics plinth: program audio stays muted');
@@ -293,6 +299,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         const next: DeckMachineState = {
           ...state,
           hasValidNeedleDrop: true,
+          hasStartedCurrentRecord: true,
           tonearm: 'needle-down',
           armInteraction: 'idle',
         };
@@ -300,13 +307,14 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
         return accept(next, 'Incorrect cartridge/fast drop on vinyl: use wrong-drop cue and offset start');
       }
 
-      const validStart = state.hasValidNeedleDrop || event.wasAlreadyNeedleDown ||
+      const validStart = state.hasStartedCurrentRecord || event.wasAlreadyNeedleDown ||
         (isAngleAtOuterLeadIn(event.angle) && !event.tooFast && !isPhysicalCartridgeDrop);
       const validDrop = state.hasRecord && inGroove &&
         isFiniteNonNegative(event.position) && validStart && !event.tooFast && !isPhysicalCartridgeDrop;
       if (!validDrop) {
         return accept({
           ...state,
+          hasValidNeedleDrop: false,
           tonearm: 'lifted',
           armInteraction: 'idle',
         }, state.hasRecord
@@ -317,6 +325,7 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       const next: DeckMachineState = {
         ...state,
         hasValidNeedleDrop: true,
+        hasStartedCurrentRecord: true,
         tonearm: 'needle-down',
         armInteraction: 'idle',
       };
@@ -327,13 +336,15 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
     case 'ARM_LIFTED':
       return accept({
         ...state,
+        hasValidNeedleDrop: false,
         tonearm: 'lifted',
         armInteraction: 'idle',
-      }, 'Tonearm lifted: audio muted without changing motor state');
+      }, 'Tonearm lifted: placement state resets and audio is muted without changing motor state');
 
     case 'ARM_PARKED':
       return accept({
         ...state,
+        hasValidNeedleDrop: false,
         tonearm: 'parked',
         armInteraction: 'idle',
       }, 'Tonearm parked in its cradle');
@@ -346,9 +357,10 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       if (!isAngleInPlayableRecord(event.angle)) {
         return accept({
           ...state,
+          hasValidNeedleDrop: false,
           tonearm: 'lifted',
           armInteraction: 'idle',
-        }, 'Cue moved outside the playable groove: stylus lifted and muted');
+        }, 'Cue moved outside the playable groove: placement state resets; stylus lifted and muted');
       }
       if (!isFiniteNonNegative(event.position)) return reject(state, 'Ignored invalid cue position');
       {

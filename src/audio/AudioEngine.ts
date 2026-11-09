@@ -47,6 +47,8 @@ export class AudioEngine {
   private recordSoundState: RecordSoundState = 'stopped';
   private recordSoundAssetsPromise: Promise<void> | null = null;
   private placementCueGeneration = 0;
+  private placementCueSource: AudioBufferSourceNode | null = null;
+  private placementCueGain: GainNode | null = null;
   private vinylLoopBuffer: AudioBuffer | null = null;
   private offRecordLoopBuffer: AudioBuffer | null = null;
   private correctDropBuffer: AudioBuffer | null = null;
@@ -156,7 +158,7 @@ export class AudioEngine {
   }
 
   public setStylusContact(isContact: boolean): void {
-    if (!isContact) this.placementCueGeneration++;
+    if (!isContact) this.invalidatePlacementCue();
     if (this.isStylusDown === isContact) {
       return;
     }
@@ -201,13 +203,50 @@ export class AudioEngine {
   }
 
   /**
+   * Stops a playing needle-placement one-shot with a short de-click fade.
+   * This is separate from programme audio and is called whenever stylus
+   * contact is broken or the record-surface audio is stopped.
+   */
+  private stopActivePlacementCue(): void {
+    const source = this.placementCueSource;
+    const gain = this.placementCueGain;
+    this.placementCueSource = null;
+    this.placementCueGain = null;
+    if (!source) return;
+
+    try {
+      if (gain && this.audioContext && this.audioContext.state !== 'closed') {
+        const now = this.audioContext.currentTime;
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setValueAtTime(gain.gain.value, now);
+        gain.gain.linearRampToValueAtTime(0, now + 0.008);
+        source.stop(now + 0.01);
+      } else {
+        source.stop();
+      }
+    } catch {
+      try {
+        source.stop();
+      } catch {
+        // The browser may already have ended the one-shot.
+      }
+    }
+  }
+
+  /** Invalidates a cue waiting for assets and stops an active cue. */
+  private invalidatePlacementCue(): void {
+    this.placementCueGeneration++;
+    this.stopActivePlacementCue();
+  }
+
+  /**
    * Selects the independent crackle/off-record layer for this deck.
    *
    * Resolves only after the requested loop is loaded and scheduled, allowing
    * the deck store to start program audio in sync with the vinyl surface layer.
    */
   public async setRecordSoundState(state: RecordSoundState): Promise<void> {
-    if (state === 'stopped') this.placementCueGeneration++;
+    if (state === 'stopped') this.invalidatePlacementCue();
     this.recordSoundState = state;
     if (state === 'stopped' || this.isDisposed) {
       this.stopRecordLoop('vinyl');
@@ -226,7 +265,8 @@ export class AudioEngine {
   /** Plays a single needle cue and resolves only when the sample has finished. */
   public async playNeedleDropSound(kind: NeedleDropSound): Promise<void> {
     if (this.isDisposed) return;
-    const cueGeneration = this.placementCueGeneration;
+    this.stopActivePlacementCue();
+    const cueGeneration = ++this.placementCueGeneration;
     const context = this.getOrCreateContext();
 
     try {
@@ -243,7 +283,13 @@ export class AudioEngine {
         voiceGain.gain.value = kind === 'correct' ? 0.62 : 0.7;
         source.connect(voiceGain);
         voiceGain.connect(context.destination);
+        this.placementCueSource = source;
+        this.placementCueGain = voiceGain;
         source.onended = () => {
+          if (this.placementCueSource === source) {
+            this.placementCueSource = null;
+            this.placementCueGain = null;
+          }
           try {
             source.disconnect();
             voiceGain.disconnect();
@@ -370,7 +416,7 @@ export class AudioEngine {
     try {
       gain.gain.cancelScheduledValues(now);
       gain.gain.setValueAtTime(gain.gain.value, now);
-      gain.gain.linearRampToValueAtTime(0, now + 0.08);
+      gain.gain.linearRampToValueAtTime(0, now + 0.015);
     } catch {
       gain.gain.value = 0;
     }
@@ -391,7 +437,7 @@ export class AudioEngine {
         this.offRecordLoopGain = null;
         this.offRecordLoopStopTimer = null;
       }
-    }, 100);
+    }, 20);
     if (kind === 'vinyl') this.vinylLoopStopTimer = timer;
     else this.offRecordLoopStopTimer = timer;
   }
@@ -1537,6 +1583,7 @@ export class AudioEngine {
    */
   public dispose(): void {
     this.isDisposed = true;
+    this.invalidatePlacementCue();
     this.recordSoundState = 'stopped';
     this.stopRecordLoop('vinyl');
     this.stopRecordLoop('off-record');

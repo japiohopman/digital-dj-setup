@@ -48,9 +48,19 @@ describe('deck state machine', () => {
     expect(selectIsTrackAudible(coasting)).toBe(true);
     expect(selectRecordSoundState(coasting)).toBe('on-record');
 
-    const restored = apply(coasting, { type: 'POWER_TOGGLED' });
+    const stopped = apply(coasting, { type: 'MOTOR_COAST_COMPLETED' });
+    expect(stopped.power).toBe('off');
+    expect(stopped.motorPhase).toBe('stopped');
+    expect(stopped.transport).toBe('paused');
+    // The motor has stopped, but the cartridge remains electrically connected
+    // to the external phono amplifier while the stylus is still in the groove.
+    expect(stopped.tonearm).toBe('needle-down');
+    expect(selectIsTrackAudible(stopped)).toBe(true);
+    expect(selectRecordSoundState(stopped)).toBe('stopped');
+
+    const restored = apply(stopped, { type: 'POWER_TOGGLED' });
     expect(restored.power).toBe('on');
-    expect(restored.motorPhase).toBe('running');
+    expect(restored.motorPhase).toBe('spinning-up');
     expect(restored.transport).toBe('playing');
     expect(selectIsTrackAudible(restored)).toBe(true);
   });
@@ -85,6 +95,8 @@ describe('deck state machine', () => {
       type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
     });
     state = apply(state, { type: 'ARM_PICKED_UP' });
+    expect(state.hasValidNeedleDrop).toBe(false);
+    expect(state.hasStartedCurrentRecord).toBe(true);
     state = apply(state, {
       type: 'ARM_DROPPED', angle: 35, wasAlreadyNeedleDown: true, position: 50,
     });
@@ -99,6 +111,8 @@ describe('deck state machine', () => {
       type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
     });
     state = apply(state, { type: 'ARM_LIFTED' });
+    expect(state.hasValidNeedleDrop).toBe(false);
+    expect(state.hasStartedCurrentRecord).toBe(true);
     state = apply(state, {
       type: 'ARM_DROPPED', angle: 36, wasAlreadyNeedleDown: false, position: 52,
     });
@@ -115,6 +129,7 @@ describe('deck state machine', () => {
     expect(state.hasValidNeedleDrop).toBe(true);
     state = apply(state, { type: 'TRACK_LOAD_REQUESTED' });
     expect(state.hasValidNeedleDrop).toBe(false);
+    expect(state.hasStartedCurrentRecord).toBe(false);
     state = apply(state, { type: 'TRACK_LOAD_SUCCEEDED' });
     const invalidDrop = transitionDeck(state, {
       type: 'ARM_DROPPED', angle: 36, wasAlreadyNeedleDown: false, position: 52,
