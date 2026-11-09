@@ -294,20 +294,6 @@ export function transitionDeck(state: DeckMachineState, event: DeckEvent): DeckT
       }
 
       const inGroove = isAngleInPlayableRecord(event.angle);
-      const isWrongGrooveDrop = state.hasRecord && inGroove &&
-        isFiniteNonNegative(event.position) && event.tooFast === true;
-      if (isWrongGrooveDrop) {
-        const next: DeckMachineState = {
-          ...state,
-          hasValidNeedleDrop: true,
-          hasStartedCurrentRecord: true,
-          tonearm: 'needle-down',
-          armInteraction: 'idle',
-        };
-        if (canPlayTrack(next) && state.transport !== 'scratching') next.transport = 'playing';
-        return accept(next, 'Incorrect cartridge/fast drop on vinyl: use wrong-drop cue and offset start');
-      }
-
       // The programme groove is a physical timecode: a first drop at 22°
       // starts partway through the track. The run-out beyond 35° is only
       // available after the record has already started.
