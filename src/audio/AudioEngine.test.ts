@@ -14,6 +14,7 @@ class MockAudioParam {
 
 class MockAudioBufferSourceNode {
   buffer: AudioBuffer | null = null;
+  loop = false;
   onended: (() => void) | null = null;
   startedAtOffset: number | null = null;
   isStarted = false;
