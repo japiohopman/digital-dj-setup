@@ -168,8 +168,12 @@ export function useTonearm({
   ) => {
     const angle = currentAngleRef.current;
     const surface = classifyTonearmLandingSurface(angle, config);
-    const position = getCuePosition(angle);
-    // Grip identifies where the user holds the arm, not how the stylus lands.
+    const groovePosition = getCuePosition(angle);
+    // Holding the cartridge is deliberately imprecise: retain the wrong-drop
+    // cue and its calibrated 30-second offset. The arm tube uses groove timecode.
+    const position = grip === 'cartridge' && surface === 'record' && duration > 0
+      ? Math.min(30, duration)
+      : groovePosition;
     dispatch({
       type: 'ARM_DROPPED',
       angle,
