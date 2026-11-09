@@ -1,5 +1,6 @@
 import { createStore, type StoreApi } from 'zustand/vanilla';
 import type { DeckTransport, RecordSoundState } from '../audio/types';
+import { DEFAULT_TONEARM_CONFIG, type TonearmConfig } from '../audio/tonearmGeometry';
 import {
   canRunMotor,
   createInitialDeckState,
@@ -38,6 +39,7 @@ const isHighFrequencyEvent = (event: DeckEvent) =>
 export function createDeckStore(
   transport: DeckTransport | undefined,
   initial: InitialDeckState = {},
+  tonearmConfig: TonearmConfig = DEFAULT_TONEARM_CONFIG,
 ): DeckStore {
   const initialMachine = createInitialDeckState({
     ...initial,
@@ -282,7 +284,7 @@ export function createDeckStore(
       trace: [],
       dispatch: (event) => {
         const previous = get().machine;
-        const result = transitionDeck(previous, event);
+        const result = transitionDeck(previous, event, tonearmConfig);
         if (result.accepted) {
           if (
             event.type === 'TRACK_LOAD_REQUESTED' ||
