@@ -22,11 +22,11 @@ interface PendingReverseScratch {
 }
 
 /**
- * Isolated Web Audio API playback engine for a single turntable deck.
+ * Per-deck Web Audio playback engine.
  *
- * Keeps all Web Audio primitives (AudioContext, AudioBuffer, AudioBufferSourceNode)
- * completely decoupled from React state and rendering. Handles AudioContext suspended/resume,
- * track loading, decoding, single-use source recreation, and logical position tracking.
+ * Owns one deck's decoded buffers, source nodes and logical transport timing.
+ * It may use a standalone AudioContext or an app-owned shared context with an
+ * injected deck output node. In shared mode it never closes the context.
  */
 export class AudioEngine {
   private audioContext: AudioContext | null = null;
