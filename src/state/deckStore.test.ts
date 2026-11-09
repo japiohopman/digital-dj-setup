@@ -512,7 +512,7 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
-  it('routes needle-down scratch through the audible program path', () => {
+  it('routes needle-down scratch through the audible program path', async () => {
     const transport = makeTransport({ isLoaded: true });
     const store = createDeckStore(transport);
 
@@ -522,6 +522,8 @@ describe('per-deck Zustand adapter', () => {
       wasAlreadyNeedleDown: false,
       position: 0,
     });
+    // The stylus gate opens after the needle impact and track source start.
+    await flushMicrotasks();
     expect(transport.setStylusContact).toHaveBeenLastCalledWith(true);
     expect(store.getState().dispatch({ type: 'SCRATCH_STARTED' })).toBe(true);
 
@@ -594,12 +596,13 @@ describe('per-deck Zustand adapter', () => {
     store.getState().dispose();
   });
 
-  it('coasts and mutes on power-off, then restores torque when powered back during coast', () => {
+  it('coasts and mutes on power-off, then restores torque when powered back during coast', async () => {
     const transport = makeTransport({ isLoaded: true, isPlaying: true, playbackState: 'playing' });
     const store = createDeckStore(transport);
     store.getState().dispatch({
       type: 'ARM_DROPPED', angle: 25, wasAlreadyNeedleDown: false, position: 0,
     });
+    await flushMicrotasks();
     store.getState().dispatch({ type: 'POWER_TOGGLED' });
 
     expect(transport.coastDown).toHaveBeenCalledWith(1200);
