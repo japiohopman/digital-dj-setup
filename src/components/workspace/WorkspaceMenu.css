@@ -55,7 +55,7 @@
     max(12px, env(safe-area-inset-right))
     max(12px, env(safe-area-inset-bottom))
     max(12px, env(safe-area-inset-left));
-  background: rgb(5 8 10 / 52%);
+  background: rgb(5 8 10 / 40%);
   backdrop-filter: blur(3px) saturate(0.72);
   -webkit-backdrop-filter: blur(3px) saturate(0.72);
 }
@@ -75,7 +75,7 @@
   border: 1px solid rgb(205 165 102 / 52%);
   border-radius: 10px;
   color: #e9e7e1;
-  background: rgb(15 19 21 / 91%);
+  background: rgb(15 19 21 / 84%);
   box-shadow: 0 24px 90px rgb(0 0 0 / 58%), inset 0 1px rgb(255 255 255 / 7%);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
