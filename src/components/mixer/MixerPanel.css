@@ -670,8 +670,40 @@
 
   .mixer-panel__footer {
     padding-top: 5px;
-    font-size: 0.35rem;
+    font-size: 0.42rem;
     letter-spacing: 0.02em;
+  }
+
+  .mixer-meter-bridge__meters {
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .mixer-meter {
+    height: clamp(170px, 28vh, 280px);
+    flex: 0 1 29%;
+  }
+
+  .mixer-meter__segments {
+    height: clamp(115px, 22vh, 220px);
+    flex: 0 0 clamp(115px, 22vh, 220px);
+  }
+
+  .mixer-channel__fader {
+    flex: 0 1 clamp(220px, 32vh, 320px);
+    margin-block: auto;
+  }
+
+  .mixer-channel__fader input {
+    height: clamp(120px, 25vh, 230px);
+  }
+
+  .mixer-channel__fader-label,
+  .mixer-channel__value,
+  .mixer-meter__label,
+  .mixer-meter__readout,
+  .mixer-panel__column-headings {
+    font-size: 0.45rem;
   }
 }
 
