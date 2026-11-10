@@ -131,7 +131,7 @@ export function WorkspaceMenu({
     setLoadMessage(null);
     try {
       await onLoadBundledTrack(targetDeck, track);
-      setLoadMessage(\`\${track.title} loaded to Deck \${targetDeck.toUpperCase()}. Ready at the start; playback has not started.\`);
+      setLoadMessage(track.title + ' loaded to Deck ' + targetDeck.toUpperCase() + '. Ready at the start; playback has not started.');
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'The track could not be loaded.');
     } finally {
@@ -249,9 +249,9 @@ export function WorkspaceMenu({
                       className="workspace-menu__load-button"
                       onClick={() => void handleLoadTrack(track)}
                       disabled={loadingTrackId !== null}
-                      aria-label={\`Load \${track.title} to Deck \${targetDeck.toUpperCase()}\`}
+                      aria-label={'Load ' + track.title + ' to Deck ' + targetDeck.toUpperCase()}
                     >
-                      {loadingTrackId === track.id ? 'LOADING…' : \`LOAD TO \${targetDeck.toUpperCase()}\`}
+                      {loadingTrackId === track.id ? 'LOADING…' : 'LOAD TO ' + targetDeck.toUpperCase()}
                     </button>
                   </article>
                 ))}
