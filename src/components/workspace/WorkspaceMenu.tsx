@@ -45,6 +45,7 @@ export function WorkspaceMenu({
   children,
 }: WorkspaceMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const [targetDeck, setTargetDeck] = useState<WorkspaceDeckId>('a');
   const [loadingTrackId, setLoadingTrackId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -52,6 +53,10 @@ export function WorkspaceMenu({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -153,7 +158,7 @@ export function WorkspaceMenu({
         <span className="workspace-menu__trigger-caret" aria-hidden="true">{isOpen ? '▲' : '▼'}</span>
       </button>
 
-      {typeof document !== 'undefined' && createPortal(
+      {portalTarget && createPortal(
         <div
           id="workspace-tools-menu"
           className="workspace-menu__popover"
@@ -283,7 +288,7 @@ export function WorkspaceMenu({
           </footer>
         </section>
         </div>,
-        document.body,
+        portalTarget,
       )}
     </div>
   );
