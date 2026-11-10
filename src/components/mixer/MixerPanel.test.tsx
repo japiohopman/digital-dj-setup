@@ -1,10 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MixerPanel } from './MixerPanel';
 import type { MixerAudioGraph } from '../../audio/MixerAudioGraph';
 
 describe('MixerPanel', () => {
+  afterEach(cleanup);
   it('routes channel fader and crossfader changes through the audio graph', () => {
     const audioGraph = {
       getChannelLevel: vi.fn(() => 1),
