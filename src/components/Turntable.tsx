@@ -104,9 +104,16 @@ export function Turntable({
 
   useEffect(() => {
     if (!onRegisterTrackLoader) return;
-    onRegisterTrackLoader(loadDeckTrack);
+
+    const loadTrackFromLibrary: DeckTrackLoader = async (file) => {
+      if (!transport) throw new Error(`${deckLabel} audio transport is not connected.`);
+      if (!isPowered) throw new Error(`Turn on ${deckLabel} before loading a track.`);
+      await loadDeckTrack(file);
+    };
+
+    onRegisterTrackLoader(loadTrackFromLibrary);
     return () => onRegisterTrackLoader(null);
-  }, [loadDeckTrack, onRegisterTrackLoader]);
+  }, [deckLabel, isPowered, loadDeckTrack, onRegisterTrackLoader, transport]);
 
   const transportEndedNaturally = !!transport &&
     transport.playbackState === 'stopped' &&
