@@ -128,20 +128,40 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
 
   return (
     <section className="mixer-panel" id="mixer-panel" aria-label="Digital DJ mixer">
-      <header className="mixer-panel__header">
-        <div>
-          <p className="mixer-panel__eyebrow">TWO CHANNEL MIXER</p>
-          <h2>MASTER CONTROL</h2>
+      <header className="mixer-panel__header" aria-label="Mixer rotary controls">
+        <div className="mixer-cut-control mixer-cut-control--header">
+          <label className="mixer-cut-control__label" htmlFor="mixer-cut-lag">CUT-IN</label>
+          <div className="mixer-cut-control__dial">
+            <input
+              id="mixer-cut-lag"
+              className="mixer-cut-control__input"
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={cutLagPercent}
+              onChange={(event) => updateCutLag(Number(event.target.value))}
+              aria-label="Crossfader cut lag"
+              aria-valuetext={cutLagValueText}
+            />
+            <span className="mixer-cut-control__face" aria-hidden="true">
+              <i style={{ transform: `rotate(${cutLagPercent * 2.7 - 135}deg)` }} />
+            </span>
+          </div>
+          <output htmlFor="mixer-cut-lag">
+            {cutLagPercent === 0 ? 'MIN' : String(cutLagPercent) + '%'}
+          </output>
         </div>
-        <span className="mixer-panel__power"><i aria-hidden="true" /> AUDIO ROUTING</span>
       </header>
 
       <div className="mixer-panel__faceplate">
-        <div className="mixer-panel__column-headings" aria-hidden="true">
-          <span>PGM 1 / DECK A</span>
-          <span>OUTPUT LEVEL</span>
-          <span>PGM 2 / DECK B</span>
-        </div>
+        <section className="mixer-meter-bridge" aria-label="Live signal meters">
+          <div className="mixer-meter-bridge__meters">
+            <MixerMeter label="A" level={meterLevels.a} className="mixer-meter--a" />
+            <MixerMeter label="MASTER" level={meterLevels.master} className="mixer-meter--master" />
+            <MixerMeter label="B" level={meterLevels.b} className="mixer-meter--b" />
+          </div>
+        </section>
 
         <div className="mixer-panel__channels">
           <section className="mixer-channel mixer-channel--a" aria-label="Deck A channel">
@@ -163,15 +183,6 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
               />
               <span className="mixer-channel__value">{Math.round(channelLevels.a * 100)}%</span>
             </label>
-          </section>
-
-          <section className="mixer-meter-bridge" aria-label="Live signal meters">
-            <div className="mixer-meter-bridge__title">INPUT LEVEL</div>
-            <div className="mixer-meter-bridge__meters">
-              <MixerMeter label="A" level={meterLevels.a} className="mixer-meter--a" />
-              <MixerMeter label="MASTER" level={meterLevels.master} className="mixer-meter--master" />
-              <MixerMeter label="B" level={meterLevels.b} className="mixer-meter--b" />
-            </div>
           </section>
 
           <section className="mixer-channel mixer-channel--b" aria-label="Deck B channel">
@@ -198,63 +209,30 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
 
         <section className="mixer-crossfader" aria-label="Crossfader controls">
           <div className="mixer-crossfader__heading">
-            <span>CROSS FADER</span>
+            <span aria-hidden="true">CROSS FADER</span>
             <output htmlFor="mixer-crossfader">
               {crossfaderPercent === 50 ? 'CENTER' : String(crossfaderPercent) + '%'}
             </output>
           </div>
-          <div className="mixer-crossfader__controls">
-            <div className="mixer-crossfader__fader">
-              <div className="mixer-crossfader__ends" aria-hidden="true">
-                <span>1 / A</span>
-                <span>2 / B</span>
-              </div>
-              <input
-                id="mixer-crossfader"
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                value={crossfaderPercent}
-                onChange={(event) => updateCrossfader(Number(event.target.value))}
-                aria-label="Crossfader position"
-                aria-valuetext={crossfaderValueText}
-              />
-              <div className="mixer-crossfader__scale" aria-hidden="true">
-                {Array.from({ length: 11 }, (_, index) => <i key={index} />)}
-              </div>
-            </div>
-
-            <div className="mixer-cut-control">
-              <label className="mixer-cut-control__label" htmlFor="mixer-cut-lag">CUT-IN</label>
-              <div className="mixer-cut-control__dial">
-                <input
-                  id="mixer-cut-lag"
-                  className="mixer-cut-control__input"
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={cutLagPercent}
-                  onChange={(event) => updateCutLag(Number(event.target.value))}
-                  aria-label="Crossfader cut lag"
-                  aria-valuetext={cutLagValueText}
-                />
-                <span className="mixer-cut-control__face" aria-hidden="true">
-                  <i style={{ transform: `rotate(${cutLagPercent * 2.7 - 135}deg)` }} />
-                </span>
-              </div>
-              <output htmlFor="mixer-cut-lag">
-                {cutLagPercent === 0 ? 'MIN' : String(cutLagPercent) + '%'}
-              </output>
-            </div>
+          <div className="mixer-crossfader__ends" aria-hidden="true">
+            <span>A</span>
+            <span>B</span>
+          </div>
+          <input
+            id="mixer-crossfader"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value={crossfaderPercent}
+            onChange={(event) => updateCrossfader(Number(event.target.value))}
+            aria-label="Crossfader position"
+            aria-valuetext={crossfaderValueText}
+          />
+          <div className="mixer-crossfader__scale" aria-hidden="true">
+            {Array.from({ length: 11 }, (_, index) => <i key={index} />)}
           </div>
         </section>
-
-        <footer className="mixer-panel__footer">
-          <span>PMC-05 / DIGITAL EDITION</span>
-          <span>DUAL DECK · EQUAL POWER</span>
-        </footer>
       </div>
     </section>
   );
