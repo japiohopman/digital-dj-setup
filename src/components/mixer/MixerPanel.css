@@ -68,7 +68,7 @@
   -webkit-appearance: none;
   cursor: ew-resize;
   opacity: 0;
-  touch-action: pan-y;
+  touch-action: none;
 }
 
 .mixer-cut-control__face {
@@ -537,5 +537,13 @@
   .mixer-panel *::after {
     transition: none !important;
     animation: none !important;
+  }
+}
+
+
+/* Preserve a clear touch zone for TOOLS while keeping every mixer control visible on short phones. */
+@media (orientation: landscape) and (max-height: 400px) {
+  .mixer-panel {
+    height: 84%;
   }
 }
