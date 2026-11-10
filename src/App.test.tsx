@@ -48,8 +48,8 @@ describe('App dual-deck workspace', () => {
 
     try {
       const markup = renderToStaticMarkup(<App />);
-      expect(markup).toContain('OFFLINE · CACHED APP ONLY');
-      expect(markup).toContain('only cached app resources are available');
+      expect(markup).toContain('OFFLINE · NO NETWORK');
+      expect(markup).toContain('network connection unavailable');
     } finally {
       if (originalOnLine) Object.defineProperty(navigator, 'onLine', originalOnLine);
       else delete (navigator as { onLine?: boolean }).onLine;
