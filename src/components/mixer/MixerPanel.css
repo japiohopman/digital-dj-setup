@@ -264,8 +264,8 @@
   flex: 1 1 auto;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 1px;
+  justify-content: center;
+  gap: 4px;
 }
 
 .mixer-channel__fader-label {
@@ -277,7 +277,7 @@
 
 .mixer-channel__fader input {
   width: 44px;
-  height: clamp(76px, 16vh, 140px);
+  height: clamp(76px, 16vh, 160px);
   min-height: 60px;
   margin: 0;
   padding: 0;
