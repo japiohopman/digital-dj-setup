@@ -357,7 +357,11 @@ textarea {
     top: 50%;
     left: 50%;
     /* Fill vertical space of slot with minimal margin */
-    width: min(calc(100% * 1256 / 1010), calc(100vh - 4px), calc(100svh - 4px));
+    width: min(
+      calc(100% * 1256 / 1010),
+      calc(87.7193vh - 3.5088px),
+      calc(87.7193svh - 3.5088px)
+    );
     max-width: none;
     /*
      * The supplied Technics PNG has built-in empty canvas around its case.
