@@ -56,10 +56,6 @@ export function WorkspaceMenu({
   useEffect(() => {
     if (!isOpen) return;
 
-    const previouslyFocused = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-
     closeButtonRef.current?.focus();
 
     /** Keeps keyboard focus inside the library while it is open. */
@@ -92,7 +88,7 @@ export function WorkspaceMenu({
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      previouslyFocused?.focus();
+      triggerRef.current?.focus();
     };
   }, [isOpen]);
 
@@ -147,7 +143,7 @@ export function WorkspaceMenu({
         ref={triggerRef}
         type="button"
         className="workspace-menu__trigger"
-        aria-label={isOpen ? 'Close track library' : 'Open track library'}
+        aria-label={isOpen ? 'Close workspace tools' : 'Open workspace tools'}
         aria-expanded={isOpen}
         aria-controls="workspace-tools-menu"
         onClick={() => setIsOpen((current) => !current)}
