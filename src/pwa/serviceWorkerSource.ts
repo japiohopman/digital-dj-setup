@@ -51,7 +51,8 @@ export function shouldCacheRuntimeRequest(
 ): boolean {
   if (request.method !== 'GET' || requestOrigin !== appOrigin) return false;
 
-  const normalizedBasePath = normalizeBasePath(basePath);
+  const leadingSlash = basePath.startsWith('/') ? basePath : '/' + basePath;
+  const normalizedBasePath = leadingSlash.endsWith('/') ? leadingSlash : leadingSlash + '/';
   if (!pathname.startsWith(normalizedBasePath)) return false;
   const appPath = '/' + pathname.slice(normalizedBasePath.length);
 
