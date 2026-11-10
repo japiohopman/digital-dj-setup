@@ -1,9 +1,28 @@
-import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { StrictMode } from 'react';
+import { cleanup, render, renderToStaticMarkup, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from './App';
 
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
 describe('App dual-deck workspace', () => {
+  it('mounts the interactive workspace in StrictMode without a render loop', () => {
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+
+    const { unmount } = render(
+      <StrictMode>
+        <App />
+      </StrictMode>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Open workspace tools' })).toBeTruthy();
+    unmount();
+  });
   it('renders two independent instances of the reusable turntable with Web Audio connected', () => {
     const markup = renderToStaticMarkup(<App />);
 
