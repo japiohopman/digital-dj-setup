@@ -13,6 +13,9 @@ import type { DeckDiagnosticsSnapshot } from './devkit/types';
  */
 export type TurntableSpeed = 33 | 45;
 
+/** Loads a user-selected or bundled track through this deck's state machine. */
+export type DeckTrackLoader = (file: File) => Promise<void>;
+
 /**
  * Configuration and initial state properties for the Turntable component.
  */
@@ -43,6 +46,8 @@ export interface TurntableProps {
   onDevDiagnosticsChange?: (snapshot: DeckDiagnosticsSnapshot) => void;
   /** Optional shared workspace menu target for the deck's track-loader controls. */
   trackControlsPortalTarget?: HTMLElement | null;
+  /** Registers this deck's state-machine-backed track loader with the shared crate overlay. */
+  onRegisterTrackLoader?: (loader: DeckTrackLoader | null) => void;
 }
 
 /**
@@ -58,6 +63,7 @@ export function Turntable({
   onArmAngleChange,
   onDevDiagnosticsChange,
   trackControlsPortalTarget,
+  onRegisterTrackLoader,
   deckLabel = 'DECK 01',
   modelName = 'SL-1200 MK2',
   initialSpeed = 33,
@@ -95,6 +101,12 @@ export function Turntable({
   const recordRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => () => deckStore.getState().dispose(), [deckStore]);
+
+  useEffect(() => {
+    if (!onRegisterTrackLoader) return;
+    onRegisterTrackLoader(loadDeckTrack);
+    return () => onRegisterTrackLoader(null);
+  }, [loadDeckTrack, onRegisterTrackLoader]);
 
   const transportEndedNaturally = !!transport &&
     transport.playbackState === 'stopped' &&
