@@ -64,5 +64,10 @@ describe('MixerPanel', () => {
     expect(screen.getByRole('meter', { name: 'A signal level' })).toBeTruthy();
     expect(screen.getByRole('meter', { name: 'MASTER signal level' })).toBeTruthy();
     expect(screen.getByRole('meter', { name: 'B signal level' })).toBeTruthy();
+
+    const channelLayout = document.querySelector('.mixer-panel__channels');
+    expect(channelLayout?.children[0].querySelector('[aria-label="Deck A channel level"]')).toBeTruthy();
+    expect(channelLayout?.children[1].querySelector('[aria-label="MASTER signal level"]')).toBeTruthy();
+    expect(channelLayout?.children[2].querySelector('[aria-label="Deck B channel level"]')).toBeTruthy();
   });
 });
