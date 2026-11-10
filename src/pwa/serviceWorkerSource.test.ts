@@ -20,6 +20,8 @@ describe('PWA app-shell caching policy', () => {
     expect(urls).toContain('/manifest.webmanifest');
     expect(urls).toContain('/turntable/landscape/tt_case_and_lighting.png');
     expect(urls).toContain('/sounds/vinyl_loop.wav');
+    expect(urls).toContain('/sounds/battle_amo/scratch_making_me_itch.mp3');
+    expect(urls).toContain('/sounds/battle_amo/super_duck_breaks.mp3');
     expect(urls).toContain('/assets/index-a1b2c3.js');
     expect(urls).toContain('/assets/index-d4e5f6.css');
     expect(urls).toContain('/assets/turntable-123.png');
@@ -66,6 +68,20 @@ describe('PWA app-shell caching policy', () => {
     )).toBe(true);
 
     expect(shouldCacheRuntimeRequest(
+      { method: 'GET', destination: 'audio' },
+      '/sounds/battle_amo/scratch_making_me_itch.mp3',
+      'https://dj.example',
+      'https://dj.example',
+    )).toBe(true);
+
+    expect(shouldCacheRuntimeRequest(
+      { method: 'GET', destination: 'audio' },
+      '/sounds/battle_amo/super_duck_breaks.mp3',
+      'https://dj.example',
+      'https://dj.example',
+    )).toBe(true);
+
+    expect(shouldCacheRuntimeRequest(
       { method: 'GET', destination: 'image' },
       '/turntable/platter.png',
       'https://dj.example',
@@ -80,6 +96,8 @@ describe('PWA app-shell caching policy', () => {
     expect(urls).toContain('/digital-dj-setup/manifest.webmanifest');
     expect(urls).toContain('/digital-dj-setup/turntable/landscape/tt_case_and_lighting.png');
     expect(urls).toContain('/digital-dj-setup/sounds/vinyl_loop.wav');
+    expect(urls).toContain('/digital-dj-setup/sounds/battle_amo/scratch_making_me_itch.mp3');
+    expect(urls).toContain('/digital-dj-setup/sounds/battle_amo/super_duck_breaks.mp3');
     expect(urls).toContain('/digital-dj-setup/assets/app-a1b2.js');
     expect(urls.every((url) => url.startsWith('/digital-dj-setup/'))).toBe(true);
   });
