@@ -92,7 +92,7 @@ export function WorkspaceMenu({
           />
         </section>
         {children}
-        <p className="workspace-menu__hint">Alt+D · Esc closes</p>
+        <p className="workspace-menu__hint">Alt+D / Alt+Shift+D · Esc closes</p>
       </div>
     </div>
   );
