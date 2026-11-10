@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
-import { cleanup, render, renderToStaticMarkup, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { App } from './App';
