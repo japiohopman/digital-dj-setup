@@ -11,7 +11,7 @@ Primary references:
 
 Use references to understand the intended look and feel. Do not copy their source or assets without checking license and provenance.
 
-The agreed mixer reference is the supplied Vestax PCV-275 image in `docs/manual_examples/manual/vestax_pro_look.jpeg`, with control notes in `docs/manual_examples/vestax.txt`. Mixer development is tracked in [Issue #17](https://github.com/japiohopman/digital-dj-setup/issues/17), which is deliberately phased: shared audio routing first, then crossfader, deck levels and real meters, followed by EQ/master refinements.
+The primary visual mixer reference is the supplied Vestax PMC-05 Pro III image in `docs/manual_examples/visuals/vestax_pmc-pro.jpg`: black upper control section, brushed-aluminium faceplate, two channel strips, central meters and a prominent lower crossfader. The older PCV-275 image in `docs/manual_examples/manual/vestax_pro_look.jpeg` is supplementary for control grouping only; control notes are in `docs/manual_examples/vestax.txt`. Mixer development is tracked in [Issue #17](https://github.com/japiohopman/digital-dj-setup/issues/17), deliberately phased: shared audio routing first, then crossfader, deck levels and real meters, followed by EQ/master refinements.
 
 ## Technical direction
 
