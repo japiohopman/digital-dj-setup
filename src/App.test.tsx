@@ -22,7 +22,7 @@ describe('App dual-deck workspace', () => {
   it('provides an accessible portrait deck selector', () => {
     const markup = renderToStaticMarkup(<App />);
 
-    expect(markup).toContain('aria-label="Choose active deck"');
+    expect(markup).toContain('aria-label="Choose workspace view"');
     expect(markup).toContain('aria-controls="deck-a-panel"');
     expect(markup).toContain('aria-controls="deck-b-panel"');
     expect(markup).toContain('aria-pressed="true"');
