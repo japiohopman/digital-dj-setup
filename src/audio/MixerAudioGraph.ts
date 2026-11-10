@@ -196,7 +196,7 @@ export class MixerAudioGraph {
   }
 
   /**
-   * Returns equal-power gains after trimming an equal silent travel zone from both ends.
+   * Returns equal-power gains after adding an equal muted cut-lag zone for the incoming deck at both ends.
    * The 15% maximum is an app simulation range, not a Vestax hardware specification.
    */
   private getCrossfaderGains(position: number): [number, number] {
