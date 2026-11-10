@@ -59,12 +59,12 @@ jobs:
             }
           }
           for (const asset of [
-  'dist/sw.js',
-  'dist/favicon.svg',
-  'dist/sounds/vinyl_loop.wav',
-  'dist/sounds/battle_amo/scratch_making_me_itch.mp3',
-  'dist/sounds/battle_amo/super_duck_breaks.mp3',
-]) {
+            'dist/sw.js',
+            'dist/favicon.svg',
+            'dist/sounds/vinyl_loop.wav',
+            'dist/sounds/battle_amo/scratch_making_me_itch.mp3',
+            'dist/sounds/battle_amo/super_duck_breaks.mp3',
+          ]) {
             if (!existsSync(asset)) throw new Error('Missing PWA shell resource: ' + asset);
           }
           const worker = readFileSync('dist/sw.js', 'utf8');
