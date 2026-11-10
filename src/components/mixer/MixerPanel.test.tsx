@@ -10,9 +10,11 @@ describe('MixerPanel', () => {
     const audioGraph = {
       getChannelLevel: vi.fn(() => 1),
       getCrossfaderPosition: vi.fn(() => 0.5),
+      getCrossfaderCutLag: vi.fn(() => 0),
       getMeterLevels: vi.fn(() => ({ a: 0, b: 0, master: 0 })),
       setChannelLevel: vi.fn(),
       setCrossfaderPosition: vi.fn(),
+      setCrossfaderCutLag: vi.fn(),
     } as unknown as MixerAudioGraph;
 
     render(<MixerPanel audioGraph={audioGraph} />);
@@ -31,15 +33,25 @@ describe('MixerPanel', () => {
       target: { value: '20' },
     });
     expect(audioGraph.setCrossfaderPosition).toHaveBeenCalledWith(0.2);
+
+    fireEvent.change(screen.getByRole('slider', { name: 'Crossfader cut lag' }), {
+      target: { value: '35' },
+    });
+    expect(audioGraph.setCrossfaderCutLag).toHaveBeenCalledWith(0.35);
+    expect(
+      screen.getByRole('slider', { name: 'Crossfader position' }).getAttribute('aria-valuetext'),
+    ).toBe('Center, both Deck A and Deck B');
   });
 
   it('exposes three real signal meters with accessible decibel readouts', () => {
     const audioGraph = {
       getChannelLevel: vi.fn(() => 1),
       getCrossfaderPosition: vi.fn(() => 0.5),
+      getCrossfaderCutLag: vi.fn(() => 0),
       getMeterLevels: vi.fn(() => ({ a: 0.25, b: 0.5, master: 0.75 })),
       setChannelLevel: vi.fn(),
       setCrossfaderPosition: vi.fn(),
+      setCrossfaderCutLag: vi.fn(),
     } as unknown as MixerAudioGraph;
 
     render(<MixerPanel audioGraph={audioGraph} />);
