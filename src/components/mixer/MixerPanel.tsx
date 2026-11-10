@@ -15,9 +15,11 @@ export interface MixerPanelProps {
 const METER_SEGMENTS = 12;
 const METER_FLOOR_DB = -48;
 
+/** Converts a normalized RMS meter level into a display-safe decibel value. */
 const toDecibels = (level: number): number =>
   level <= 0.0001 ? -60 : Math.max(-60, Math.min(0, 20 * Math.log10(level)));
 
+/** Renders one accessible RMS meter and its matching visual segments. */
 function MixerMeter({ label, level, className = '' }: {
   label: string;
   level: number;
@@ -72,28 +74,57 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
   const [crossfaderPercent, setCrossfaderPercent] = useState(
     Math.round(audioGraph.getCrossfaderPosition() * 100),
   );
+  const [cutLagPercent, setCutLagPercent] = useState(
+    Math.round(audioGraph.getCrossfaderCutLag() * 100),
+  );
   const [meterLevels, setMeterLevels] = useState<MixerMeterLevels>(
     () => audioGraph.getMeterLevels(),
   );
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      setMeterLevels(audioGraph.getMeterLevels());
+      const next = audioGraph.getMeterLevels();
+      setMeterLevels((current) => (
+        current.a === next.a && current.b === next.b && current.master === next.master
+          ? current
+          : next
+      ));
     }, 80);
     return () => window.clearInterval(intervalId);
   }, [audioGraph]);
 
+  /** Updates one deck's mixer gain without changing its transport state. */
   const updateChannelLevel = (deckId: MixerDeckId, percent: number) => {
     const level = Math.max(0, Math.min(100, percent)) / 100;
     setChannelLevels((current) => ({ ...current, [deckId]: level }));
     audioGraph.setChannelLevel(deckId, level);
   };
 
+  /** Updates the A-to-B crossfader position in the shared audio graph. */
   const updateCrossfader = (percent: number) => {
     const nextPercent = Math.max(0, Math.min(100, percent));
     setCrossfaderPercent(nextPercent);
     audioGraph.setCrossfaderPosition(nextPercent / 100);
   };
+
+  /** Sets the symmetric silent travel zone at the two ends of the crossfader. */
+  const updateCutLag = (percent: number) => {
+    const nextPercent = Math.max(0, Math.min(100, percent));
+    setCutLagPercent(nextPercent);
+    audioGraph.setCrossfaderCutLag(nextPercent / 100);
+  };
+
+  const crossfaderValueText = crossfaderPercent === 0
+    ? 'Hard left, Deck A only'
+    : crossfaderPercent === 100
+      ? 'Hard right, Deck B only'
+      : crossfaderPercent === 50
+        ? 'Center, both Deck A and Deck B'
+        : String(crossfaderPercent) + '% from Deck A to Deck B';
+
+  const cutLagValueText = cutLagPercent === 0
+    ? 'Minimum cut lag; audio starts as soon as the fader leaves either end'
+    : String(cutLagPercent) + '% cut lag; symmetric silent zones at both ends';
 
   return (
     <section className="mixer-panel" id="mixer-panel" aria-label="Digital DJ mixer">
@@ -168,24 +199,55 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
         <section className="mixer-crossfader" aria-label="Crossfader controls">
           <div className="mixer-crossfader__heading">
             <span>CROSS FADER</span>
-            <output htmlFor="mixer-crossfader">{crossfaderPercent === 50 ? 'CENTER' : String(crossfaderPercent) + '%'}</output>
+            <output htmlFor="mixer-crossfader">
+              {crossfaderPercent === 50 ? 'CENTER' : String(crossfaderPercent) + '%'}
+            </output>
           </div>
-          <div className="mixer-crossfader__ends" aria-hidden="true">
-            <span>1 / A</span>
-            <span>2 / B</span>
-          </div>
-          <input
-            id="mixer-crossfader"
-            type="range"
-            min="0"
-            max="100"
-            step="1"
-            value={crossfaderPercent}
-            onChange={(event) => updateCrossfader(Number(event.target.value))}
-            aria-label="Crossfader position"
-          />
-          <div className="mixer-crossfader__scale" aria-hidden="true">
-            {Array.from({ length: 11 }, (_, index) => <i key={index} />)}
+          <div className="mixer-crossfader__controls">
+            <div className="mixer-crossfader__fader">
+              <div className="mixer-crossfader__ends" aria-hidden="true">
+                <span>1 / A</span>
+                <span>2 / B</span>
+              </div>
+              <input
+                id="mixer-crossfader"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={crossfaderPercent}
+                onChange={(event) => updateCrossfader(Number(event.target.value))}
+                aria-label="Crossfader position"
+                aria-valuetext={crossfaderValueText}
+              />
+              <div className="mixer-crossfader__scale" aria-hidden="true">
+                {Array.from({ length: 11 }, (_, index) => <i key={index} />)}
+              </div>
+            </div>
+
+            <div className="mixer-cut-control">
+              <label className="mixer-cut-control__label" htmlFor="mixer-cut-lag">CUT-IN</label>
+              <div className="mixer-cut-control__dial">
+                <input
+                  id="mixer-cut-lag"
+                  className="mixer-cut-control__input"
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={cutLagPercent}
+                  onChange={(event) => updateCutLag(Number(event.target.value))}
+                  aria-label="Crossfader cut lag"
+                  aria-valuetext={cutLagValueText}
+                />
+                <span className="mixer-cut-control__face" aria-hidden="true">
+                  <i style={{ transform: `rotate(${cutLagPercent * 2.7 - 135}deg)` }} />
+                </span>
+              </div>
+              <output htmlFor="mixer-cut-lag">
+                {cutLagPercent === 0 ? 'MIN' : String(cutLagPercent) + '%'}
+              </output>
+            </div>
           </div>
         </section>
 
