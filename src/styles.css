@@ -182,8 +182,8 @@ textarea {
 .deck-workspace.is-mixer-view .dual-deck__center-panel {
   display: flex;
   width: 100%;
-  min-height: clamp(380px, 58svh, 590px);
-  align-items: stretch;
+  min-height: 0;
+  align-items: center;
 }
 
 .dual-deck__turntable {
