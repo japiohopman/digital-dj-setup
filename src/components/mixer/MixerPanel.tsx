@@ -128,7 +128,7 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
 
   return (
     <section className="mixer-panel" id="mixer-panel" aria-label="Digital DJ mixer">
-      <header className="mixer-panel__header" aria-label="Mixer rotary controls">
+      <header className="mixer-panel__header" role="group" aria-label="Mixer rotary controls">
         <div className="mixer-cut-control mixer-cut-control--header">
           <label className="mixer-cut-control__label" htmlFor="mixer-cut-lag">CUT-IN</label>
           <div className="mixer-cut-control__dial">
