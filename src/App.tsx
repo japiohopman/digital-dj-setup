@@ -24,17 +24,45 @@ export function App() {
     b?: DeckDiagnosticsSnapshot;
   }>({});
   const [trackControlsPortalTarget, setTrackControlsPortalTarget] = useState<HTMLDivElement | null>(null);
+  /** Stores a deck arm angle only when its measured value actually changes. */
   const updateDeckAAngle = useCallback((angle: number) => {
-    setArmAngles((current) => ({ ...current, a: angle }));
+    setArmAngles((current) => current.a === angle ? current : { ...current, a: angle });
   }, []);
+  /** Stores a deck arm angle only when its measured value actually changes. */
   const updateDeckBAngle = useCallback((angle: number) => {
-    setArmAngles((current) => ({ ...current, b: angle }));
+    setArmAngles((current) => current.b === angle ? current : { ...current, b: angle });
   }, []);
+  /** Avoids rerendering the whole workspace for an unchanged diagnostic snapshot. */
   const updateDeckADiagnostics = useCallback((snapshot: DeckDiagnosticsSnapshot) => {
-    setDeckDiagnostics((current) => ({ ...current, a: snapshot }));
+    setDeckDiagnostics((current) => {
+      const previous = current.a;
+      if (previous &&
+        previous.power === snapshot.power &&
+        previous.motorPhase === snapshot.motorPhase &&
+        previous.tonearm === snapshot.tonearm &&
+        previous.track === snapshot.track &&
+        previous.transport === snapshot.transport &&
+        previous.isAudible === snapshot.isAudible &&
+        previous.trace === snapshot.trace
+      ) return current;
+      return { ...current, a: snapshot };
+    });
   }, []);
+  /** Avoids rerendering the whole workspace for an unchanged diagnostic snapshot. */
   const updateDeckBDiagnostics = useCallback((snapshot: DeckDiagnosticsSnapshot) => {
-    setDeckDiagnostics((current) => ({ ...current, b: snapshot }));
+    setDeckDiagnostics((current) => {
+      const previous = current.b;
+      if (previous &&
+        previous.power === snapshot.power &&
+        previous.motorPhase === snapshot.motorPhase &&
+        previous.tonearm === snapshot.tonearm &&
+        previous.track === snapshot.track &&
+        previous.transport === snapshot.transport &&
+        previous.isAudible === snapshot.isAudible &&
+        previous.trace === snapshot.trace
+      ) return current;
+      return { ...current, b: snapshot };
+    });
   }, []);
   const [mixerAudioGraph] = useState(() => new MixerAudioGraph());
   const [deckAAudioOptions] = useState(() => mixerAudioGraph.createDeckAudioOptions('a'));
