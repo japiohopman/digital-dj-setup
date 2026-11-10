@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import './MixerPanel.css';
+
 import {
   MixerAudioGraph,
   type MixerDeckId,
