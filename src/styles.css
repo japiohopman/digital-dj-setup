@@ -170,6 +170,22 @@ textarea {
   display: none;
 }
 
+.deck-workspace.is-mixer-view .dual-deck-layout {
+  width: min(100%, 760px);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.deck-workspace.is-mixer-view .dual-deck__slot {
+  display: none;
+}
+
+.deck-workspace.is-mixer-view .dual-deck__center-panel {
+  display: flex;
+  width: 100%;
+  min-height: clamp(380px, 58svh, 590px);
+  align-items: stretch;
+}
+
 .dual-deck__turntable {
   width: 100%;
 }
@@ -286,10 +302,13 @@ textarea {
 
   .dual-deck__center-panel {
     display: flex;
-    flex: 0 0 clamp(48px, 14vw, 220px);
+    flex: 0 0 clamp(190px, 22vw, 310px);
     height: 100%;
     min-width: 0;
-    pointer-events: none;
+    align-items: stretch;
+    justify-content: center;
+    pointer-events: auto;
+    overflow: hidden;
   }
 
   /*
