@@ -85,7 +85,10 @@ export function getPrecacheUrls(bundleAssetPaths: string[], basePath = '/'): str
   ])).sort();
 }
 
-/** Emits a small versioned install/activate/fetch worker scoped to the deployment base. */
+/**
+ * Emits a versioned service worker scoped to the deployment base.
+ * The Vite plugin supplies a fingerprint of the emitted bundle and public asset bytes.
+ */
 export function createServiceWorkerSource(
   bundleAssetPaths: string[],
   basePath = '/',
@@ -159,7 +162,7 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       } catch {
-        let cached: Response | undefined;
+        let cached;
         try {
           cached = await caches.match(request) || await caches.match(APP_SHELL_URL);
         } catch {
@@ -177,7 +180,7 @@ self.addEventListener('fetch', (event) => {
   if (!shouldCacheRuntimeRequest(request, url.pathname, url.origin, self.location.origin, APP_BASE_PATH)) return;
 
   event.respondWith((async () => {
-    let cached: Response | undefined;
+    let cached;
     try {
       cached = await caches.match(request);
     } catch {
@@ -185,7 +188,7 @@ self.addEventListener('fetch', (event) => {
     }
     if (cached) return cached;
 
-    let response: Response;
+    let response;
     try {
       response = await fetch(request);
     } catch {
@@ -204,14 +207,6 @@ self.addEventListener('fetch', (event) => {
       }
     }
     return response;
-  })());
-});
-`;
-}
-        'This application resource is not available offline. Reconnect and reload.',
-        { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } },
-      );
-    }
   })());
 });
 `;
