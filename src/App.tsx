@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useDeckTransport } from './audio/useDeckTransport';
 import { MixerAudioGraph } from './audio/MixerAudioGraph';
 import { MixerPanel } from './components/mixer/MixerPanel';
-import { Turntable } from './components/Turntable';
+import { Turntable, type DeckTrackLoader } from './components/Turntable';
 import { DevKit } from './components/devkit/DevKit';
-import { WorkspaceMenu } from './components/workspace/WorkspaceMenu';
+import { BATTLE_AMMO_TRACKS, WorkspaceMenu, type BattleAmmoTrack } from './components/workspace/WorkspaceMenu';
 import type { DeckDiagnosticsSnapshot } from './components/devkit/types';
 import './components/Turntable.css';
 
@@ -27,6 +27,33 @@ export function App() {
     b?: DeckDiagnosticsSnapshot;
   }>({});
   const [trackControlsPortalTarget, setTrackControlsPortalTarget] = useState<HTMLDivElement | null>(null);
+  const deckTrackLoaders = useRef<Partial<Record<ActiveDeck, DeckTrackLoader>>>({});
+  const registerDeckALoader = useCallback((loader: DeckTrackLoader | null) => {
+    if (loader) deckTrackLoaders.current.a = loader;
+    else delete deckTrackLoaders.current.a;
+  }, []);
+  const registerDeckBLoader = useCallback((loader: DeckTrackLoader | null) => {
+    if (loader) deckTrackLoaders.current.b = loader;
+    else delete deckTrackLoaders.current.b;
+  }, []);
+  const loadBundledTrack = useCallback(async (deck: ActiveDeck, track: BattleAmmoTrack) => {
+    const loadTrack = deckTrackLoaders.current[deck];
+    if (!loadTrack) {
+      throw new Error(`Deck ${deck.toUpperCase()} is not ready to load a track yet.`);
+    }
+
+    const response = await fetch(`${import.meta.env.BASE_URL}${track.path}`);
+    if (!response.ok) {
+      throw new Error(`Could not load ${track.filename} (HTTP ${response.status}).`);
+    }
+
+    const audioFile = new File(
+      [await response.blob()],
+      track.filename,
+      { type: response.headers.get('content-type') || 'audio/mpeg' },
+    );
+    await loadTrack(audioFile);
+  }, []);
   /** Stores a deck arm angle only when its measured value actually changes. */
   const updateDeckAAngle = useCallback((angle: number) => {
     setArmAngles((current) => current.a === angle ? current : { ...current, a: angle });
@@ -164,12 +191,17 @@ export function App() {
                 onArmAngleChange={updateDeckAAngle}
                 onDevDiagnosticsChange={updateDeckADiagnostics}
                 trackControlsPortalTarget={trackControlsPortalTarget}
+                onRegisterTrackLoader={registerDeckALoader}
               />
             </div>
           </div>
 
           <div className="dual-deck__center-panel">
-            <WorkspaceMenu onTrackControlsTargetChange={setTrackControlsPortalTarget}>
+            <WorkspaceMenu
+              onTrackControlsTargetChange={setTrackControlsPortalTarget}
+              onLoadBundledTrack={loadBundledTrack}
+              tracks={BATTLE_AMMO_TRACKS}
+            >
               {import.meta.env.DEV && (
                 <DevKit
                   activeDeckLabel={activeDeck === 'a' ? 'DECK A' : 'DECK B'}
@@ -193,6 +225,7 @@ export function App() {
                 onArmAngleChange={updateDeckBAngle}
                 onDevDiagnosticsChange={updateDeckBDiagnostics}
                 trackControlsPortalTarget={trackControlsPortalTarget}
+                onRegisterTrackLoader={registerDeckBLoader}
               />
             </div>
           </div>
