@@ -28,4 +28,15 @@ describe('App dual-deck workspace', () => {
     expect(markup).toContain('aria-pressed="true"');
     expect(markup).toContain('aria-pressed="false"');
   });
+  it('renders the dedicated two-channel mixer with accessible fader controls', () => {
+    const markup = renderToStaticMarkup(<App />);
+
+    expect(markup).toContain('aria-controls="mixer-panel"');
+    expect(markup).toContain('aria-label="Digital DJ mixer"');
+    expect(markup).toContain('aria-label="Deck A channel level"');
+    expect(markup).toContain('aria-label="Deck B channel level"');
+    expect(markup).toContain('aria-label="Crossfader position"');
+    expect(markup).toContain('role="meter"');
+  });
+
 });
