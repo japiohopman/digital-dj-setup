@@ -28,7 +28,7 @@ function createBuildFingerprint(bundle: Record<string, {
 
   const publicAssetPaths = [...PUBLIC_APP_ASSETS, '/manifest.webmanifest'];
   for (const publicAsset of publicAssetPaths) {
-    const filePath = resolve(process.cwd(), 'public', publicAsset.replace(/^\\/+/, ''));
+    const filePath = resolve(process.cwd(), 'public', publicAsset.replace(/^\/+/, ''));
     if (!existsSync(filePath)) {
       throw new Error('Missing public app-shell asset: ' + publicAsset);
     }
