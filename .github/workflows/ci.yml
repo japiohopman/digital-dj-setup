@@ -58,12 +58,23 @@ jobs:
               throw new Error('Missing install icon: ' + size);
             }
           }
-          for (const asset of ['dist/sw.js', 'dist/favicon.svg', 'dist/sounds/vinyl_loop.wav']) {
+          for (const asset of [
+            'dist/sw.js',
+            'dist/favicon.svg',
+            'dist/sounds/vinyl_loop.wav',
+            'dist/sounds/battle_amo/scratch_making_me_itch.mp3',
+            'dist/sounds/battle_amo/super_duck_breaks.mp3',
+          ]) {
             if (!existsSync(asset)) throw new Error('Missing PWA shell resource: ' + asset);
           }
           const worker = readFileSync('dist/sw.js', 'utf8');
           if (!worker.includes('digital-dj-shell-') || !worker.includes('PRECACHE_URLS')) {
             throw new Error('The generated versioned app-shell worker is missing.');
+          }
+          for (const track of ['scratch_making_me_itch.mp3', 'super_duck_breaks.mp3']) {
+            if (!worker.includes('/sounds/battle_amo/' + track)) {
+              throw new Error('Battle Ammo track is missing from the offline precache: ' + track);
+            }
           }
           if (worker.includes('user-audio-preview')) {
             throw new Error('User-selected audio must not be added to the precache.');
@@ -104,6 +115,11 @@ jobs:
           if (!worker.includes('"/digital-dj-setup/"') ||
               !worker.includes('"/digital-dj-setup/turntable/landscape/tt_case_and_lighting.png"')) {
             throw new Error('GitHub Pages worker does not precache resources under the project path.');
+          }
+          for (const track of ['scratch_making_me_itch.mp3', 'super_duck_breaks.mp3']) {
+            if (!worker.includes('"/digital-dj-setup/sounds/battle_amo/' + track + '"')) {
+              throw new Error('GitHub Pages worker is missing a Battle Ammo track: ' + track);
+            }
           }
           if (worker.includes('user-audio-preview')) {
             throw new Error('User-selected audio must never be added to the app-shell cache.');

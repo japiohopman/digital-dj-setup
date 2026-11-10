@@ -437,3 +437,30 @@ textarea {
     max-height: 100dvh;
   }
 }
+
+
+/* Keep the shared library entry point reachable in portrait without consuming deck space. */
+@media (orientation: portrait) {
+  .deck-workspace:not(.is-mixer-view) .dual-deck__center-panel {
+    position: fixed;
+    z-index: 15000;
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    display: flex;
+    width: auto;
+    height: auto;
+    pointer-events: none;
+  }
+
+  .deck-workspace:not(.is-mixer-view) .dual-deck__center-panel > .workspace-menu {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: auto;
+    pointer-events: auto;
+  }
+
+  .deck-workspace:not(.is-mixer-view) .dual-deck__center-panel > .mixer-panel {
+    display: none;
+  }
+}

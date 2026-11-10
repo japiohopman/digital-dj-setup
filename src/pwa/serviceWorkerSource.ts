@@ -29,6 +29,9 @@ export const PUBLIC_APP_ASSETS = [
   '/sounds/needle_start_record.wav',
   '/sounds/not_on_record_loop.wav',
   '/sounds/vinyl_loop.wav',
+  // Bundled Battle Ammo crate tracks are app-owned and intentionally available offline.
+  '/sounds/battle_amo/scratch_making_me_itch.mp3',
+  '/sounds/battle_amo/super_duck_breaks.mp3',
 ] as const;
 
 export interface RuntimeRequestDescriptor {
