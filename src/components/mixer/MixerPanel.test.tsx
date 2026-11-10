@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MixerPanel } from './MixerPanel';
@@ -37,8 +37,8 @@ describe('MixerPanel', () => {
       target: { value: '50' },
     });
 
-    const cutIn = screen.getByRole('slider', { name: 'Crossfader cut lag' });
-    expect(cutIn.closest('.mixer-panel__header')).toBeTruthy();
+    const rotaryControls = screen.getByRole('group', { name: 'Mixer rotary controls' });
+    const cutIn = within(rotaryControls).getByRole('slider', { name: 'Crossfader cut lag' });
     fireEvent.change(cutIn, {
       target: { value: '35' },
     });
