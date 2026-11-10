@@ -180,10 +180,13 @@ textarea {
 }
 
 .deck-workspace.is-mixer-view .dual-deck__center-panel {
+  position: relative;
   display: flex;
   width: 100%;
   min-height: 0;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
 }
 
 .dual-deck__turntable {
@@ -260,10 +263,10 @@ textarea {
     height: 100svh;
     min-height: 0;
     padding:
-      max(4px, env(safe-area-inset-top))
-      max(6px, env(safe-area-inset-right))
-      max(4px, env(safe-area-inset-bottom))
-      max(6px, env(safe-area-inset-left));
+      max(2px, env(safe-area-inset-top))
+      max(2px, env(safe-area-inset-right))
+      max(2px, env(safe-area-inset-bottom))
+      max(2px, env(safe-area-inset-left));
     gap: 0;
     justify-content: center;
     overflow: hidden;
@@ -293,9 +296,9 @@ textarea {
     width: 100%;
     height: 100%;
     max-width: none;
-    align-items: center;
+    align-items: stretch;
     justify-content: space-between;
-    gap: clamp(6px, 1.2vw, 18px);
+    gap: 0;
   }
 
   .dual-deck-layout .dual-deck__slot {
@@ -312,15 +315,30 @@ textarea {
   .dual-deck__center-panel {
     position: relative;
     display: flex;
-    flex: 0 0 clamp(220px, 28vw, 320px);
-    height: 76%;
+    flex: 0 0 clamp(180px, 24vw, 270px);
+    width: auto;
+    height: 100%;
     min-width: 0;
-    align-self: flex-end;
-    margin-bottom: 3.5%;
+    flex-direction: column;
     align-items: stretch;
-    justify-content: center;
+    justify-content: flex-end;
     pointer-events: auto;
-    overflow: hidden;
+    overflow: visible;
+  }
+
+  .dual-deck__center-panel > .workspace-menu {
+    position: absolute;
+    top: 5px;
+    left: 0;
+    width: 100%;
+  }
+
+  .dual-deck__center-panel > .mixer-panel {
+    width: 100%;
+    height: 76%;
+    max-width: none;
+    align-self: flex-end;
+    margin-top: auto;
   }
 
   /*
@@ -337,7 +355,7 @@ textarea {
     top: 50%;
     left: 50%;
     /* Fill vertical space of slot with minimal margin */
-    width: min(calc(100% * 1256 / 1010), calc(100vh - 12px), calc(100svh - 12px));
+    width: min(calc(100% * 1256 / 1010), calc(100vh - 4px), calc(100svh - 4px));
     max-width: none;
     transform: translate(-50%, -50%) rotate(-90deg);
   }
@@ -350,10 +368,7 @@ textarea {
 }
 
 @media (orientation: landscape) and (min-height: 700px) {
-  .dual-deck__center-panel {
-    height: min(76%, 500px);
-    align-self: center;
-    margin-bottom: 0;
-    transform: translateY(6vh);
+  .dual-deck__center-panel > .mixer-panel {
+    height: min(76%, 760px);
   }
 }
