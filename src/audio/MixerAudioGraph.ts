@@ -21,7 +21,7 @@ interface DeckChannelPath {
   channelGain: GainNode;
   crossfaderGain: GainNode;
   analyser: AnalyserNode;
-  meterData: Float32Array;
+  meterData: Float32Array<ArrayBuffer>;
 }
 
 /**
@@ -35,7 +35,7 @@ export class MixerAudioGraph {
   private audioContext: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private masterAnalyser: AnalyserNode | null = null;
-  private masterMeterData = new Float32Array(2048);
+  private masterMeterData: Float32Array<ArrayBuffer> = new Float32Array(2048);
   private readonly deckPaths = new Map<MixerDeckId, DeckChannelPath>();
   private readonly channelLevels: Record<MixerDeckId, number> = { a: 1, b: 1 };
   private crossfaderPosition = 0.5;
@@ -200,7 +200,7 @@ export class MixerAudioGraph {
   }
 
   /** Converts analyser time-domain samples into a normalized RMS level. */
-  private readRms(analyser: AnalyserNode, samples: Float32Array): number {
+  private readRms(analyser: AnalyserNode, samples: Float32Array<ArrayBuffer>): number {
     try {
       analyser.getFloatTimeDomainData(samples);
       let sumSquares = 0;
