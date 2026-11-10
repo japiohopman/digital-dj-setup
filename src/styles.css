@@ -351,8 +351,9 @@ textarea {
 
 @media (orientation: landscape) and (min-height: 700px) {
   .dual-deck__center-panel {
-    height: min(76%, 760px);
-    align-self: flex-end;
-    margin-bottom: 3.5%;
+    height: min(76%, 500px);
+    align-self: center;
+    margin-bottom: 0;
+    transform: translateY(6vh);
   }
 }
