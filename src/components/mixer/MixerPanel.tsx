@@ -124,7 +124,7 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
 
   const cutLagValueText = cutLagPercent === 0
     ? 'Minimum cut lag; audio starts as soon as the fader leaves either end'
-    : String(cutLagPercent) + '% cut lag; symmetric silent zones at both ends';
+    : String(cutLagPercent) + '% cut lag; symmetric muted zones for the incoming deck at both ends';
 
   return (
     <section className="mixer-panel" id="mixer-panel" aria-label="Digital DJ mixer">
