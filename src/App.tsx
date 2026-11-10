@@ -13,7 +13,10 @@ type ActiveView = ActiveDeck | 'mixer';
 
 export function App() {
   const [activeDeck, setActiveDeck] = useState<ActiveDeck>('a');
-  const [activeView, setActiveView] = useState<ActiveView>('a');
+  const [activeView, setActiveView] = useState<ActiveView>(() => {
+    if (typeof window === 'undefined') return 'a';
+    return new URLSearchParams(window.location.search).get('view') === 'mixer' ? 'mixer' : 'a';
+  });
   const [armAngles, setArmAngles] = useState<{ a: number; b: number }>({ a: 0, b: 0 });
   const [deckDiagnostics, setDeckDiagnostics] = useState<{
     a?: DeckDiagnosticsSnapshot;
