@@ -295,7 +295,7 @@ textarea {
     max-width: none;
     align-items: center;
     justify-content: space-between;
-    gap: clamp(12px, 3vw, 40px);
+    gap: clamp(6px, 1.2vw, 18px);
   }
 
   .dual-deck-layout .dual-deck__slot {
@@ -310,10 +310,13 @@ textarea {
   }
 
   .dual-deck__center-panel {
+    position: relative;
     display: flex;
-    flex: 0 0 clamp(220px, 26vw, 360px);
-    height: 100%;
+    flex: 0 0 clamp(220px, 28vw, 320px);
+    height: 76%;
     min-width: 0;
+    align-self: flex-end;
+    margin-bottom: 3.5%;
     align-items: stretch;
     justify-content: center;
     pointer-events: auto;
@@ -348,7 +351,8 @@ textarea {
 
 @media (orientation: landscape) and (min-height: 700px) {
   .dual-deck__center-panel {
-    height: min(82vh, 760px);
-    align-self: center;
+    height: min(76%, 760px);
+    align-self: flex-end;
+    margin-bottom: 3.5%;
   }
 }
