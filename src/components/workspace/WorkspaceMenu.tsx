@@ -142,23 +142,7 @@ export function WorkspaceMenu({
     }
   };
 
-  return (
-    <div className="workspace-menu">
-      <button
-        ref={triggerRef}
-        type="button"
-        className="workspace-menu__trigger"
-        aria-label={isOpen ? 'Close workspace tools' : 'Open workspace tools'}
-        aria-expanded={isOpen}
-        aria-controls="workspace-tools-menu"
-        onClick={() => setIsOpen((current) => !current)}
-      >
-        <span className="workspace-menu__trigger-icon" aria-hidden="true">☰</span>
-        <span>TOOLS</span>
-        <span className="workspace-menu__trigger-caret" aria-hidden="true">{isOpen ? '▲' : '▼'}</span>
-      </button>
-
-      {portalTarget && createPortal(
+  const overlayMarkup = (
         <div
           id="workspace-tools-menu"
           className="workspace-menu__popover"
@@ -287,9 +271,26 @@ export function WorkspaceMenu({
             <span>ALT + D TOGGLE <i aria-hidden="true">·</i> ESC TO CLOSE</span>
           </footer>
         </section>
-        </div>,
-        portalTarget,
-      )}
+        </div>
+  );
+
+  return (
+    <div className="workspace-menu">
+      <button
+        ref={triggerRef}
+        type="button"
+        className="workspace-menu__trigger"
+        aria-label={isOpen ? 'Close workspace tools' : 'Open workspace tools'}
+        aria-expanded={isOpen}
+        aria-controls="workspace-tools-menu"
+        onClick={() => setIsOpen((current) => !current)}
+      >
+        <span className="workspace-menu__trigger-icon" aria-hidden="true">☰</span>
+        <span>TOOLS</span>
+        <span className="workspace-menu__trigger-caret" aria-hidden="true">{isOpen ? '▲' : '▼'}</span>
+      </button>
+
+      {portalTarget ? createPortal(overlayMarkup, portalTarget) : overlayMarkup}
     </div>
   );
 }
