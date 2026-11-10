@@ -17,6 +17,23 @@ describe('registerAppServiceWorker', () => {
     expect(register).toHaveBeenCalledWith('/sw.js', { scope: '/' });
   });
 
+  it('registers the worker inside a nested project-site scope', () => {
+    const register = vi.fn(() => Promise.resolve({} as ServiceWorkerRegistration));
+    let onLoad: (() => void) | undefined;
+
+    registerAppServiceWorker(
+      { register },
+      (listener) => { onLoad = listener; },
+      '/digital-dj-setup/',
+    );
+
+    onLoad?.();
+    expect(register).toHaveBeenCalledWith(
+      '/digital-dj-setup/sw.js',
+      { scope: '/digital-dj-setup/' },
+    );
+  });
+
   it('does nothing when service workers are unavailable', () => {
     const addLoadListener = vi.fn();
 
@@ -34,6 +51,7 @@ describe('registerAppServiceWorker', () => {
     registerAppServiceWorker(
       { register },
       (listener) => { onLoad = listener; },
+      '/',
       onError,
     );
 
