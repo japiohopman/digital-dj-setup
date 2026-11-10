@@ -378,7 +378,7 @@ export function Turntable({
             aria-label={deckLabel + ' Load audio track'}
           >
             <span className="deck-load-icon" aria-hidden="true">▲</span>
-            LOAD
+            LOAD TRACK
           </button>
           {machine.track === 'loading' && (
             <span className="deck-transport-state">LOADING</span>
