@@ -73,12 +73,59 @@ describe('PWA app-shell caching policy', () => {
     )).toBe(true);
   });
 
+  it('builds every precache URL under a GitHub Pages project path', () => {
+    const urls = getPrecacheUrls(['assets/app-a1b2.js'], '/digital-dj-setup/');
+
+    expect(urls).toContain('/digital-dj-setup/');
+    expect(urls).toContain('/digital-dj-setup/manifest.webmanifest');
+    expect(urls).toContain('/digital-dj-setup/turntable/landscape/tt_case_and_lighting.png');
+    expect(urls).toContain('/digital-dj-setup/sounds/vinyl_loop.wav');
+    expect(urls).toContain('/digital-dj-setup/assets/app-a1b2.js');
+    expect(urls.every((url) => url.startsWith('/digital-dj-setup/'))).toBe(true);
+  });
+
+  it('does not apply the app-shell cache policy outside its project path', () => {
+    expect(shouldCacheRuntimeRequest(
+      { method: 'GET', destination: 'image' },
+      '/turntable/platter.png',
+      'https://dj.example',
+      'https://dj.example',
+      '/digital-dj-setup/',
+    )).toBe(false);
+
+    expect(shouldCacheRuntimeRequest(
+      { method: 'GET', destination: 'image' },
+      '/digital-dj-setup/turntable/platter.png',
+      'https://dj.example',
+      'https://dj.example',
+      '/digital-dj-setup/',
+    )).toBe(true);
+
+    expect(shouldCacheRuntimeRequest(
+      { method: 'GET', destination: 'audio' },
+      '/digital-dj-setup/uploads/my-record.mp3',
+      'https://dj.example',
+      'https://dj.example',
+      '/digital-dj-setup/',
+    )).toBe(false);
+  });
+
+  it('generates a service worker whose scope and fallback use the Pages base path', () => {
+    const source = createServiceWorkerSource(['assets/app-a1b2.js'], '/digital-dj-setup/');
+
+    expect(source).toContain('const APP_BASE_PATH = "/digital-dj-setup/";');
+    expect(source).toContain('"/digital-dj-setup/manifest.webmanifest"');
+    expect(source).toContain('"/digital-dj-setup/assets/app-a1b2.js"');
+    expect(source).not.toContain('"/assets/app-a1b2.js"');
+  });
+
   it('generates offline navigation fallback and a versioned cache', () => {
     const source = createServiceWorkerSource(['assets/app-a1b2.js']);
     expect(source).toContain('digital-dj-shell-');
     expect(source).toContain('self.skipWaiting()');
     expect(source).toContain('self.clients.claim()');
-    expect(source).toContain('await caches.match(\'/\')');
+    expect(source).toContain('const APP_SHELL_URL = new URL(APP_BASE_PATH, self.location.origin).href;');
+    expect(source).toContain('await caches.match(APP_SHELL_URL)');
     expect(source).toContain('not available offline');
     expect(source).toContain('/assets/app-a1b2.js');
     expect(source).not.toContain('user-audio-preview');
