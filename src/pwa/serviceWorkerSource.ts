@@ -36,6 +36,7 @@ export interface RuntimeRequestDescriptor {
   destination: string;
 }
 
+/** Normalizes a deployment path to a leading- and trailing-slash URL scope. */
 function normalizeBasePath(basePath: string): string {
   const leadingSlash = basePath.startsWith('/') ? basePath : '/' + basePath;
   return leadingSlash.endsWith('/') ? leadingSlash : leadingSlash + '/';
@@ -85,10 +86,18 @@ export function getPrecacheUrls(bundleAssetPaths: string[], basePath = '/'): str
 }
 
 /** Emits a small versioned install/activate/fetch worker scoped to the deployment base. */
-export function createServiceWorkerSource(bundleAssetPaths: string[], basePath = '/'): string {
+export function createServiceWorkerSource(
+  bundleAssetPaths: string[],
+  basePath = '/',
+  buildFingerprint = '',
+): string {
   const normalizedBasePath = normalizeBasePath(basePath);
   const precacheUrls = getPrecacheUrls(bundleAssetPaths, normalizedBasePath);
-  const seed = normalizedBasePath + '\n' + precacheUrls.join('\n');
+  const seed = [
+    normalizedBasePath,
+    buildFingerprint,
+    ...precacheUrls,
+  ].join('\n');
   let versionHash = 2166136261;
   for (let index = 0; index < seed.length; index += 1) {
     versionHash ^= seed.charCodeAt(index);
@@ -141,12 +150,21 @@ self.addEventListener('fetch', (event) => {
       try {
         const response = await fetch(request);
         if (response.ok) {
-          const cache = await caches.open(CACHE_NAME);
-          await cache.put(APP_SHELL_URL, response.clone());
+          try {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(APP_SHELL_URL, response.clone());
+          } catch {
+            // Preserve a successful page response when storage is unavailable or full.
+          }
         }
         return response;
       } catch {
-        const cached = await caches.match(request) || await caches.match(APP_SHELL_URL);
+        let cached: Response | undefined;
+        try {
+          cached = await caches.match(request) || await caches.match(APP_SHELL_URL);
+        } catch {
+          // Cache lookup can also fail; keep the explicit offline response below.
+        }
         return cached || new Response(
           'The DJ app shell is not cached yet. Connect once and open the app again.',
           { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } },
@@ -159,18 +177,37 @@ self.addEventListener('fetch', (event) => {
   if (!shouldCacheRuntimeRequest(request, url.pathname, url.origin, self.location.origin, APP_BASE_PATH)) return;
 
   event.respondWith((async () => {
-    const cached = await caches.match(request);
+    let cached: Response | undefined;
+    try {
+      cached = await caches.match(request);
+    } catch {
+      // A cache lookup failure should not prevent trying the network.
+    }
     if (cached) return cached;
 
+    let response: Response;
     try {
-      const response = await fetch(request);
-      if (response.ok) {
-        const cache = await caches.open(CACHE_NAME);
-        await cache.put(request, response.clone());
-      }
-      return response;
+      response = await fetch(request);
     } catch {
       return new Response(
+        'This application resource is not available offline. Reconnect and reload.',
+        { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } },
+      );
+    }
+
+    if (response.ok) {
+      try {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(request, response.clone());
+      } catch {
+        // Return the successful network response even when cache storage cannot be written.
+      }
+    }
+    return response;
+  })());
+});
+`;
+}
         'This application resource is not available offline. Reconnect and reload.',
         { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } },
       );
