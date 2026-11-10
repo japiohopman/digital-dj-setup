@@ -45,7 +45,7 @@ jobs:
       - name: Verify installable PWA output
         run: |
           node --input-type=module <<'NODE'
-          import { existsSync, readFileSync } from 'node:fs';
+          import { existsSync, readFileSync, readdirSync } from 'node:fs';
 
           const manifest = JSON.parse(readFileSync('dist/manifest.webmanifest', 'utf8'));
           if (manifest.display !== 'standalone' || manifest.start_url !== './' || manifest.scope !== './') {
@@ -92,6 +92,12 @@ jobs:
           const html = readFileSync('dist-pages/index.html', 'utf8');
           if (!html.includes('/digital-dj-setup/assets/') || !html.includes('/digital-dj-setup/manifest.webmanifest')) {
             throw new Error('GitHub Pages HTML does not reference project-scoped assets.');
+          }
+          const cssFile = readdirSync('dist-pages/assets').find((file) => file.endsWith('.css'));
+          if (!cssFile) throw new Error('No CSS bundle was emitted for GitHub Pages.');
+          const css = readFileSync('dist-pages/assets/' + cssFile, 'utf8');
+          if (!css.includes('/digital-dj-setup/turntable/')) {
+            throw new Error('Turntable CSS artwork URLs were not rewritten under the GitHub Pages base path.');
           }
           const worker = readFileSync('dist-pages/sw.js', 'utf8');
           if (!worker.includes('"/digital-dj-setup/"') ||
