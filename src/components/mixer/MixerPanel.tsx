@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 
-import './MixerPanel.css';
-
 import {
   MixerAudioGraph,
   type MixerDeckId,
   type MixerMeterLevels,
 } from '../../audio/MixerAudioGraph';
+import './MixerPanel.css';
 
 export interface MixerPanelProps {
   /** App-owned audio graph; the panel never manipulates Web Audio nodes directly. */
