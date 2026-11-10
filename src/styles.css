@@ -357,11 +357,7 @@ textarea {
     top: 50%;
     left: 50%;
     /* Fill vertical space of slot with minimal margin */
-    width: min(
-      calc(100% * 1256 / 1010),
-      calc(87.7193vh - 3.5088px),
-      calc(87.7193svh - 3.5088px)
-    );
+    width: min(calc(100% * 1256 / 1010), calc(100vh - 4px), calc(100svh - 4px));
     max-width: none;
     /*
      * The supplied Technics PNG has built-in empty canvas around its case.
@@ -383,5 +379,17 @@ textarea {
 @media (orientation: landscape) and (min-height: 700px) {
   .dual-deck__center-panel > .mixer-panel {
     height: min(76%, 760px);
+  }
+}
+
+
+/* At short 320px-class landscape heights, keep the entire 1.14x deck zoom in view. */
+@media (orientation: landscape) and (max-height: 360px) {
+  .dual-deck__turntable {
+    width: min(
+      calc(100% * 1256 / 1010),
+      calc(87.7193vh - 3.5088px),
+      calc(87.7193svh - 3.5088px)
+    );
   }
 }
