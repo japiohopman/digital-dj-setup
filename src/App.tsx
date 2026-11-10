@@ -5,6 +5,7 @@ import { MixerAudioGraph } from './audio/MixerAudioGraph';
 import { MixerPanel } from './components/mixer/MixerPanel';
 import { Turntable } from './components/Turntable';
 import { DevKit } from './components/devkit/DevKit';
+import { WorkspaceMenu } from './components/workspace/WorkspaceMenu';
 import type { DeckDiagnosticsSnapshot } from './components/devkit/types';
 import './components/Turntable.css';
 
@@ -22,6 +23,7 @@ export function App() {
     a?: DeckDiagnosticsSnapshot;
     b?: DeckDiagnosticsSnapshot;
   }>({});
+  const [trackControlsPortalTarget, setTrackControlsPortalTarget] = useState<HTMLDivElement | null>(null);
   const updateDeckAAngle = useCallback((angle: number) => {
     setArmAngles((current) => ({ ...current, a: angle }));
   }, []);
@@ -103,11 +105,27 @@ export function App() {
             id="deck-a-panel"
           >
             <div className="dual-deck__turntable">
-              <Turntable deckLabel="DECK A" modelName="SL-1200 MK2" transport={transportA} onArmAngleChange={updateDeckAAngle} onDevDiagnosticsChange={updateDeckADiagnostics} />
+              <Turntable
+                deckLabel="DECK A"
+                modelName="SL-1200 MK2"
+                transport={transportA}
+                onArmAngleChange={updateDeckAAngle}
+                onDevDiagnosticsChange={updateDeckADiagnostics}
+                trackControlsPortalTarget={trackControlsPortalTarget}
+              />
             </div>
           </div>
 
           <div className="dual-deck__center-panel">
+            <WorkspaceMenu onTrackControlsTargetChange={setTrackControlsPortalTarget}>
+              {import.meta.env.DEV && (
+                <DevKit
+                  activeDeckLabel={activeDeck === 'a' ? 'DECK A' : 'DECK B'}
+                  activeArmAngle={armAngles[activeDeck]}
+                  activeDeckDiagnostics={deckDiagnostics[activeDeck]}
+                />
+              )}
+            </WorkspaceMenu>
             <MixerPanel audioGraph={mixerAudioGraph} />
           </div>
 
@@ -116,19 +134,18 @@ export function App() {
             id="deck-b-panel"
           >
             <div className="dual-deck__turntable">
-              <Turntable deckLabel="DECK B" modelName="SL-1200 MK2" transport={transportB} onArmAngleChange={updateDeckBAngle} onDevDiagnosticsChange={updateDeckBDiagnostics} />
+              <Turntable
+                deckLabel="DECK B"
+                modelName="SL-1200 MK2"
+                transport={transportB}
+                onArmAngleChange={updateDeckBAngle}
+                onDevDiagnosticsChange={updateDeckBDiagnostics}
+                trackControlsPortalTarget={trackControlsPortalTarget}
+              />
             </div>
           </div>
         </div>
       </section>
-
-      {import.meta.env.DEV && (
-        <DevKit
-          activeDeckLabel={activeDeck === 'a' ? 'DECK A' : 'DECK B'}
-          activeArmAngle={armAngles[activeDeck]}
-          activeDeckDiagnostics={deckDiagnostics[activeDeck]}
-        />
-      )}
 
       <footer className="app-footer">
         <span className={`app-footer__status${isAudioActive ? ' is-active' : ''}`} />
