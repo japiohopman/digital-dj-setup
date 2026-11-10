@@ -155,14 +155,6 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
       </header>
 
       <div className="mixer-panel__faceplate">
-        <section className="mixer-meter-bridge" aria-label="Live signal meters">
-          <div className="mixer-meter-bridge__meters">
-            <MixerMeter label="A" level={meterLevels.a} className="mixer-meter--a" />
-            <MixerMeter label="MASTER" level={meterLevels.master} className="mixer-meter--master" />
-            <MixerMeter label="B" level={meterLevels.b} className="mixer-meter--b" />
-          </div>
-        </section>
-
         <div className="mixer-panel__channels">
           <section className="mixer-channel mixer-channel--a" aria-label="Deck A channel">
             <div className="mixer-channel__identity">
@@ -183,6 +175,14 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
               />
               <span className="mixer-channel__value">{Math.round(channelLevels.a * 100)}%</span>
             </label>
+          </section>
+
+          <section className="mixer-meter-bridge" aria-label="Live signal meters">
+            <div className="mixer-meter-bridge__meters">
+              <MixerMeter label="A" level={meterLevels.a} className="mixer-meter--a" />
+              <MixerMeter label="MASTER" level={meterLevels.master} className="mixer-meter--master" />
+              <MixerMeter label="B" level={meterLevels.b} className="mixer-meter--b" />
+            </div>
           </section>
 
           <section className="mixer-channel mixer-channel--b" aria-label="Deck B channel">
