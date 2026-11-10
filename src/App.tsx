@@ -14,6 +14,9 @@ type ActiveView = ActiveDeck | 'mixer';
 
 export function App() {
   const [activeDeck, setActiveDeck] = useState<ActiveDeck>('a');
+  const [isOnline, setIsOnline] = useState(
+    () => typeof navigator === 'undefined' || navigator.onLine,
+  );
   const [activeView, setActiveView] = useState<ActiveView>(() => {
     if (typeof window === 'undefined') return 'a';
     return new URLSearchParams(window.location.search).get('view') === 'mixer' ? 'mixer' : 'a';
@@ -72,10 +75,31 @@ export function App() {
 
   useEffect(() => () => mixerAudioGraph.dispose(), [mixerAudioGraph]);
 
+  useEffect(() => {
+    /** Keeps the small app-shell status current as connectivity changes. */
+    const updateNetworkStatus = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', updateNetworkStatus);
+    window.addEventListener('offline', updateNetworkStatus);
+    return () => {
+      window.removeEventListener('online', updateNetworkStatus);
+      window.removeEventListener('offline', updateNetworkStatus);
+    };
+  }, []);
+
   const isAudioActive = transportA.isPlaying || transportB.isPlaying;
 
   return (
     <main className="app-shell">
+      {!isOnline && (
+        <aside
+          className="app-offline-status"
+          role="status"
+          aria-label="Offline: only cached app resources are available"
+          title="Offline mode. Only the app shell and resources cached during an online visit are available."
+        >
+          OFFLINE · CACHED APP ONLY
+        </aside>
+      )}
       <header className="app-header">
         <div>
           <p className="eyebrow">DIGITAL DJ SETUP</p>
