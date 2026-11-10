@@ -119,6 +119,26 @@ describe('PWA app-shell caching policy', () => {
     expect(source).not.toContain('"/assets/app-a1b2.js"');
   });
 
+  it('changes the cache version when public asset content changes at the same URLs', () => {
+    const firstBuild = createServiceWorkerSource(
+      ['assets/app-a1b2.js'],
+      '/digital-dj-setup/',
+      'public-bytes-v1',
+    );
+    const secondBuild = createServiceWorkerSource(
+      ['assets/app-a1b2.js'],
+      '/digital-dj-setup/',
+      'public-bytes-v2',
+    );
+
+    const firstCacheName = firstBuild.match(/const CACHE_NAME = "([^"]+)";/)?.[1];
+    const secondCacheName = secondBuild.match(/const CACHE_NAME = "([^"]+)";/)?.[1];
+
+    expect(firstCacheName).toBeTruthy();
+    expect(secondCacheName).toBeTruthy();
+    expect(firstCacheName).not.toBe(secondCacheName);
+  });
+
   it('generates offline navigation fallback and a versioned cache', () => {
     const source = createServiceWorkerSource(['assets/app-a1b2.js']);
     expect(source).toContain('digital-dj-shell-');
