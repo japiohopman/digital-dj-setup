@@ -74,4 +74,4 @@ See [AGENTS.md](AGENTS.md) for coding-agent instructions and [CHATGPT.md](CHATGP
 
 ## Installable app
 
-The production build includes an installable standalone PWA shell. See [the PWA install and offline guide](docs/reference/pwa-shell.md) for Android/iPhone installation steps, cache boundaries and device acceptance checks.
+The project includes an installable standalone PWA shell and a manual GitHub Pages deployment workflow for mobile testing. See [the PWA install, Pages and offline guide](docs/reference/pwa-shell.md) for the public test URL, Android/iPhone installation steps, cache boundaries and device acceptance checks.
