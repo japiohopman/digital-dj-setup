@@ -8,7 +8,7 @@ describe('WorkspaceMenu', () => {
 
   it('opens the full-screen library and closes with Escape while restoring focus', () => {
     const onTrackControlsTargetChange = vi.fn();
-    const { container } = render(
+    render(
       <WorkspaceMenu
         onTrackControlsTargetChange={onTrackControlsTargetChange}
         onLoadBundledTrack={vi.fn(async () => undefined)}
@@ -21,12 +21,12 @@ describe('WorkspaceMenu', () => {
     fireEvent.click(trigger);
 
     expect(screen.getByRole('dialog', { name: 'Track crates' })).toBeTruthy();
-    expect(screen.getByText('BATTLE AMMO')).toBeTruthy();
+    expect(screen.getAllByText('BATTLE AMMO').length).toBeGreaterThan(0);
     expect(screen.getByText('Scratch Making Me Itch')).toBeTruthy();
     expect(screen.getByText('Super Duck Breaks')).toBeTruthy();
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
     expect(onTrackControlsTargetChange).toHaveBeenLastCalledWith(
-      container.querySelector('.workspace-menu__track-loaders'),
+      document.querySelector('.workspace-menu__track-loaders'),
     );
 
     fireEvent.keyDown(window, { key: 'Escape' });
@@ -46,7 +46,7 @@ describe('WorkspaceMenu', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Open track library' }));
-    fireEvent.click(screen.getByRole('button', { name: /DECK B/ }));
+    fireEvent.click(screen.getByRole('button', { name: '02 DECK B' }));
     fireEvent.click(screen.getByRole('button', { name: 'Load Super Duck Breaks to Deck B' }));
 
     expect(onLoadBundledTrack).toHaveBeenCalledWith('b', expect.objectContaining({
