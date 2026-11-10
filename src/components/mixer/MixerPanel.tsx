@@ -84,11 +84,13 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       const next = audioGraph.getMeterLevels();
-      setMeterLevels((current) => (
-        current.a === next.a && current.b === next.b && current.master === next.master
-          ? current
-          : next
-      ));
+      const meterNoiseFloor = 0.002;
+      setMeterLevels((current) => {
+        const changed = Math.abs(current.a - next.a) >= meterNoiseFloor ||
+          Math.abs(current.b - next.b) >= meterNoiseFloor ||
+          Math.abs(current.master - next.master) >= meterNoiseFloor;
+        return changed ? next : current;
+      });
     }, 80);
     return () => window.clearInterval(intervalId);
   }, [audioGraph]);
