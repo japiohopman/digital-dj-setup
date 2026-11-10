@@ -64,6 +64,7 @@ jobs:
             exit 1
           fi
           "$CHROME_BIN" --headless --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --force-device-scale-factor=1 --window-size=390,844 --screenshot=screenshots/dual-deck-portrait-390x844.png http://127.0.0.1:4173/
+          "$CHROME_BIN" --headless --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --force-device-scale-factor=1 --window-size=390,844 --screenshot=screenshots/mixer-portrait-390x844.png "http://127.0.0.1:4173/?view=mixer"
           "$CHROME_BIN" --headless --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --force-device-scale-factor=1 --window-size=844,390 --screenshot=screenshots/dual-deck-90-degree-landscape-844x390.png http://127.0.0.1:4173/
           "$CHROME_BIN" --headless --no-sandbox --disable-gpu --disable-dev-shm-usage --hide-scrollbars --force-device-scale-factor=1 --window-size=1440,1000 --screenshot=screenshots/dual-deck-desktop-1440x1000.png http://127.0.0.1:4173/
 
