@@ -6,37 +6,20 @@ import { DevKit } from './DevKit';
 afterEach(() => cleanup());
 
 describe('DevKit', () => {
-  it('starts closed with the arm angle meter hidden', () => {
+  it('renders diagnostic options as an embedded workspace-menu section', () => {
     render(<DevKit activeDeckLabel="DECK A" activeArmAngle={12.5} />);
 
-    expect(screen.getByRole('button', { name: 'DEVKIT' }).getAttribute('aria-expanded')).toBe('false');
-    expect(screen.queryByRole('region', { name: 'Developer toolkit' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Developer toolkit' })).toBeTruthy();
+    expect(screen.getByText('DEVKIT')).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'Arm angle meter' })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'Deck state trace' })).toBeTruthy();
     expect(screen.queryByTestId('tonearm-angle-readout')).toBeNull();
   });
 
-  it('opens with the Alt+D shortcut and closes with Escape', () => {
-    render(<DevKit activeDeckLabel="DECK A" activeArmAngle={12.5} />);
-
-    fireEvent.keyDown(window, { key: 'd', altKey: true });
-    expect(screen.getByRole('region', { name: 'Developer toolkit' })).toBeTruthy();
-
-    fireEvent.keyDown(window, { key: 'Escape' });
-    expect(screen.queryByRole('region', { name: 'Developer toolkit' })).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'DEVKIT' }));
-  });
-
-  it('supports Alt+Shift+D as a fallback shortcut', () => {
-    render(<DevKit activeDeckLabel="DECK B" activeArmAngle={22} />);
-
-    fireEvent.keyDown(window, { key: 'd', altKey: true, shiftKey: true });
-    expect(screen.getByRole('region', { name: 'Developer toolkit' })).toBeTruthy();
-  });
-
-  it('toggles the live arm meter and keeps its measurement controls', () => {
+  it('toggles the live arm meter and retains its measurement controls', () => {
     const { rerender } = render(<DevKit activeDeckLabel="DECK A" activeArmAngle={12} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'DEVKIT' }));
-    fireEvent.click(screen.getByLabelText('Arm angle meter'));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Arm angle meter' }));
 
     expect(screen.getByTestId('tonearm-angle-readout').textContent).toBe('12.00°');
     expect(screen.getByLabelText('DECK A tonearm measurement')).toBeTruthy();
@@ -50,10 +33,10 @@ describe('DevKit', () => {
     expect(screen.getByTestId('tonearm-end-readout').textContent).toBe('22.00°');
     expect(screen.getByTestId('tonearm-reach-readout').textContent).toBe('10.00°');
 
-    fireEvent.click(screen.getByLabelText('Arm angle meter'));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Arm angle meter' }));
     expect(screen.queryByTestId('tonearm-angle-readout')).toBeNull();
 
-    fireEvent.click(screen.getByLabelText('Arm angle meter'));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Arm angle meter' }));
     expect(screen.getByTestId('tonearm-start-readout').textContent).toBe('12.00°');
     expect(screen.getByTestId('tonearm-end-readout').textContent).toBe('22.00°');
   });
@@ -73,15 +56,14 @@ describe('DevKit', () => {
         reason: 'valid lead-in drop',
       }],
     };
+
     render(<DevKit activeDeckLabel="DECK B" activeArmAngle={18} activeDeckDiagnostics={snapshot} />);
 
     expect(document.body.querySelector('[data-dev-widget="deck-state-trace"]')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'DEVKIT' }));
-    fireEvent.click(screen.getByLabelText('Deck state trace'));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Deck state trace' }));
 
     expect(screen.getByRole('region', { name: 'DECK B state trace' })).toBeTruthy();
     fireEvent.click(screen.getByText(/DECK B STATE/));
     expect(document.body.querySelector('[data-dev-widget="deck-state-trace"]')?.textContent).toContain('valid lead-in drop');
   });
-
 });

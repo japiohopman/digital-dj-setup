@@ -128,12 +128,16 @@ export function useVinylMotion({
     const currentTime = transport.currentTime;
     const previousTime = lastTransportTimeRef.current;
     lastTransportTimeRef.current = currentTime;
-    if (currentTime === 0 || Math.abs(currentTime - previousTime) > 1.5) {
+    const resetToStart = currentTime === 0 && previousTime > 0;
+    const jumpedToAnotherPosition = Math.abs(currentTime - previousTime) > 1.5;
+    if (resetToStart || jumpedToAnotherPosition) {
       const targetAngle = currentTime * effectiveRps * TWO_PI;
-      angleRef.current = targetAngle;
-      setAngle(targetAngle);
+      if (Math.abs(angleRef.current - targetAngle) > 0.0001) {
+        angleRef.current = targetAngle;
+        setAngle(targetAngle);
+      }
     }
-  }, [transport?.currentTime, effectiveRps, transport]);
+  }, [transport?.currentTime, effectiveRps]);
 
   const coastProgressRef = useRef<{ start: number; duration: number } | null>(null);
   const spinUpProgressRef = useRef<{ start: number; duration: number } | null>(null);

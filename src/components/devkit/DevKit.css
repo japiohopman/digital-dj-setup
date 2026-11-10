@@ -1,55 +1,17 @@
 .devkit-root {
-  position: fixed;
-  right: max(10px, env(safe-area-inset-right));
-  bottom: max(10px, env(safe-area-inset-bottom));
-  z-index: 11000;
   display: grid;
-  justify-items: end;
-  gap: 7px;
+  min-width: 0;
+  gap: 6px;
   font-family: 'SF Mono', Monaco, Consolas, monospace;
 }
 
-.devkit-trigger {
-  display: inline-flex;
-  min-height: 32px;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 10px;
-  border: 1px solid rgba(197, 154, 88, 0.5);
-  border-radius: 5px;
-  color: #e8d6b5;
-  background: rgba(13, 16, 18, 0.92);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.32);
-  font: 800 9px/1 'SF Mono', Monaco, Consolas, monospace;
-  letter-spacing: 0.12em;
-  cursor: pointer;
-  backdrop-filter: blur(8px);
-}
-
-.devkit-trigger:focus-visible,
-.devkit-menu button:focus-visible,
-.devkit-widget-toggle input:focus-visible {
-  outline: 2px solid #f2c574;
-  outline-offset: 3px;
-}
-
-.devkit-trigger__light {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #d5ad70;
-  box-shadow: 0 0 6px rgba(213, 173, 112, 0.75);
-}
-
 .devkit-menu {
-  width: min(260px, calc(100vw - 20px));
-  padding: 10px;
+  width: 100%;
+  min-width: 0;
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.13);
   color: #e5e7eb;
-  background: rgba(13, 16, 18, 0.96);
-  border: 1px solid rgba(197, 154, 88, 0.48);
-  border-radius: 6px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(10px);
 }
 
 .devkit-menu__header {
@@ -58,25 +20,19 @@
   justify-content: space-between;
   gap: 12px;
   color: #d5ad70;
-  font-size: 9px;
+  font-size: 0.49rem;
   letter-spacing: 0.12em;
 }
 
-.devkit-menu__close {
-  width: 25px;
-  height: 25px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 4px;
-  color: #e5e7eb;
-  background: rgba(255, 255, 255, 0.06);
-  font: 20px/1 sans-serif;
-  cursor: pointer;
+.devkit-menu__header span {
+  color: rgba(229, 231, 235, 0.55);
+  font-size: 0.4rem;
 }
 
 .devkit-menu__widgets {
   display: grid;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 6px;
+  margin-top: 7px;
 }
 
 .devkit-widget-toggle {
@@ -84,35 +40,18 @@
   min-height: 36px;
   align-items: center;
   gap: 9px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   color: #e5e7eb;
   background: rgba(255, 255, 255, 0.045);
-  font-size: 11px;
+  font-size: 0.53rem;
   cursor: pointer;
 }
 
 .devkit-widget-toggle input {
   width: 16px;
   height: 16px;
+  flex: 0 0 16px;
   accent-color: #c59a58;
-}
-
-.devkit-menu__hint {
-  margin: 10px 0 0;
-  color: rgba(229, 231, 235, 0.55);
-  font-size: 8px;
-  line-height: 1.4;
-}
-
-@media (max-width: 520px) {
-  .devkit-root {
-    right: max(8px, env(safe-area-inset-right));
-    bottom: max(8px, env(safe-area-inset-bottom));
-  }
-
-  .devkit-menu {
-    width: min(260px, calc(100vw - 16px));
-  }
 }

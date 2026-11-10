@@ -1,8 +1,8 @@
 # Shared mixer audio routing
 
-**Status:** Phase 0 implementation baseline  
-**Last updated:** 2026-11-09  
-**Scope:** two independent Technics-inspired decks routed through one app-owned output graph.
+**Status:** Phase 1 implementation in progress  
+**Last updated:** 2026-11-10  
+**Scope:** two independent Technics-inspired decks routed through one app-owned mixer graph.
 
 ## Ownership
 
@@ -55,7 +55,7 @@ This is deliberate: stylus contact controls programme audio, but record/needle i
 - The per-deck analyser is post-channel and post-crossfader, so later meters can show the actual signal after those controls.
 - The master analyser is post-master gain, so it can measure the final output.
 
-In Phase 0 the channel gain and crossfader gain both remain at unity (1.0). There are no mixer controls yet. Phase 1 will introduce their control logic after this routing has been proved.
+In the Phase 0 routing baseline both gains were fixed at unity (1.0). Phase 1 now adds independent channel-level control and the A/B crossfader; the current gain behaviour and meter API are documented below.
 
 ## Lifecycle and browser policy
 
@@ -71,9 +71,25 @@ In Phase 0 the channel gain and crossfader gain both remain at unity (1.0). Ther
 - `src/audio/AudioEngine.test.ts` verifies programme audio, vinyl loops and needle one-shots all connect to the injected deck input, and disposing the engine leaves the shared context alive.
 - The application instantiates one graph and passes separate Deck A and Deck B options into their independent `useDeckTransport` hooks.
 
-## Phase 1 constraints
+## Phase 1 controls and signal measurement
 
-1. Add channel fader and crossfader actions to the graph; do not wire UI directly to Web Audio nodes.
-2. Keep every deck sound layer upstream of the channel fader and crossfader.
-3. Decide and document the centre crossfader curve after listening tests. The Phase 0 graph deliberately does not pick a curve.
-4. Add real-device checks with both decks playing simultaneously, each deck independently muted/faded, and both channel meters plus the master meter observed.
+- `MixerAudioGraph.setChannelLevel(deckId, value)` controls each channel gain independently from 0 (silent) to 1 (unity). Values are retained before the AudioContext is created and applied when a deck path is first built.
+- `MixerAudioGraph.setCrossfaderPosition(value)` controls the A/B blend from 0 (A) to 1 (B). The equal-power cosine/sine response and 18 ms gain ramp are **app simulation choices**, not verified specifications of the PMC-05 Pro III hardware. Each deck is approximately -3 dB at centre.
+- `MixerAudioGraph.setCrossfaderCutLag(value)` controls the symmetric cut-lag width from 0 (minimum gap) to 1 (maximum configured gap). The app maps that normalized setting to a maximum 15% muted travel zone for the incoming deck at each end. This 15% range is an **app simulation choice**, not a Vestax specification. The centre remains at equal-power balance.
+- The Vestax PMC-05 Pro IV manual describes **C.F. CUT CONTROL** as adjusting cut-lag width: the muted cut-lag gap at each fader end. Its hardware has separate left and right controls; this app deliberately uses one shared dial so both sides stay matched. See the [PMC-05 Pro IV manual](https://imagescdn.juno.co.uk/manual/404904-01U.pdf) and [AlphaTheta's explanation of crossfader curve vs cut lag](https://pioneer-support.zendesk.com/hc/en-us/articles/12185566369561-I-don-t-like-the-cut-of-the-crossfader-Can-I-adjust-it).
+- CUT-IN and crossfader curve are separate behaviours: CUT-IN changes how far the fader travels before the incoming deck begins to open; the existing equal-power curve determines the gain transition after cut-in. The dial does not yet expose a separate sharp/scratch curve control.
+- `MixerAudioGraph.getMeterLevels()` reads RMS time-domain samples from the post-channel/post-crossfader Deck A and Deck B analysers and the post-master analyser. It returns normalized levels and never creates or resumes an AudioContext.
+- `MixerPanel` owns only presentation state. It sends fader values to the graph API and polls the real meter readings; it does not access Web Audio nodes directly.
+- In portrait, the mixer is a dedicated third view rather than a narrow strip between decks. In landscape, the mixer follows the user's Figma composition: narrow centre column, both decks full-size and still rotated -90°. The centre mixer is shorter than the decks and anchored low, leaving a reserved headroom area above it.
+- The landscape layout uses zero intentional gaps between each deck and the mixer, with only device safe-area insets around the outside. The decks can therefore use as much of the phone width as possible without shrinking their touch controls.
+- The turntable's full artwork/composition wrapper is scaled uniformly by 1.14 in landscape to compensate for the built-in empty canvas around the source Technics PNG. This is an app layout calibration, not an asset edit: the stub image, frame, platter, slipmat, record, arm and hardware controls all scale together. Deck slots allow this artwork to extend behind the centre mixer, which is layered above it; only the overall viewport clips the enlarged decks.
+- The reserved headroom contains one compact **TOOLS** toggle. Its popover hosts both existing deck track-loader/status panels and the development-only DevKit controls. The loader panels are portalled into this shared menu instead of occupying the outer flank of each rotated deck. The menu stays mounted but hidden when closed so diagnostic widget settings are retained.
+- The supplied Figma frame 41:36 is the authoritative composition reference; the PMC-05 Pro III is a secondary visual/material reference only. The dark upper strip contains working rotary/utility controls (currently CUT-IN). The aluminium faceplate places the three real signal meters in a central bridge **between** the two vertical Deck A / Deck B level faders. The lower horizontal crossfader uses the same normalized travel length as either channel fader; its larger hit area remains touch-friendly even though the visible travel is compact. Large title/status copy and the decorative footer are omitted. Non-functional mic, effects, cue/monitor, EQ and input-selector controls remain out of scope.
+
+## Phase 1 verification still required
+
+1. Listen to the equal-power centre behaviour with two simultaneous decks and adjust/document the curve if the real-device test calls for it.
+2. Verify each channel fader at minimum silences only its deck without changing transport, platter motor or tonearm state.
+3. Verify crossfader hard-left, centre and hard-right behaviour, plus both post-fader channel meters and the combined master meter.
+4. Test portrait Mixer view and landscape central mixer on a real phone, and retain the CI screenshots for desktop and both mobile orientations.
+5. Test minimum and maximum CUT-IN settings from both fader ends, confirming the symmetric silent zones and that neither deck's transport, motor or tonearm state changes.

@@ -13,6 +13,8 @@ class MockGainNode extends MockAudioNode {
 
 class MockAnalyserNode extends MockAudioNode {
   fftSize = 2048;
+  sampleValue = 0;
+  getFloatTimeDomainData = vi.fn((samples: Float32Array) => samples.fill(this.sampleValue));
 }
 
 class MockAudioContext {
@@ -114,4 +116,103 @@ describe('MixerAudioGraph', () => {
     graph.dispose();
     expect(contexts[1]?.close).toHaveBeenCalledOnce();
   });
+  it('applies stored channel levels and an equal-power crossfader without creating audio early', () => {
+    const context = new MockAudioContext();
+    const factory = vi.fn(() => context as unknown as AudioContext);
+    const graph = new MixerAudioGraph({ audioContextFactory: factory });
+
+    graph.setChannelLevel('a', 0.4);
+    graph.setChannelLevel('b', 0.8);
+    graph.setCrossfaderPosition(0.5);
+    expect(factory).not.toHaveBeenCalled();
+    expect(graph.getChannelLevel('a')).toBe(0.4);
+    expect(graph.getCrossfaderPosition()).toBe(0.5);
+
+    const deckA = graph.createDeckAudioOptions('a');
+    const deckB = graph.createDeckAudioOptions('b');
+    const contextA = deckA.audioContextProvider?.();
+    const contextB = deckB.audioContextProvider?.();
+    deckA.outputNodeProvider?.(contextA!);
+    deckB.outputNodeProvider?.(contextB!);
+
+    const channelGainA = context.createdGains[2];
+    const crossfaderGainA = context.createdGains[3];
+    const channelGainB = context.createdGains[5];
+    const crossfaderGainB = context.createdGains[6];
+    expect(channelGainA?.gain.value).toBe(0.4);
+    expect(channelGainB?.gain.value).toBe(0.8);
+    expect(crossfaderGainA?.gain.value).toBeCloseTo(Math.SQRT1_2);
+    expect(crossfaderGainB?.gain.value).toBeCloseTo(Math.SQRT1_2);
+
+    graph.setChannelLevel('a', 0.25);
+    graph.setCrossfaderPosition(0);
+    expect(channelGainA?.gain.value).toBe(0.25);
+    expect(crossfaderGainA?.gain.value).toBeCloseTo(1);
+    expect(crossfaderGainB?.gain.value).toBeCloseTo(0);
+
+    graph.setCrossfaderPosition(1);
+    expect(crossfaderGainA?.gain.value).toBeCloseTo(0);
+    expect(crossfaderGainB?.gain.value).toBeCloseTo(1);
+    graph.dispose();
+  });
+
+  it('applies a symmetric cut-lag zone at both crossfader ends', () => {
+    const context = new MockAudioContext();
+    const factory = vi.fn(() => context as unknown as AudioContext);
+    const graph = new MixerAudioGraph({ audioContextFactory: factory });
+
+    graph.setCrossfaderCutLag(1);
+    expect(factory).not.toHaveBeenCalled();
+    expect(graph.getCrossfaderCutLag()).toBe(1);
+
+    const deckA = graph.createDeckAudioOptions('a');
+    const deckB = graph.createDeckAudioOptions('b');
+    const contextA = deckA.audioContextProvider?.();
+    const contextB = deckB.audioContextProvider?.();
+    deckA.outputNodeProvider?.(contextA!);
+    deckB.outputNodeProvider?.(contextB!);
+
+    const crossfaderGainA = context.createdGains[3];
+    const crossfaderGainB = context.createdGains[6];
+
+    graph.setCrossfaderPosition(0.1);
+    expect(crossfaderGainA?.gain.value).toBeCloseTo(1);
+    expect(crossfaderGainB?.gain.value).toBeCloseTo(0);
+
+    graph.setCrossfaderPosition(0.5);
+    expect(crossfaderGainA?.gain.value).toBeCloseTo(Math.SQRT1_2);
+    expect(crossfaderGainB?.gain.value).toBeCloseTo(Math.SQRT1_2);
+
+    graph.setCrossfaderPosition(0.9);
+    expect(crossfaderGainA?.gain.value).toBeCloseTo(0);
+    expect(crossfaderGainB?.gain.value).toBeCloseTo(1);
+    graph.dispose();
+  });
+
+  it('reads real RMS values from both channel meters and the master meter without forcing audio startup', () => {
+    const context = new MockAudioContext();
+    const factory = vi.fn(() => context as unknown as AudioContext);
+    const graph = new MixerAudioGraph({ audioContextFactory: factory });
+
+    expect(graph.getMeterLevels()).toEqual({ a: 0, b: 0, master: 0 });
+    expect(factory).not.toHaveBeenCalled();
+
+    const deckA = graph.createDeckAudioOptions('a');
+    const deckB = graph.createDeckAudioOptions('b');
+    const contextA = deckA.audioContextProvider?.();
+    const contextB = deckB.audioContextProvider?.();
+    deckA.outputNodeProvider?.(contextA!);
+    deckB.outputNodeProvider?.(contextB!);
+
+    context.createdAnalysers[0]!.sampleValue = 0.75;
+    context.createdAnalysers[1]!.sampleValue = 0.25;
+    context.createdAnalysers[2]!.sampleValue = 0.5;
+
+    const levels = graph.getMeterLevels();
+    expect(levels.a).toBeCloseTo(0.25);
+    expect(levels.b).toBeCloseTo(0.5);
+    expect(levels.master).toBeCloseTo(0.75);
+    graph.dispose();
+  });
+
 });

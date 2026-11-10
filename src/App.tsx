@@ -2,31 +2,67 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { useDeckTransport } from './audio/useDeckTransport';
 import { MixerAudioGraph } from './audio/MixerAudioGraph';
+import { MixerPanel } from './components/mixer/MixerPanel';
 import { Turntable } from './components/Turntable';
 import { DevKit } from './components/devkit/DevKit';
+import { WorkspaceMenu } from './components/workspace/WorkspaceMenu';
 import type { DeckDiagnosticsSnapshot } from './components/devkit/types';
 import './components/Turntable.css';
 
 type ActiveDeck = 'a' | 'b';
+type ActiveView = ActiveDeck | 'mixer';
 
 export function App() {
   const [activeDeck, setActiveDeck] = useState<ActiveDeck>('a');
+  const [activeView, setActiveView] = useState<ActiveView>(() => {
+    if (typeof window === 'undefined') return 'a';
+    return new URLSearchParams(window.location.search).get('view') === 'mixer' ? 'mixer' : 'a';
+  });
   const [armAngles, setArmAngles] = useState<{ a: number; b: number }>({ a: 0, b: 0 });
   const [deckDiagnostics, setDeckDiagnostics] = useState<{
     a?: DeckDiagnosticsSnapshot;
     b?: DeckDiagnosticsSnapshot;
   }>({});
+  const [trackControlsPortalTarget, setTrackControlsPortalTarget] = useState<HTMLDivElement | null>(null);
+  /** Stores a deck arm angle only when its measured value actually changes. */
   const updateDeckAAngle = useCallback((angle: number) => {
-    setArmAngles((current) => ({ ...current, a: angle }));
+    setArmAngles((current) => current.a === angle ? current : { ...current, a: angle });
   }, []);
+  /** Stores a deck arm angle only when its measured value actually changes. */
   const updateDeckBAngle = useCallback((angle: number) => {
-    setArmAngles((current) => ({ ...current, b: angle }));
+    setArmAngles((current) => current.b === angle ? current : { ...current, b: angle });
   }, []);
+  /** Avoids rerendering the whole workspace for an unchanged diagnostic snapshot. */
   const updateDeckADiagnostics = useCallback((snapshot: DeckDiagnosticsSnapshot) => {
-    setDeckDiagnostics((current) => ({ ...current, a: snapshot }));
+    setDeckDiagnostics((current) => {
+      const previous = current.a;
+      if (previous &&
+        previous.power === snapshot.power &&
+        previous.motorPhase === snapshot.motorPhase &&
+        previous.tonearm === snapshot.tonearm &&
+        previous.track === snapshot.track &&
+        previous.transport === snapshot.transport &&
+        previous.isAudible === snapshot.isAudible &&
+        previous.trace === snapshot.trace
+      ) return current;
+      return { ...current, a: snapshot };
+    });
   }, []);
+  /** Avoids rerendering the whole workspace for an unchanged diagnostic snapshot. */
   const updateDeckBDiagnostics = useCallback((snapshot: DeckDiagnosticsSnapshot) => {
-    setDeckDiagnostics((current) => ({ ...current, b: snapshot }));
+    setDeckDiagnostics((current) => {
+      const previous = current.b;
+      if (previous &&
+        previous.power === snapshot.power &&
+        previous.motorPhase === snapshot.motorPhase &&
+        previous.tonearm === snapshot.tonearm &&
+        previous.track === snapshot.track &&
+        previous.transport === snapshot.transport &&
+        previous.isAudible === snapshot.isAudible &&
+        previous.trace === snapshot.trace
+      ) return current;
+      return { ...current, b: snapshot };
+    });
   }, []);
   const [mixerAudioGraph] = useState(() => new MixerAudioGraph());
   const [deckAAudioOptions] = useState(() => mixerAudioGraph.createDeckAudioOptions('a'));
@@ -48,13 +84,16 @@ export function App() {
         <span className="app-header__mode">DMC / DUAL DECK</span>
       </header>
 
-      <nav className="deck-selector" aria-label="Choose active deck">
+      <nav className="deck-selector" aria-label="Choose workspace view">
         <button
           className="deck-selector__button"
           type="button"
-          aria-pressed={activeDeck === 'a'}
+          aria-pressed={activeView === 'a'}
           aria-controls="deck-a-panel"
-          onClick={() => setActiveDeck('a')}
+          onClick={() => {
+            setActiveDeck('a');
+            setActiveView('a');
+          }}
         >
           <span className="deck-selector__number">01</span>
           DECK A
@@ -62,46 +101,79 @@ export function App() {
         <button
           className="deck-selector__button"
           type="button"
-          aria-pressed={activeDeck === 'b'}
+          aria-pressed={activeView === 'b'}
           aria-controls="deck-b-panel"
-          onClick={() => setActiveDeck('b')}
+          onClick={() => {
+            setActiveDeck('b');
+            setActiveView('b');
+          }}
         >
           <span className="deck-selector__number">02</span>
           DECK B
         </button>
+        <button
+          className="deck-selector__button deck-selector__button--mixer"
+          type="button"
+          aria-pressed={activeView === 'mixer'}
+          aria-controls="mixer-panel"
+          onClick={() => setActiveView('mixer')}
+        >
+          <span className="deck-selector__number">03</span>
+          MIXER
+        </button>
       </nav>
 
-      <section className="deck-workspace" aria-label="DJ dual-deck workspace">
+      <section
+        className={`deck-workspace${activeView === 'mixer' ? ' is-mixer-view' : ''}`}
+        aria-label="DJ dual-deck workspace"
+      >
         <div className="dual-deck-layout">
           <div
-            className={`dual-deck__slot dual-deck__slot--a${activeDeck === 'a' ? ' is-active' : ''}`}
+            className={`dual-deck__slot dual-deck__slot--a${activeView === 'a' ? ' is-active' : ''}`}
             id="deck-a-panel"
           >
             <div className="dual-deck__turntable">
-              <Turntable deckLabel="DECK A" modelName="SL-1200 MK2" transport={transportA} onArmAngleChange={updateDeckAAngle} onDevDiagnosticsChange={updateDeckADiagnostics} />
+              <Turntable
+                deckLabel="DECK A"
+                modelName="SL-1200 MK2"
+                transport={transportA}
+                onArmAngleChange={updateDeckAAngle}
+                onDevDiagnosticsChange={updateDeckADiagnostics}
+                trackControlsPortalTarget={trackControlsPortalTarget}
+              />
             </div>
           </div>
 
-          <div className="dual-deck__center-panel" aria-hidden="true" />
+          <div className="dual-deck__center-panel">
+            <WorkspaceMenu onTrackControlsTargetChange={setTrackControlsPortalTarget}>
+              {import.meta.env.DEV && (
+                <DevKit
+                  activeDeckLabel={activeDeck === 'a' ? 'DECK A' : 'DECK B'}
+                  activeArmAngle={armAngles[activeDeck]}
+                  activeDeckDiagnostics={deckDiagnostics[activeDeck]}
+                />
+              )}
+            </WorkspaceMenu>
+            <MixerPanel audioGraph={mixerAudioGraph} />
+          </div>
 
           <div
-            className={`dual-deck__slot dual-deck__slot--b${activeDeck === 'b' ? ' is-active' : ''}`}
+            className={`dual-deck__slot dual-deck__slot--b${activeView === 'b' ? ' is-active' : ''}`}
             id="deck-b-panel"
           >
             <div className="dual-deck__turntable">
-              <Turntable deckLabel="DECK B" modelName="SL-1200 MK2" transport={transportB} onArmAngleChange={updateDeckBAngle} onDevDiagnosticsChange={updateDeckBDiagnostics} />
+              <Turntable
+                deckLabel="DECK B"
+                modelName="SL-1200 MK2"
+                transport={transportB}
+                onArmAngleChange={updateDeckBAngle}
+                onDevDiagnosticsChange={updateDeckBDiagnostics}
+                trackControlsPortalTarget={trackControlsPortalTarget}
+              />
             </div>
           </div>
         </div>
       </section>
-
-      {import.meta.env.DEV && (
-        <DevKit
-          activeDeckLabel={activeDeck === 'a' ? 'DECK A' : 'DECK B'}
-          activeArmAngle={armAngles[activeDeck]}
-          activeDeckDiagnostics={deckDiagnostics[activeDeck]}
-        />
-      )}
 
       <footer className="app-footer">
         <span className={`app-footer__status${isAudioActive ? ' is-active' : ''}`} />

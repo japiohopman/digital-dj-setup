@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { AudioEngine } from './AudioEngine';
 import type { DeckTransport, AudioEngineState, AudioEngineOptions, NeedleDropSound, RecordSoundState } from './types';
 
@@ -119,7 +119,7 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     return engineRef.current?.playNeedleDropSound(kind) ?? Promise.resolve();
   }, []);
 
-  return {
+  return useMemo<DeckTransport>(() => ({
     trackName: state.trackName,
     metadata: state.metadata,
     duration: state.duration,
@@ -145,5 +145,23 @@ export function useDeckTransport(options?: AudioEngineOptions): DeckTransport {
     coastDown,
     cancelCoastDown,
     spinUp,
-  };
+  }), [
+    state,
+    loadTrack,
+    play,
+    getCurrentTime,
+    pause,
+    stop,
+    togglePlayPause,
+    scratch,
+    endScratch,
+    seek,
+    setPlaybackRate,
+    coastDown,
+    cancelCoastDown,
+    spinUp,
+    setStylusContact,
+    setRecordSoundState,
+    playNeedleDropSound,
+  ]);
 }

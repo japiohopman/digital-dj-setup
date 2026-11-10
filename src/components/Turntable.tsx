@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type CSSProperties, type PointerEvent, type KeyboardEvent, type ChangeEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from 'zustand';
 import type { DeckTransport } from '../audio/types';
 import { useVinylMotion } from '../audio/useVinylMotion';
@@ -40,6 +41,8 @@ export interface TurntableProps {
   onArmAngleChange?: (angle: number) => void;
   /** Reports a read-only state-machine snapshot to development-only diagnostics. */
   onDevDiagnosticsChange?: (snapshot: DeckDiagnosticsSnapshot) => void;
+  /** Optional shared workspace menu target for the deck's track-loader controls. */
+  trackControlsPortalTarget?: HTMLElement | null;
 }
 
 /**
@@ -54,6 +57,7 @@ export function Turntable({
   transport,
   onArmAngleChange,
   onDevDiagnosticsChange,
+  trackControlsPortalTarget,
   deckLabel = 'DECK 01',
   modelName = 'SL-1200 MK2',
   initialSpeed = 33,
@@ -351,6 +355,73 @@ export function Turntable({
   // Convert pitch (-8 to +8) to percentage along the fader slot (0% = +8, 50% = 0, 100% = -8)
   const knobPercent = ((8 - pitch) / 16) * 100;
 
+  const trackControlsPanel = (
+    <div className="turntable track-loader-portal">
+      <div className="deck-audio-panel" role="region" aria-label={deckLabel + ' audio transport'}>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          accept="audio/*,.mp3,.wav,.ogg,.flac,.aac,.m4a"
+          className="deck-file-input"
+          aria-label={deckLabel + ' Select audio file'}
+          tabIndex={-1}
+        />
+
+        <span className="deck-loader-label">{deckLabel}</span>
+        <div className="deck-audio-controls">
+          <button
+            type="button"
+            className="deck-load-btn"
+            onClick={handleOpenFileDialog}
+            disabled={!isPowered || !transport}
+            aria-label={deckLabel + ' Load audio track'}
+          >
+            <span className="deck-load-icon" aria-hidden="true">▲</span>
+            LOAD TRACK
+          </button>
+          {machine.track === 'loading' && (
+            <span className="deck-transport-state">LOADING</span>
+          )}
+        </div>
+
+        <div className="deck-audio-readout">
+          {machine.track === 'loading' ? (
+            <span className="deck-audio-status loading">DECODING...</span>
+          ) : machine.track === 'error' ? (
+            <span className="deck-audio-status error" role="alert">{machine.trackError || transport?.error || 'Unable to load track'}</span>
+          ) : transport?.error ? (
+            <span className="deck-audio-status error" role="alert">{transport.error}</span>
+          ) : transport?.trackName ? (
+            <div className="deck-track-meta">
+              <span
+                className="deck-track-name"
+                title={transport.metadata?.artist
+                  ? transport.metadata.artist + ' — ' + transport.metadata.title
+                  : transport.trackName}
+              >
+                {transport.metadata?.artist
+                  ? transport.metadata.artist + ' — ' + transport.metadata.title
+                  : transport.trackName}
+              </span>
+              <span className="deck-track-time">
+                {formatTime(transport.currentTime)} / {formatTime(transport.duration)}
+              </span>
+            </div>
+          ) : (
+            <span className="deck-audio-status idle">NO TRACK</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  const trackControlsMarkup = trackControlsPortalTarget === undefined
+    ? trackControlsPanel
+    : trackControlsPortalTarget
+      ? createPortal(trackControlsPanel, trackControlsPortalTarget)
+      : null;
+
   return (
     <div
       id={id}
@@ -626,65 +697,7 @@ export function Turntable({
         </div>
       </div>
 
-        {/* Track Loading and Audio Transport Info Bar */}
-        <div className="deck-audio-panel" role="region" aria-label={`${deckLabel} audio transport`}>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept="audio/*,.mp3,.wav,.ogg,.flac,.aac,.m4a"
-            className="deck-file-input"
-            aria-label={`${deckLabel} Select audio file`}
-            tabIndex={-1}
-          />
-
-          <div className="deck-audio-controls">
-            <button
-              type="button"
-              className="deck-load-btn"
-              onClick={handleOpenFileDialog}
-              disabled={!isPowered || !transport}
-              aria-label={`${deckLabel} Load audio track`}
-            >
-              <span className="deck-load-icon" aria-hidden="true">▲</span>
-              LOAD TRACK
-            </button>
-
-            {machine.track === 'loading' && (
-              <span className="deck-transport-state">LOADING TRACK</span>
-            )}
-          </div>
-
-          <div className="deck-audio-readout">
-            {machine.track === 'loading' ? (
-              <span className="deck-audio-status loading">DECODING AUDIO...</span>
-            ) : machine.track === 'error' ? (
-              <span className="deck-audio-status error" role="alert">{machine.trackError || transport?.error || 'Unable to load track'}</span>
-            ) : transport?.error ? (
-              <span className="deck-audio-status error" role="alert">{transport.error}</span>
-            ) : transport?.trackName ? (
-              <div className="deck-track-meta">
-                <span
-                  className="deck-track-name"
-                  title={
-                    transport.metadata?.artist
-                      ? `${transport.metadata.artist} — ${transport.metadata.title}`
-                      : transport.trackName
-                  }
-                >
-                  {transport.metadata?.artist
-                    ? `${transport.metadata.artist} — ${transport.metadata.title}`
-                    : transport.trackName}
-                </span>
-                <span className="deck-track-time">
-                  {formatTime(transport.currentTime)} / {formatTime(transport.duration)}
-                </span>
-              </div>
-            ) : (
-              <span className="deck-audio-status idle">NO TRACK LOADED</span>
-            )}
-          </div>
-        </div>
+        {trackControlsMarkup}
 
     </div>
   );

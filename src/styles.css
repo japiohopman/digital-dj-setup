@@ -170,6 +170,25 @@ textarea {
   display: none;
 }
 
+.deck-workspace.is-mixer-view .dual-deck-layout {
+  width: min(100%, 760px);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.deck-workspace.is-mixer-view .dual-deck__slot {
+  display: none;
+}
+
+.deck-workspace.is-mixer-view .dual-deck__center-panel {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
 .dual-deck__turntable {
   width: 100%;
 }
@@ -230,15 +249,24 @@ textarea {
 }
 
 @media (orientation: landscape) {
+  .deck-workspace.is-mixer-view .dual-deck-layout {
+    width: 100%;
+    max-width: none;
+  }
+
+  .deck-workspace.is-mixer-view .dual-deck__slot {
+    display: flex;
+  }
+
   .app-shell {
     height: 100vh;
     height: 100svh;
     min-height: 0;
     padding:
-      max(4px, env(safe-area-inset-top))
-      max(6px, env(safe-area-inset-right))
-      max(4px, env(safe-area-inset-bottom))
-      max(6px, env(safe-area-inset-left));
+      max(2px, env(safe-area-inset-top))
+      max(2px, env(safe-area-inset-right))
+      max(2px, env(safe-area-inset-bottom))
+      max(2px, env(safe-area-inset-left));
     gap: 0;
     justify-content: center;
     overflow: hidden;
@@ -268,28 +296,51 @@ textarea {
     width: 100%;
     height: 100%;
     max-width: none;
-    align-items: center;
+    align-items: stretch;
     justify-content: space-between;
-    gap: clamp(12px, 3vw, 40px);
+    gap: 0;
   }
 
   .dual-deck-layout .dual-deck__slot {
     position: relative;
+    z-index: 1;
     display: flex;
     flex: 1 1 0%;
     height: 100%;
     max-height: 100%;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .dual-deck__center-panel {
+    position: relative;
+    z-index: 2;
     display: flex;
-    flex: 0 0 clamp(48px, 14vw, 220px);
+    flex: 0 0 clamp(180px, 24vw, 270px);
+    width: auto;
     height: 100%;
     min-width: 0;
-    pointer-events: none;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-end;
+    pointer-events: auto;
+    overflow: visible;
+  }
+
+  .dual-deck__center-panel > .workspace-menu {
+    position: absolute;
+    top: 5px;
+    left: 0;
+    width: 100%;
+  }
+
+  .dual-deck__center-panel > .mixer-panel {
+    width: 100%;
+    height: 76%;
+    max-width: none;
+    align-self: flex-end;
+    margin-top: auto;
   }
 
   /*
@@ -306,14 +357,39 @@ textarea {
     top: 50%;
     left: 50%;
     /* Fill vertical space of slot with minimal margin */
-    width: min(calc(100% * 1256 / 1010), calc(100vh - 12px), calc(100svh - 12px));
+    width: min(calc(100% * 1256 / 1010), calc(100vh - 4px), calc(100svh - 4px));
     max-width: none;
-    transform: translate(-50%, -50%) rotate(-90deg);
+    /*
+     * The supplied Technics PNG has built-in empty canvas around its case.
+     * Scale the complete deck composition (stub, frame, platter, arm and controls)
+     * together so every overlay stays aligned while the artwork fills the slot.
+     * The parent workspace clips only at the viewport edge; the centre mixer
+     * intentionally sits above the enlarged inner edges of both decks.
+     */
+    transform: translate(-50%, -50%) rotate(-90deg) scale(1.14);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .deck-selector__button {
     transition: none;
+  }
+}
+
+@media (orientation: landscape) and (min-height: 700px) {
+  .dual-deck__center-panel > .mixer-panel {
+    height: min(76%, 760px);
+  }
+}
+
+
+/* At short 320px-class landscape heights, keep the entire 1.14x deck zoom in view. */
+@media (orientation: landscape) and (max-height: 360px) {
+  .dual-deck__turntable {
+    width: min(
+      calc(100% * 1256 / 1010),
+      calc(87.7193vh - 3.5088px),
+      calc(87.7193svh - 3.5088px)
+    );
   }
 }
