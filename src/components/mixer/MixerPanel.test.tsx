@@ -33,6 +33,9 @@ describe('MixerPanel', () => {
       target: { value: '20' },
     });
     expect(audioGraph.setCrossfaderPosition).toHaveBeenCalledWith(0.2);
+    fireEvent.change(screen.getByRole('slider', { name: 'Crossfader position' }), {
+      target: { value: '50' },
+    });
 
     fireEvent.change(screen.getByRole('slider', { name: 'Crossfader cut lag' }), {
       target: { value: '35' },
