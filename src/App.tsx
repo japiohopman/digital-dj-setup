@@ -2,15 +2,18 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { useDeckTransport } from './audio/useDeckTransport';
 import { MixerAudioGraph } from './audio/MixerAudioGraph';
+import { MixerPanel } from './components/mixer/MixerPanel';
 import { Turntable } from './components/Turntable';
 import { DevKit } from './components/devkit/DevKit';
 import type { DeckDiagnosticsSnapshot } from './components/devkit/types';
 import './components/Turntable.css';
 
 type ActiveDeck = 'a' | 'b';
+type ActiveView = ActiveDeck | 'mixer';
 
 export function App() {
   const [activeDeck, setActiveDeck] = useState<ActiveDeck>('a');
+  const [activeView, setActiveView] = useState<ActiveView>('a');
   const [armAngles, setArmAngles] = useState<{ a: number; b: number }>({ a: 0, b: 0 });
   const [deckDiagnostics, setDeckDiagnostics] = useState<{
     a?: DeckDiagnosticsSnapshot;
@@ -52,9 +55,12 @@ export function App() {
         <button
           className="deck-selector__button"
           type="button"
-          aria-pressed={activeDeck === 'a'}
+          aria-pressed={activeView === 'a'}
           aria-controls="deck-a-panel"
-          onClick={() => setActiveDeck('a')}
+          onClick={() => {
+            setActiveDeck('a');
+            setActiveView('a');
+          }}
         >
           <span className="deck-selector__number">01</span>
           DECK A
@@ -62,19 +68,35 @@ export function App() {
         <button
           className="deck-selector__button"
           type="button"
-          aria-pressed={activeDeck === 'b'}
+          aria-pressed={activeView === 'b'}
           aria-controls="deck-b-panel"
-          onClick={() => setActiveDeck('b')}
+          onClick={() => {
+            setActiveDeck('b');
+            setActiveView('b');
+          }}
         >
           <span className="deck-selector__number">02</span>
           DECK B
         </button>
+        <button
+          className="deck-selector__button deck-selector__button--mixer"
+          type="button"
+          aria-pressed={activeView === 'mixer'}
+          aria-controls="mixer-panel"
+          onClick={() => setActiveView('mixer')}
+        >
+          <span className="deck-selector__number">03</span>
+          MIXER
+        </button>
       </nav>
 
-      <section className="deck-workspace" aria-label="DJ dual-deck workspace">
+      <section
+        className={`deck-workspace${activeView === 'mixer' ? ' is-mixer-view' : ''}`}
+        aria-label="DJ dual-deck workspace"
+      >
         <div className="dual-deck-layout">
           <div
-            className={`dual-deck__slot dual-deck__slot--a${activeDeck === 'a' ? ' is-active' : ''}`}
+            className={`dual-deck__slot dual-deck__slot--a${activeView === 'a' ? ' is-active' : ''}`}
             id="deck-a-panel"
           >
             <div className="dual-deck__turntable">
@@ -82,10 +104,12 @@ export function App() {
             </div>
           </div>
 
-          <div className="dual-deck__center-panel" aria-hidden="true" />
+          <div className="dual-deck__center-panel">
+            <MixerPanel audioGraph={mixerAudioGraph} />
+          </div>
 
           <div
-            className={`dual-deck__slot dual-deck__slot--b${activeDeck === 'b' ? ' is-active' : ''}`}
+            className={`dual-deck__slot dual-deck__slot--b${activeView === 'b' ? ' is-active' : ''}`}
             id="deck-b-panel"
           >
             <div className="dual-deck__turntable">
