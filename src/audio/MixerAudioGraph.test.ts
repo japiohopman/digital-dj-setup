@@ -156,6 +156,39 @@ describe('MixerAudioGraph', () => {
     graph.dispose();
   });
 
+  it('applies a symmetric cut-lag zone at both crossfader ends', () => {
+    const context = new MockAudioContext();
+    const factory = vi.fn(() => context as unknown as AudioContext);
+    const graph = new MixerAudioGraph({ audioContextFactory: factory });
+
+    graph.setCrossfaderCutLag(1);
+    expect(factory).not.toHaveBeenCalled();
+    expect(graph.getCrossfaderCutLag()).toBe(1);
+
+    const deckA = graph.createDeckAudioOptions('a');
+    const deckB = graph.createDeckAudioOptions('b');
+    const contextA = deckA.audioContextProvider?.();
+    const contextB = deckB.audioContextProvider?.();
+    deckA.outputNodeProvider?.(contextA!);
+    deckB.outputNodeProvider?.(contextB!);
+
+    const crossfaderGainA = context.createdGains[3];
+    const crossfaderGainB = context.createdGains[6];
+
+    graph.setCrossfaderPosition(0.1);
+    expect(crossfaderGainA?.gain.value).toBeCloseTo(1);
+    expect(crossfaderGainB?.gain.value).toBeCloseTo(0);
+
+    graph.setCrossfaderPosition(0.5);
+    expect(crossfaderGainA?.gain.value).toBeCloseTo(Math.SQRT1_2);
+    expect(crossfaderGainB?.gain.value).toBeCloseTo(Math.SQRT1_2);
+
+    graph.setCrossfaderPosition(0.9);
+    expect(crossfaderGainA?.gain.value).toBeCloseTo(0);
+    expect(crossfaderGainB?.gain.value).toBeCloseTo(1);
+    graph.dispose();
+  });
+
   it('reads real RMS values from both channel meters and the master meter without forcing audio startup', () => {
     const context = new MockAudioContext();
     const factory = vi.fn(() => context as unknown as AudioContext);
