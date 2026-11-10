@@ -55,7 +55,7 @@ This is deliberate: stylus contact controls programme audio, but record/needle i
 - The per-deck analyser is post-channel and post-crossfader, so later meters can show the actual signal after those controls.
 - The master analyser is post-master gain, so it can measure the final output.
 
-In Phase 0 the channel gain and crossfader gain both remain at unity (1.0). There are no mixer controls yet. Phase 1 will introduce their control logic after this routing has been proved.
+In the Phase 0 routing baseline both gains were fixed at unity (1.0). Phase 1 now adds independent channel-level control and the A/B crossfader; the current gain behaviour and meter API are documented below.
 
 ## Lifecycle and browser policy
 
