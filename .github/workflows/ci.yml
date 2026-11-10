@@ -85,7 +85,8 @@ jobs:
           for (const size of ['192x192', '512x512']) {
             const icon = manifest.icons.find((item) => item.sizes === size);
             const iconPath = icon && new URL(icon.src, 'https://example.test/digital-dj-setup/manifest.webmanifest').pathname;
-            if (!iconPath?.startsWith(base) || !existsSync('dist-pages' + iconPath)) {
+            const outputPath = iconPath?.startsWith(base) ? iconPath.slice(base.length) : '';
+            if (!outputPath || !existsSync('dist-pages/' + outputPath)) {
               throw new Error('GitHub Pages icon is missing or outside the project path: ' + size);
             }
           }
