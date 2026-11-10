@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type MouseEvent } from 'react';
+import { createPortal } from 'react-dom';
 
 import './WorkspaceMenu.css';
 
@@ -48,7 +49,6 @@ export function WorkspaceMenu({
   const [loadingTrackId, setLoadingTrackId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadMessage, setLoadMessage] = useState<string | null>(null);
-  const rootRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLElement | null>(null);
@@ -140,7 +140,7 @@ export function WorkspaceMenu({
   };
 
   return (
-    <div className="workspace-menu" ref={rootRef}>
+    <div className="workspace-menu">
       <button
         ref={triggerRef}
         type="button"
@@ -155,12 +155,13 @@ export function WorkspaceMenu({
         <span className="workspace-menu__trigger-caret" aria-hidden="true">{isOpen ? '▲' : '▼'}</span>
       </button>
 
-      <div
-        id="workspace-tools-menu"
-        className="workspace-menu__popover"
-        hidden={!isOpen}
-        onClick={handleOverlayClick}
-      >
+      {typeof document !== 'undefined' && createPortal(
+        <div
+          id="workspace-tools-menu"
+          className="workspace-menu__popover"
+          hidden={!isOpen}
+          onClick={handleOverlayClick}
+        >
         <section
           className="workspace-menu__dialog"
           ref={dialogRef}
@@ -283,7 +284,9 @@ export function WorkspaceMenu({
             <span>ALT + D TOGGLE <i aria-hidden="true">·</i> ESC TO CLOSE</span>
           </footer>
         </section>
-      </div>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }
