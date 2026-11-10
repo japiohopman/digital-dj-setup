@@ -52,6 +52,7 @@ describe('App dual-deck workspace', () => {
       expect(markup).toContain('only cached app resources are available');
     } finally {
       if (originalOnLine) Object.defineProperty(navigator, 'onLine', originalOnLine);
+      else delete (navigator as { onLine?: boolean }).onLine;
     }
   });
 
