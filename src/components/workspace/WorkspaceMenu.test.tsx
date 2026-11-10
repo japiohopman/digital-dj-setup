@@ -15,7 +15,7 @@ describe('WorkspaceMenu', () => {
       />,
     );
 
-    const trigger = screen.getByRole('button', { name: 'Open track library' });
+    const trigger = screen.getByRole('button', { name: 'Open workspace tools' });
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
 
     fireEvent.click(trigger);
@@ -32,7 +32,7 @@ describe('WorkspaceMenu', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
 
     expect(screen.queryByRole('dialog', { name: 'Track crates' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Open track library' }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByRole('button', { name: 'Open workspace tools' }).getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(trigger);
   });
 
@@ -45,7 +45,7 @@ describe('WorkspaceMenu', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open track library' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open workspace tools' }));
     fireEvent.click(screen.getByRole('button', { name: '02 DECK B' }));
     fireEvent.click(screen.getByRole('button', { name: 'Load Super Duck Breaks to Deck B' }));
 
