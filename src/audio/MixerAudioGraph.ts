@@ -42,6 +42,7 @@ export class MixerAudioGraph {
   /** Normalized user setting; 1 maps to the configured maximum lag at each end. */
   private crossfaderCutLag = 0;
 
+  /** Creates the graph while deferring AudioContext creation until a deck first needs audio. */
   constructor(options: MixerAudioGraphOptions = {}) {
     this.contextFactory = options.audioContextFactory ?? (() => {
       const AudioContextClass =
