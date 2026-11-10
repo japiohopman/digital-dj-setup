@@ -39,6 +39,8 @@ export class MixerAudioGraph {
   private readonly deckPaths = new Map<MixerDeckId, DeckChannelPath>();
   private readonly channelLevels: Record<MixerDeckId, number> = { a: 1, b: 1 };
   private crossfaderPosition = 0.5;
+  /** Normalized user setting; 1 maps to the configured maximum lag at each end. */
+  private crossfaderCutLag = 0;
 
   constructor(options: MixerAudioGraphOptions = {}) {
     this.contextFactory = options.audioContextFactory ?? (() => {
@@ -125,16 +127,26 @@ export class MixerAudioGraph {
    */
   public setCrossfaderPosition(position: number): void {
     this.crossfaderPosition = this.clampUnit(position);
-    const [gainA, gainB] = this.getCrossfaderGains(this.crossfaderPosition);
-    const pathA = this.deckPaths.get('a');
-    const pathB = this.deckPaths.get('b');
-    if (pathA) this.applyGain(pathA.crossfaderGain, gainA);
-    if (pathB) this.applyGain(pathB.crossfaderGain, gainB);
+    this.applyCrossfaderGains();
   }
 
   /** Returns the last selected crossfader position without creating audio nodes. */
   public getCrossfaderPosition(): number {
     return this.crossfaderPosition;
+  }
+
+  /**
+   * Sets the symmetric cut-lag control from 0 (minimum gap) to 1 (maximum gap).
+   * The normalized value is retained before audio starts and applied to both ends.
+   */
+  public setCrossfaderCutLag(value: number): void {
+    this.crossfaderCutLag = this.clampUnit(value);
+    this.applyCrossfaderGains();
+  }
+
+  /** Returns the normalized symmetric cut-lag setting without creating audio nodes. */
+  public getCrossfaderCutLag(): number {
+    return this.crossfaderCutLag;
   }
 
   /**
@@ -173,11 +185,28 @@ export class MixerAudioGraph {
     }
   }
 
-  /** Returns the equal-power gain pair for a normalized A-to-B crossfader position. */
+  /** Applies the current position and symmetric cut-lag setting to any existing deck paths. */
+  private applyCrossfaderGains(): void {
+    const [gainA, gainB] = this.getCrossfaderGains(this.crossfaderPosition);
+    const pathA = this.deckPaths.get('a');
+    const pathB = this.deckPaths.get('b');
+    if (pathA) this.applyGain(pathA.crossfaderGain, gainA);
+    if (pathB) this.applyGain(pathB.crossfaderGain, gainB);
+  }
+
+  /**
+   * Returns equal-power gains after trimming an equal silent travel zone from both ends.
+   * The 15% maximum is an app simulation range, not a Vestax hardware specification.
+   */
   private getCrossfaderGains(position: number): [number, number] {
+    const maximumCutLag = 0.15;
+    const cutLag = this.crossfaderCutLag * maximumCutLag;
+    const activeTravel = 1 - cutLag * 2;
+    const activePosition = this.clampUnit((position - cutLag) / activeTravel);
+
     return [
-      Math.cos(position * Math.PI * 0.5),
-      Math.sin(position * Math.PI * 0.5),
+      Math.cos(activePosition * Math.PI * 0.5),
+      Math.sin(activePosition * Math.PI * 0.5),
     ];
   }
 
