@@ -42,6 +42,34 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Verify installable PWA output
+        run: |
+          node --input-type=module <<'NODE'
+          import { existsSync, readFileSync } from 'node:fs';
+
+          const manifest = JSON.parse(readFileSync('dist/manifest.webmanifest', 'utf8'));
+          if (manifest.display !== 'standalone' || manifest.start_url !== '/') {
+            throw new Error('PWA manifest must launch at / in standalone mode.');
+          }
+          for (const size of ['192x192', '512x512']) {
+            const icon = manifest.icons.find((item) => item.sizes === size && item.type === 'image/png');
+            if (!icon || !existsSync('dist' + icon.src)) {
+              throw new Error('Missing install icon: ' + size);
+            }
+          }
+          for (const asset of ['dist/sw.js', 'dist/favicon.svg', 'dist/sounds/vinyl_loop.wav']) {
+            if (!existsSync(asset)) throw new Error('Missing PWA shell resource: ' + asset);
+          }
+          const worker = readFileSync('dist/sw.js', 'utf8');
+          if (!worker.includes('digital-dj-shell-') || !worker.includes('PRECACHE_URLS')) {
+            throw new Error('The generated versioned app-shell worker is missing.');
+          }
+          if (worker.includes('user-audio-preview')) {
+            throw new Error('User-selected audio must not be added to the precache.');
+          }
+          console.log('Standalone manifest, icons, versioned worker and bundled app sounds verified.');
+          NODE
+
       - name: Start production preview
         run: |
           npm run preview -- --host 127.0.0.1 > /tmp/digital-dj-preview.log 2>&1 &
