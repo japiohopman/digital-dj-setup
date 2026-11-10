@@ -75,7 +75,7 @@ jobs:
         run: |
           VITE_BASE_PATH=/digital-dj-setup/ npm run build -- --outDir dist-pages
           node --input-type=module <<'NODE'
-          import { existsSync, readFileSync } from 'node:fs';
+          import { existsSync, readFileSync, readdirSync } from 'node:fs';
 
           const base = '/digital-dj-setup/';
           const manifest = JSON.parse(readFileSync('dist-pages/manifest.webmanifest', 'utf8'));
