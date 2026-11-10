@@ -70,4 +70,23 @@ describe('MixerPanel', () => {
     expect(channelLayout?.children.item(1)?.querySelector('[aria-label="MASTER signal level"]')).toBeTruthy();
     expect(channelLayout?.children.item(2)?.querySelector('[aria-label="Deck B channel level"]')).toBeTruthy();
   });
+
+  it('keeps quiet finite signals consistent across meter readout and ARIA values', () => {
+    const audioGraph = {
+      getChannelLevel: vi.fn(() => 1),
+      getCrossfaderPosition: vi.fn(() => 0.5),
+      getCrossfaderCutLag: vi.fn(() => 0),
+      getMeterLevels: vi.fn(() => ({ a: 0.002, b: 0.25, master: 0.25 })),
+      setChannelLevel: vi.fn(),
+      setCrossfaderPosition: vi.fn(),
+      setCrossfaderCutLag: vi.fn(),
+    } as unknown as MixerAudioGraph;
+
+    render(<MixerPanel audioGraph={audioGraph} />);
+
+    const quietMeter = screen.getByRole('meter', { name: 'A signal level' });
+    expect(quietMeter.getAttribute('aria-valuenow')).toBe('-54');
+    expect(quietMeter.getAttribute('aria-valuetext')).toBe('-54 dB');
+    expect(quietMeter.textContent).toContain('-54 dB');
+  });
 });
