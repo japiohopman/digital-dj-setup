@@ -76,8 +76,10 @@ export function WorkspaceMenu({
       );
       if (!focusable?.length) return;
 
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
+      const first = focusable.item(0);
+      const last = focusable.item(focusable.length - 1);
+      if (!first || !last) return;
+
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
@@ -190,7 +192,7 @@ export function WorkspaceMenu({
           <div className="workspace-menu__body">
             <aside className="workspace-menu__sidebar" aria-label="Crate collection">
               <span className="workspace-menu__section-label">YOUR CRATES</span>
-              <button className="workspace-menu__crate-card" type="button" aria-current="true">
+              <div className="workspace-menu__crate-card" aria-current="true">
                 <span className="workspace-menu__crate-art" aria-hidden="true">
                   <span>BA</span>
                   <i />
@@ -200,7 +202,7 @@ export function WorkspaceMenu({
                   <small>{tracks.length.toString().padStart(2, '0')} TRACKS · STARTER CRATE</small>
                 </span>
                 <span className="workspace-menu__crate-chevron" aria-hidden="true">›</span>
-              </button>
+              </div>
               <p className="workspace-menu__sidebar-note">
                 More crates can live here as the library grows.
               </p>
