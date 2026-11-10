@@ -94,10 +94,10 @@ export function App() {
         <aside
           className="app-offline-status"
           role="status"
-          aria-label="Offline: only cached app resources are available"
-          title="Offline mode. Only the app shell and resources cached during an online visit are available."
+          aria-label="Offline: network connection unavailable"
+          title="Offline network status. App-shell availability requires a successful online visit and service-worker cache installation."
         >
-          OFFLINE · CACHED APP ONLY
+          OFFLINE · NO NETWORK
         </aside>
       )}
       <header className="app-header">
