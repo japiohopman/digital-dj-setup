@@ -1,8 +1,8 @@
 # Shared mixer audio routing
 
-**Status:** Phase 0 implementation baseline  
-**Last updated:** 2026-11-09  
-**Scope:** two independent Technics-inspired decks routed through one app-owned output graph.
+**Status:** Phase 1 implementation in progress  
+**Last updated:** 2026-11-10  
+**Scope:** two independent Technics-inspired decks routed through one app-owned mixer graph.
 
 ## Ownership
 
@@ -71,9 +71,18 @@ In Phase 0 the channel gain and crossfader gain both remain at unity (1.0). Ther
 - `src/audio/AudioEngine.test.ts` verifies programme audio, vinyl loops and needle one-shots all connect to the injected deck input, and disposing the engine leaves the shared context alive.
 - The application instantiates one graph and passes separate Deck A and Deck B options into their independent `useDeckTransport` hooks.
 
-## Phase 1 constraints
+## Phase 1 controls and signal measurement
 
-1. Add channel fader and crossfader actions to the graph; do not wire UI directly to Web Audio nodes.
-2. Keep every deck sound layer upstream of the channel fader and crossfader.
-3. Decide and document the centre crossfader curve after listening tests. The Phase 0 graph deliberately does not pick a curve.
-4. Add real-device checks with both decks playing simultaneously, each deck independently muted/faded, and both channel meters plus the master meter observed.
+- `MixerAudioGraph.setChannelLevel(deckId, value)` controls each channel gain independently from 0 (silent) to 1 (unity). Values are retained before the AudioContext is created and applied when a deck path is first built.
+- `MixerAudioGraph.setCrossfaderPosition(value)` controls the A/B blend from 0 (A) to 1 (B). The initial candidate is an equal-power cosine/sine curve: each deck is approximately -3 dB at centre. Gain changes use a short 18 ms ramp to avoid clicks.
+- `MixerAudioGraph.getMeterLevels()` reads RMS time-domain samples from the post-channel/post-crossfader Deck A and Deck B analysers and the post-master analyser. It returns normalized levels and never creates or resumes an AudioContext.
+- `MixerPanel` owns only presentation state. It sends fader values to the graph API and polls the real meter readings; it does not access Web Audio nodes directly.
+- In portrait, the mixer is a dedicated third view rather than a narrow strip between decks. In landscape, it occupies the central bridge while both decks retain their existing -90° arrangement.
+- The faceplate uses the supplied PMC-05 Pro III as visual inspiration; non-functional mic, effects, cue/monitor, EQ and input-selector controls are intentionally omitted.
+
+## Phase 1 verification still required
+
+1. Listen to the equal-power centre behaviour with two simultaneous decks and adjust/document the curve if the real-device test calls for it.
+2. Verify each channel fader at minimum silences only its deck without changing transport, platter motor or tonearm state.
+3. Verify crossfader hard-left, centre and hard-right behaviour, plus both post-fader channel meters and the combined master meter.
+4. Test portrait Mixer view and landscape central mixer on a real phone, and retain the CI screenshots for desktop and both mobile orientations.
