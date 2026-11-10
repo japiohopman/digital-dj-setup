@@ -147,6 +147,8 @@ describe('PWA app-shell caching policy', () => {
     expect(source).toContain('const APP_SHELL_URL = new URL(APP_BASE_PATH, self.location.origin).href;');
     expect(source).toContain('await caches.match(APP_SHELL_URL)');
     expect(source).toContain('not available offline');
+    expect(source).toContain('Preserve a successful page response when storage is unavailable or full.');
+    expect(source).toContain('Return the successful network response even when cache storage cannot be written.');
     expect(source).toContain('/assets/app-a1b2.js');
     expect(source).not.toContain('user-audio-preview');
   });
