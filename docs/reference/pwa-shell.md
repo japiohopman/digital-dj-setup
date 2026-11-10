@@ -2,6 +2,27 @@
 
 The Digital DJ app can be installed and launched in **standalone** display mode. This gives the installed app its own window without the normal browser URL/navigation bar. A platform status area may still be visible.
 
+## Test hosting with GitHub Pages
+
+The repository is public, so GitHub Pages can host the static PWA without creating a Render service. The project-site URL is:
+
+`https://japiohopman.github.io/digital-dj-setup/`
+
+The Vite build uses the Pages base path for HTML, CSS artwork, manifest icons and the service-worker scope. The manifest itself uses deployment-relative paths so it also works on a root-hosted static host.
+
+### First-time Pages setup
+
+1. Merge the PWA implementation PR so the deployment workflow is available on `main`.
+2. Open the repository's **Settings → Pages**.
+3. Under **Build and deployment**, set **Source** to **GitHub Actions**.
+4. Open **Actions → Deploy GitHub Pages**.
+5. Choose the branch you want to test in the **Run workflow** branch selector, then run it.
+6. Open the URL reported by the deployment job. The default project URL is the address above.
+
+The workflow is manual by design. It deploys only when explicitly run, and builds the branch selected in the Actions run form. GitHub Pages is a public website for this public repository; do not put secrets or private files in its build output.
+
+
+
 ## Install on Android
 
 1. Open the deployed app once in Chrome while online.
@@ -28,6 +49,7 @@ The service worker is generated during the Vite production build from the actual
 
 ## Device acceptance checklist
 
+- [ ] Publish the selected branch to GitHub Pages and open the HTTPS project URL.
 - [ ] Install from HTTPS on Android Chrome and launch from the home-screen icon.
 - [ ] Install from Safari on iPhone and launch with **Open as Web App**.
 - [ ] Confirm the normal browser URL/navigation bar is absent in the installed launch.
