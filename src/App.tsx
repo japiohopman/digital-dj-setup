@@ -51,7 +51,7 @@ export function App() {
         <span className="app-header__mode">DMC / DUAL DECK</span>
       </header>
 
-      <nav className="deck-selector" aria-label="Choose active deck">
+      <nav className="deck-selector" aria-label="Choose workspace view">
         <button
           className="deck-selector__button"
           type="button"
