@@ -72,7 +72,8 @@ jobs:
           for (const size of ['192x192', '512x512']) {
             const icon = manifest.icons.find((item) => item.sizes === size && item.type === 'image/png');
             const iconPath = icon && new URL(icon.src, 'https://example.test' + base + 'manifest.webmanifest').pathname;
-            if (!iconPath?.startsWith(base) || !existsSync('dist' + iconPath)) {
+            const outputPath = iconPath?.startsWith(base) ? iconPath.slice(base.length) : '';
+            if (!outputPath || !existsSync('dist/' + outputPath)) {
               throw new Error('Missing or out-of-scope PWA install icon: ' + size);
             }
           }
