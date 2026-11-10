@@ -13,7 +13,7 @@ export interface MixerPanelProps {
 }
 
 const METER_SEGMENTS = 12;
-const METER_FLOOR_DB = -48;
+const METER_FLOOR_DB = -60;
 
 /** Converts a normalized RMS meter level into a display-safe decibel value. */
 const toDecibels = (level: number): number =>
