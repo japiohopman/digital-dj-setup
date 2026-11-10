@@ -193,7 +193,7 @@ export function WorkspaceMenu({
               </p>
             </aside>
 
-            <main className="workspace-menu__main">
+            <div className="workspace-menu__main">
               <div className="workspace-menu__crate-heading">
                 <div>
                   <span className="workspace-menu__section-label">BATTLE SERIES / VOLUME 01</span>
@@ -223,9 +223,9 @@ export function WorkspaceMenu({
                 </div>
               </div>
 
-              <div className="workspace-menu__track-list" aria-label="Battle Ammo tracks">
+              <div className="workspace-menu__track-list" role="list" aria-label="Battle Ammo tracks">
                 {tracks.map((track, index) => (
-                  <article className="workspace-menu__track-row" key={track.id}>
+                  <article className="workspace-menu__track-row" role="listitem" key={track.id}>
                     <span className="workspace-menu__track-index">{String(index + 1).padStart(2, '0')}</span>
                     <span className="workspace-menu__record-icon" aria-hidden="true">◉</span>
                     <span className="workspace-menu__track-info">
@@ -264,7 +264,7 @@ export function WorkspaceMenu({
               </section>
 
               {children && <div className="workspace-menu__utilities">{children}</div>}
-            </main>
+            </div>
           </div>
           <footer className="workspace-menu__footer">
             <span>◎ BATTLE AMMO · BUILT-IN STARTER CRATE</span>
