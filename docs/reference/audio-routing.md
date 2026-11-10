@@ -80,8 +80,8 @@ In the Phase 0 routing baseline both gains were fixed at unity (1.0). Phase 1 no
 - CUT-IN and crossfader curve are separate behaviours: CUT-IN changes how far the fader travels before the incoming deck begins to open; the existing equal-power curve determines the gain transition after cut-in. The dial does not yet expose a separate sharp/scratch curve control.
 - `MixerAudioGraph.getMeterLevels()` reads RMS time-domain samples from the post-channel/post-crossfader Deck A and Deck B analysers and the post-master analyser. It returns normalized levels and never creates or resumes an AudioContext.
 - `MixerPanel` owns only presentation state. It sends fader values to the graph API and polls the real meter readings; it does not access Web Audio nodes directly.
-- In portrait, the mixer is a dedicated third view rather than a narrow strip between decks. In landscape, it occupies the central bridge while both decks retain their existing -90° arrangement.
-- The faceplate uses the supplied PMC-05 Pro III as visual inspiration; non-functional mic, effects, cue/monitor, EQ and input-selector controls are intentionally omitted.
+- In portrait, the mixer is a dedicated third view rather than a narrow strip between decks. In landscape, the mixer follows the user's Figma composition: narrow centre column, both decks full-size and still rotated -90°. The mixer is shorter than the decks and anchored low, intentionally leaving headroom above it for future transient overlays such as the track loader.
+- The supplied Figma frame 41:36 is now the authoritative layout reference; the PMC-05 Pro III is a secondary visual/material reference only. The dark upper strip contains working rotary/utility controls (currently CUT-IN). The aluminium faceplate keeps the real signal meters in its upper area, two vertical channel faders in the middle, and the compact horizontal crossfader at the bottom. The title/status copy and decorative footer were removed. Small visual controls retain 44px hit areas where practical. Non-functional mic, effects, cue/monitor, EQ and input-selector controls remain omitted.
 
 ## Phase 1 verification still required
 
