@@ -21,5 +21,6 @@ if (import.meta.env.PROD) {
   registerAppServiceWorker(
     'serviceWorker' in navigator ? navigator.serviceWorker : undefined,
     (onLoad) => window.addEventListener('load', onLoad, { once: true }),
+    import.meta.env.BASE_URL,
   );
 }
