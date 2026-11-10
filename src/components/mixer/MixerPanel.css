@@ -333,9 +333,9 @@
 }
 
 .mixer-crossfader__fader {
-  width: 64%;
+  width: 60%;
   min-width: 0;
-  flex: 0 1 64%;
+  flex: 0 1 60%;
 }
 
 .mixer-cut-control {
@@ -586,8 +586,8 @@
   }
 
   .mixer-crossfader__fader {
-    width: 64%;
-    flex-basis: 64%;
+    width: 60%;
+    flex-basis: 60%;
   }
 
   .mixer-cut-control {
@@ -802,14 +802,14 @@
   }
 
   .mixer-crossfader__fader input::-webkit-slider-thumb {
-    width: 23px;
-    height: 20px;
+    width: 18px;
+    height: 16px;
     margin-top: -7px;
   }
 
   .mixer-crossfader__fader input::-moz-range-thumb {
-    width: 23px;
-    height: 20px;
+    width: 18px;
+    height: 16px;
   }
 
   .mixer-crossfader__scale i {
