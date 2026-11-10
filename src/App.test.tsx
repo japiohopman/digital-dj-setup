@@ -16,6 +16,9 @@ describe('App dual-deck workspace', () => {
     expect(markup.match(/class="turntable power-on motor-on has-slipmat"/g)).toHaveLength(2);
     expect(markup).toContain('aria-label="Developer tools"');
     expect(markup).toContain('DEVKIT');
+    expect(markup).toContain('aria-label="Open workspace tools"');
+    expect(markup).not.toContain('class="devkit-trigger"');
+    expect(markup).not.toContain('class="deck-load-btn"');
     expect(markup).not.toContain('tonearm-meter-panel');
   });
 
