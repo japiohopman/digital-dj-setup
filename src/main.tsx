@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { App } from './App';
+import { registerAppServiceWorker } from './pwa/registerServiceWorker';
 import './styles.css';
 
 const rootElement = document.getElementById('root');
@@ -15,3 +16,11 @@ createRoot(rootElement).render(
     <App />
   </StrictMode>,
 );
+
+if (import.meta.env.PROD) {
+  registerAppServiceWorker(
+    'serviceWorker' in navigator ? navigator.serviceWorker : undefined,
+    (onLoad) => window.addEventListener('load', onLoad, { once: true }),
+    import.meta.env.BASE_URL,
+  );
+}

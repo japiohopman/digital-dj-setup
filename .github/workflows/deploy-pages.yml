@@ -1,0 +1,117 @@
+name: Deploy GitHub Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy PWA test site
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out selected branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test
+
+      - name: Build project-site PWA
+        env:
+          VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+        run: npm run build
+
+      - name: Verify the published project-site paths
+        env:
+          VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+        run: |
+          node --input-type=module <<'NODE'
+          import { existsSync, readFileSync, readdirSync } from 'node:fs';
+
+          const base = process.env.VITE_BASE_PATH;
+          if (!base?.startsWith('/') || !base.endsWith('/')) {
+            throw new Error('Invalid GitHub Pages base path: ' + base);
+          }
+
+          const manifest = JSON.parse(readFileSync('dist/manifest.webmanifest', 'utf8'));
+          if (manifest.display !== 'standalone' || manifest.start_url !== './' || manifest.scope !== './') {
+            throw new Error('PWA manifest must use standalone mode and a relative deployment scope.');
+          }
+
+          for (const size of ['192x192', '512x512']) {
+            const icon = manifest.icons.find((item) => item.sizes === size && item.type === 'image/png');
+            const iconPath = icon && new URL(icon.src, 'https://example.test' + base + 'manifest.webmanifest').pathname;
+            const outputPath = iconPath?.startsWith(base) ? iconPath.slice(base.length) : '';
+            if (!outputPath || !existsSync('dist/' + outputPath)) {
+              throw new Error('Missing or out-of-scope PWA install icon: ' + size);
+            }
+          }
+
+          for (const asset of ['sw.js', 'favicon.svg', 'sounds/vinyl_loop.wav']) {
+            if (!existsSync('dist/' + asset)) throw new Error('Missing PWA app-shell asset: ' + asset);
+          }
+
+          const html = readFileSync('dist/index.html', 'utf8');
+          if (!html.includes(base + 'manifest.webmanifest') || !html.includes(base + 'assets/')) {
+            throw new Error('HTML contains asset URLs outside the configured Pages base path.');
+          }
+
+          const cssFile = readdirSync('dist/assets').find((file) => file.endsWith('.css'));
+          if (!cssFile) throw new Error('No CSS bundle was emitted.');
+          const css = readFileSync('dist/assets/' + cssFile, 'utf8');
+          if (!css.includes(base + 'turntable/')) {
+            throw new Error('Turntable artwork URLs are not prefixed with the Pages base path.');
+          }
+
+          const worker = readFileSync('dist/sw.js', 'utf8');
+          if (!worker.includes('const APP_BASE_PATH = "' + base + '";') ||
+              !worker.includes('"' + base + 'turntable/landscape/tt_case_and_lighting.png"') ||
+              !worker.includes('"' + base + 'sounds/vinyl_loop.wav"')) {
+            throw new Error('Service worker is not scoped to the Pages project path.');
+          }
+          if (worker.includes('user-audio-preview')) {
+            throw new Error('User-selected audio must never be added to the app-shell cache.');
+          }
+
+          console.log('PWA manifest, icons, CSS art, worker and offline assets use base path ' + base);
+          NODE
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+      - name: Deploy selected branch to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
