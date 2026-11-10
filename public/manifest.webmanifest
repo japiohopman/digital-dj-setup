@@ -1,0 +1,25 @@
+{
+  "id": "./",
+  "name": "Digital DJ Setup",
+  "short_name": "Digital DJ",
+  "description": "A two-deck mobile DJ workspace inspired by classic Technics turntables.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101113",
+  "theme_color": "#101113",
+  "icons": [
+    {
+      "src": "./icons/app-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/app-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

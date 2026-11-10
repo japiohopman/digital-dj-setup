@@ -58,7 +58,7 @@ Start with the [technical reference index](docs/reference/README.md) before rese
 - Give each deck an independent transport/audio-engine instance.
 - Prefer browser-native APIs and a small dependency footprint.
 - Do not implement mixer features until a mixer reference and dedicated issue are agreed.
-- Do not add PWA/offline support, a backend or remote music storage prematurely.
+- The installable PWA shell is tracked in [Issue #19](https://github.com/japiohopman/digital-dj-setup/issues/19); it caches only application resources, never user-selected audio.
 
 ## Issue and pull request workflow
 
@@ -70,3 +70,8 @@ Start with the [technical reference index](docs/reference/README.md) before rese
 6. Merge when the issue's acceptance criteria are met, CI is green and review has no unresolved blockers; the user has delegated this merge decision to the assistant.
 
 See [AGENTS.md](AGENTS.md) for coding-agent instructions and [CHATGPT.md](CHATGPT.md) for project collaboration guidance.
+
+
+## Installable app
+
+The project includes an installable standalone PWA shell and a manual GitHub Pages deployment workflow for mobile testing. See [the PWA install, Pages and offline guide](docs/reference/pwa-shell.md) for the public test URL, Android/iPhone installation steps, cache boundaries and device acceptance checks.

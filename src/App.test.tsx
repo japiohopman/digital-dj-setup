@@ -42,6 +42,20 @@ describe('App dual-deck workspace', () => {
     expect(markup).not.toContain('tonearm-meter-panel');
   });
 
+  it('shows a clear app-shell status when the device is offline', () => {
+    const originalOnLine = Object.getOwnPropertyDescriptor(navigator, 'onLine');
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+
+    try {
+      const markup = renderToStaticMarkup(<App />);
+      expect(markup).toContain('OFFLINE · NO NETWORK');
+      expect(markup).toContain('network connection unavailable');
+    } finally {
+      if (originalOnLine) Object.defineProperty(navigator, 'onLine', originalOnLine);
+      else delete (navigator as { onLine?: boolean }).onLine;
+    }
+  });
+
   it('provides an accessible portrait deck selector', () => {
     const markup = renderToStaticMarkup(<App />);
 

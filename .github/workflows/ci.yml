@@ -42,6 +42,75 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Verify installable PWA output
+        run: |
+          node --input-type=module <<'NODE'
+          import { existsSync, readFileSync, readdirSync } from 'node:fs';
+
+          const manifest = JSON.parse(readFileSync('dist/manifest.webmanifest', 'utf8'));
+          if (manifest.display !== 'standalone' || manifest.start_url !== './' || manifest.scope !== './') {
+            throw new Error('PWA manifest must use standalone mode with a deployment-relative scope.');
+          }
+          for (const size of ['192x192', '512x512']) {
+            const icon = manifest.icons.find((item) => item.sizes === size && item.type === 'image/png');
+            const iconPath = icon && new URL(icon.src, 'https://example.test/manifest.webmanifest').pathname;
+            if (!iconPath || !existsSync('dist' + iconPath)) {
+              throw new Error('Missing install icon: ' + size);
+            }
+          }
+          for (const asset of ['dist/sw.js', 'dist/favicon.svg', 'dist/sounds/vinyl_loop.wav']) {
+            if (!existsSync(asset)) throw new Error('Missing PWA shell resource: ' + asset);
+          }
+          const worker = readFileSync('dist/sw.js', 'utf8');
+          if (!worker.includes('digital-dj-shell-') || !worker.includes('PRECACHE_URLS')) {
+            throw new Error('The generated versioned app-shell worker is missing.');
+          }
+          if (worker.includes('user-audio-preview')) {
+            throw new Error('User-selected audio must not be added to the precache.');
+          }
+          console.log('Standalone manifest, icons, versioned worker and bundled app sounds verified.');
+          NODE
+
+      - name: Verify GitHub Pages project-path build
+        run: |
+          VITE_BASE_PATH=/digital-dj-setup/ npm run build -- --outDir dist-pages
+          node --input-type=module <<'NODE'
+          import { existsSync, readFileSync, readdirSync } from 'node:fs';
+
+          const base = '/digital-dj-setup/';
+          const manifest = JSON.parse(readFileSync('dist-pages/manifest.webmanifest', 'utf8'));
+          if (manifest.display !== 'standalone' || manifest.start_url !== './' || manifest.scope !== './') {
+            throw new Error('GitHub Pages manifest must retain its relative standalone scope.');
+          }
+          for (const size of ['192x192', '512x512']) {
+            const icon = manifest.icons.find((item) => item.sizes === size);
+            const iconPath = icon && new URL(icon.src, 'https://example.test/digital-dj-setup/manifest.webmanifest').pathname;
+            const outputPath = iconPath?.startsWith(base) ? iconPath.slice(base.length) : '';
+            if (!outputPath || !existsSync('dist-pages/' + outputPath)) {
+              throw new Error('GitHub Pages icon is missing or outside the project path: ' + size);
+            }
+          }
+          const html = readFileSync('dist-pages/index.html', 'utf8');
+          if (!html.includes('/digital-dj-setup/assets/') || !html.includes('/digital-dj-setup/manifest.webmanifest')) {
+            throw new Error('GitHub Pages HTML does not reference project-scoped assets.');
+          }
+          const cssFile = readdirSync('dist-pages/assets').find((file) => file.endsWith('.css'));
+          if (!cssFile) throw new Error('No CSS bundle was emitted for GitHub Pages.');
+          const css = readFileSync('dist-pages/assets/' + cssFile, 'utf8');
+          if (!css.includes('/digital-dj-setup/turntable/')) {
+            throw new Error('Turntable CSS artwork URLs were not rewritten under the GitHub Pages base path.');
+          }
+          const worker = readFileSync('dist-pages/sw.js', 'utf8');
+          if (!worker.includes('"/digital-dj-setup/"') ||
+              !worker.includes('"/digital-dj-setup/turntable/landscape/tt_case_and_lighting.png"')) {
+            throw new Error('GitHub Pages worker does not precache resources under the project path.');
+          }
+          if (worker.includes('user-audio-preview')) {
+            throw new Error('User-selected audio must never be added to the app-shell cache.');
+          }
+          console.log('GitHub Pages base path, manifest icons and scoped service worker verified.');
+          NODE
+
       - name: Start production preview
         run: |
           npm run preview -- --host 127.0.0.1 > /tmp/digital-dj-preview.log 2>&1 &

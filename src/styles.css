@@ -393,3 +393,47 @@ textarea {
     );
   }
 }
+
+
+.app-offline-status {
+  position: fixed;
+  z-index: 30000;
+  top: max(6px, env(safe-area-inset-top));
+  left: 50%;
+  max-width: calc(100vw - 16px);
+  padding: 6px 9px;
+  transform: translateX(-50%);
+  border: 1px solid rgb(218 166 77 / 55%);
+  border-radius: 4px;
+  color: #f4d49e;
+  background: rgb(16 20 22 / 94%);
+  box-shadow: 0 3px 12px rgb(0 0 0 / 38%);
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-align: center;
+  pointer-events: none;
+}
+
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior: none;
+  }
+
+  .app-shell {
+    min-height: 100dvh;
+  }
+}
+
+@media (display-mode: standalone) and (orientation: landscape) {
+  .app-shell {
+    height: 100dvh;
+  }
+
+  .deck-workspace {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+}

@@ -14,6 +14,9 @@ type ActiveView = ActiveDeck | 'mixer';
 
 export function App() {
   const [activeDeck, setActiveDeck] = useState<ActiveDeck>('a');
+  const [isOnline, setIsOnline] = useState(
+    () => typeof navigator === 'undefined' || navigator.onLine,
+  );
   const [activeView, setActiveView] = useState<ActiveView>(() => {
     if (typeof window === 'undefined') return 'a';
     return new URLSearchParams(window.location.search).get('view') === 'mixer' ? 'mixer' : 'a';
@@ -72,10 +75,31 @@ export function App() {
 
   useEffect(() => () => mixerAudioGraph.dispose(), [mixerAudioGraph]);
 
+  useEffect(() => {
+    /** Keeps the small app-shell status current as connectivity changes. */
+    const updateNetworkStatus = () => setIsOnline(navigator.onLine);
+    window.addEventListener('online', updateNetworkStatus);
+    window.addEventListener('offline', updateNetworkStatus);
+    return () => {
+      window.removeEventListener('online', updateNetworkStatus);
+      window.removeEventListener('offline', updateNetworkStatus);
+    };
+  }, []);
+
   const isAudioActive = transportA.isPlaying || transportB.isPlaying;
 
   return (
     <main className="app-shell">
+      {!isOnline && (
+        <aside
+          className="app-offline-status"
+          role="status"
+          aria-label="Offline: network connection unavailable"
+          title="Offline network status. App-shell availability requires a successful online visit and service-worker cache installation."
+        >
+          OFFLINE · NO NETWORK
+        </aside>
+      )}
       <header className="app-header">
         <div>
           <p className="eyebrow">DIGITAL DJ SETUP</p>
