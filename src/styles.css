@@ -246,6 +246,15 @@ textarea {
 }
 
 @media (orientation: landscape) {
+  .deck-workspace.is-mixer-view .dual-deck-layout {
+    width: 100%;
+    max-width: none;
+  }
+
+  .deck-workspace.is-mixer-view .dual-deck__slot {
+    display: flex;
+  }
+
   .app-shell {
     height: 100vh;
     height: 100svh;
