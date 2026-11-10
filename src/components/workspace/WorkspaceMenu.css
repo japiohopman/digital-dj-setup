@@ -1,0 +1,169 @@
+.workspace-menu {
+  position: relative;
+  z-index: 12000;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+}
+
+.workspace-menu__trigger {
+  display: inline-flex;
+  min-width: 84px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border: 1px solid rgb(197 154 88 / 55%);
+  border-radius: 4px;
+  color: #e8d6b5;
+  background: linear-gradient(180deg, #252a2b, #101416);
+  box-shadow: 0 2px 7px rgb(0 0 0 / 38%), inset 0 1px rgb(255 255 255 / 8%);
+  font: 800 0.56rem/1 'SF Mono', Monaco, Consolas, monospace;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.workspace-menu__trigger-icon {
+  color: #d5ad70;
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.workspace-menu__trigger-caret {
+  color: #9ca3a3;
+  font-size: 0.45rem;
+}
+
+.workspace-menu__trigger:focus-visible,
+.workspace-menu__popover button:focus-visible,
+.workspace-menu__popover input:focus-visible {
+  outline: 2px solid #f2c574;
+  outline-offset: 3px;
+}
+
+.workspace-menu__popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  z-index: 12001;
+  width: min(278px, calc(100vw - 16px));
+  max-height: min(44vh, 320px);
+  overflow: auto;
+  padding: 9px;
+  transform: translateX(-50%);
+  border: 1px solid rgb(197 154 88 / 50%);
+  border-radius: 5px;
+  color: #e5e7eb;
+  background: rgb(13 16 18 / 97%);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 54%);
+  backdrop-filter: blur(10px);
+  overscroll-behavior: contain;
+}
+
+.workspace-menu__popover[hidden] {
+  display: none;
+}
+
+.workspace-menu__section {
+  display: grid;
+  gap: 7px;
+}
+
+.workspace-menu__section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px 5px;
+  border-bottom: 1px solid rgb(255 255 255 / 13%);
+  color: #d5ad70;
+  font-size: 0.49rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.workspace-menu__section-heading span {
+  color: #9ca3a3;
+  font-size: 0.42rem;
+  letter-spacing: 0.06em;
+}
+
+.workspace-menu__track-loaders {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.workspace-menu__track-loaders .turntable.track-loader-portal {
+  width: 100%;
+  max-width: none;
+}
+
+.workspace-menu__track-loaders .turntable.track-loader-portal .deck-audio-panel {
+  position: relative;
+  top: auto;
+  right: auto;
+  left: auto;
+  width: 100%;
+  min-width: 0;
+  gap: 7px;
+  padding: 6px;
+  transform: none;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 4px;
+  background: rgb(255 255 255 / 4%);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.workspace-menu__track-loaders .deck-loader-label {
+  flex: 0 0 40px;
+  color: #d5ad70;
+  font: 800 0.48rem/1 'SF Mono', Monaco, Consolas, monospace;
+}
+
+.workspace-menu__track-loaders .deck-audio-controls {
+  gap: 0;
+}
+
+.workspace-menu__track-loaders .deck-load-btn {
+  min-height: 36px;
+  padding: 6px 8px;
+  font-size: 0.52rem;
+  white-space: nowrap;
+}
+
+.workspace-menu__track-loaders .deck-audio-readout {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.workspace-menu__track-loaders .deck-track-meta {
+  min-width: 0;
+  align-items: flex-end;
+}
+
+.workspace-menu__track-loaders .deck-track-name,
+.workspace-menu__track-loaders .deck-audio-status {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.49rem;
+}
+
+.workspace-menu__track-loaders .deck-track-time {
+  font-size: 0.44rem;
+}
+
+.workspace-menu__hint {
+  margin: 8px 1px 0;
+  color: rgb(229 231 235 / 48%);
+  font-size: 0.4rem;
+  line-height: 1.4;
+  text-align: right;
+}
