@@ -77,6 +77,123 @@ describe('useVinylMotion transport and phase regression', () => {
     vi.unstubAllGlobals();
   });
 
+  it('allows two decks to scratch independently with simultaneous touch pointers', () => {
+    const dispatchA = vi.fn((event: { type: string }) => event.type.length > 0);
+    const dispatchB = vi.fn((event: { type: string }) => event.type.length > 0);
+    const makeTarget = () => Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      getBoundingClientRect: vi.fn(() => ({
+        left: 0, top: 0, width: 100, height: 100,
+        right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}),
+      })),
+    });
+    const targetA = makeTarget();
+    const targetB = makeTarget();
+    const makeTransport = () => ({
+      isLoaded: true,
+      duration: 120,
+      currentTime: 20,
+      getCurrentTime: () => 20,
+    }) as unknown as DeckTransport;
+
+    const { result, unmount } = renderHook(() => {
+      const deckA = useVinylMotion({
+        isPowered: true,
+        isMotorOn: true,
+        speedRpm: 33,
+        pitch: 0,
+        motorState: 'running',
+        transportPhase: 'playing',
+        transport: makeTransport(),
+        hasRecord: true,
+        dispatch: dispatchA,
+      });
+      const deckB = useVinylMotion({
+        isPowered: true,
+        isMotorOn: true,
+        speedRpm: 33,
+        pitch: 0,
+        motorState: 'running',
+        transportPhase: 'playing',
+        transport: makeTransport(),
+        hasRecord: true,
+        dispatch: dispatchB,
+      });
+      return { deckA, deckB };
+    });
+
+    result.current.deckA.discRef.current = targetA;
+    result.current.deckB.discRef.current = targetB;
+
+    const pointerDown = (
+      target: HTMLDivElement,
+      pointerId: number,
+      isPrimary: boolean,
+    ) => ({
+      button: 0,
+      isPrimary,
+      preventDefault: vi.fn(),
+      pointerId,
+      clientX: 75,
+      clientY: 50,
+      currentTarget: target,
+    }) as unknown as ReactPointerEvent<HTMLDivElement>;
+
+    act(() => result.current.deckA.onPointerDown(pointerDown(targetA, 41, true)));
+    act(() => result.current.deckB.onPointerDown(pointerDown(targetB, 42, false)));
+
+    expect(result.current.deckA.isScratching).toBe(true);
+    expect(result.current.deckB.isScratching).toBe(true);
+    expect(dispatchA).toHaveBeenCalledWith(expect.objectContaining({ type: 'SCRATCH_STARTED' }));
+    expect(dispatchB).toHaveBeenCalledWith(expect.objectContaining({ type: 'SCRATCH_STARTED' }));
+
+    // A third touch on Deck A must not replace that deck's already active pointer.
+    act(() => result.current.deckA.onPointerDown(pointerDown(targetA, 43, false)));
+    expect(dispatchA.mock.calls.filter(([event]) => event.type === 'SCRATCH_STARTED')).toHaveLength(1);
+
+    const pointerMove = (pointerId: number, clientX: number, clientY: number) => {
+      const event = new Event('pointermove', { cancelable: true }) as Event & {
+        pointerId: number;
+        clientX: number;
+        clientY: number;
+      };
+      Object.defineProperties(event, {
+        pointerId: { value: pointerId },
+        clientX: { value: clientX },
+        clientY: { value: clientY },
+      });
+      return event;
+    };
+
+    act(() => window.dispatchEvent(pointerMove(41, 50, 75)));
+    act(() => window.dispatchEvent(pointerMove(42, 50, 75)));
+
+    expect(result.current.deckA.angle).not.toBe(0);
+    expect(result.current.deckB.angle).not.toBe(0);
+
+    const pointerUp = (pointerId: number, clientX: number, clientY: number) => {
+      const event = new Event('pointerup') as Event & {
+        pointerId: number;
+        clientX: number;
+        clientY: number;
+      };
+      Object.defineProperties(event, {
+        pointerId: { value: pointerId },
+        clientX: { value: clientX },
+        clientY: { value: clientY },
+      });
+      return event;
+    };
+
+    act(() => window.dispatchEvent(pointerUp(41, 50, 75)));
+    act(() => window.dispatchEvent(pointerUp(42, 50, 75)));
+
+    expect(result.current.deckA.isScratching).toBe(false);
+    expect(result.current.deckB.isScratching).toBe(false);
+    unmount();
+  });
+
   it('still synchronizes the record phase after an unrelated transport seek', () => {
     const dispatch = vi.fn(() => true);
     const makeTransport = (currentTime: number) => ({
