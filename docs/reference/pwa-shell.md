@@ -38,7 +38,7 @@ The workflow is manual by design. It deploys only when explicitly run, and build
 
 ## Offline behaviour
 
-- The app shell, built JavaScript/CSS, turntable artwork, icons and application-owned needle/vinyl sound effects are precached.
+- The app shell, built JavaScript/CSS and manifest are critical precache resources. Turntable artwork, icons and application-owned needle/vinyl sounds are cached best-effort; their failure cannot block installation of the offline app shell.
 - Navigation is network-first while online and falls back to the cached app shell when offline.
 - Only same-origin application assets are cached. No third-party resources or API responses are cached.
 - User-selected audio files remain local File/Blob objects. They are not sent to a server and are never added to the service-worker cache.
@@ -46,7 +46,7 @@ The workflow is manual by design. It deploys only when explicitly run, and build
 - The separate `OFFLINE CACHE READY` footer indicator appears only when an active service worker controls the page and the exact current HTML, JavaScript and CSS entry resources are present in Cache Storage. `OFFLINE CACHE NOT READY` means the app should not yet be relied on for offline launch.
 - Offline shell availability is conditional on a successful online visit that installs the service worker and completes the initial app-shell cache population. A resource that was not included in the app build cannot be fetched while offline.
 
-The service worker is generated during the Vite production build from the actual output asset list. It uses a versioned cache and removes older app-shell caches after an update. Development mode does not register it, avoiding stale assets while running Vite locally.
+The service worker is generated during the Vite production build from the actual output asset list. It uses a versioned cache and removes older app-shell caches after an update. Optional precache fetches are bounded to eight seconds each so a slow media request cannot hold the worker installation indefinitely. Development mode does not register it, avoiding stale assets while running Vite locally.
 
 ## Device acceptance checklist
 
