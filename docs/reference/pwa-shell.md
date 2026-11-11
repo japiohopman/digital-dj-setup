@@ -43,6 +43,7 @@ The workflow is manual by design. It deploys only when explicitly run, and build
 - Only same-origin application assets are cached. No third-party resources or API responses are cached.
 - User-selected audio files remain local File/Blob objects. They are not sent to a server and are never added to the service-worker cache.
 - The `OFFLINE · NO NETWORK` indicator reports the browser's network status only; it does not confirm that the service worker is installed or that the shell cache is populated.
+- The separate `OFFLINE CACHE READY` footer indicator appears only when an active service worker controls the page and the exact current HTML, JavaScript and CSS entry resources are present in Cache Storage. `OFFLINE CACHE NOT READY` means the app should not yet be relied on for offline launch.
 - Offline shell availability is conditional on a successful online visit that installs the service worker and completes the initial app-shell cache population. A resource that was not included in the app build cannot be fetched while offline.
 
 The service worker is generated during the Vite production build from the actual output asset list. It uses a versioned cache and removes older app-shell caches after an update. Development mode does not register it, avoiding stale assets while running Vite locally.
