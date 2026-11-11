@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createServiceWorkerSource,
+  getPrecachePlan,
   getPrecacheUrls,
   shouldCacheRuntimeRequest,
 } from './serviceWorkerSource';
@@ -27,6 +28,28 @@ describe('PWA app-shell caching policy', () => {
     expect(urls).toContain('/assets/turntable-123.png');
     expect(urls).not.toContain('/assets/user-audio-preview-456.mp3');
     expect(urls).not.toContain('/assets/sample-789.wav');
+  });
+
+  it('keeps the offline boot resources separate from best-effort media and artwork', () => {
+    const plan = getPrecachePlan([
+      'assets/index-a1b2c3.js',
+      'assets/index-d4e5f6.css',
+      'assets/turntable-123.png',
+      'assets/local-font-456.woff2',
+      'assets/user-audio-preview-456.mp3',
+    ], '/digital-dj-setup/');
+
+    expect(plan.critical).toContain('/digital-dj-setup/');
+    expect(plan.critical).toContain('/digital-dj-setup/manifest.webmanifest');
+    expect(plan.critical).toContain('/digital-dj-setup/assets/index-a1b2c3.js');
+    expect(plan.critical).toContain('/digital-dj-setup/assets/index-d4e5f6.css');
+    expect(plan.critical).not.toContain('/digital-dj-setup/turntable-123.png');
+
+    expect(plan.optional).toContain('/digital-dj-setup/turntable-123.png');
+    expect(plan.optional).toContain('/digital-dj-setup/assets/local-font-456.woff2');
+    expect(plan.optional).toContain('/digital-dj-setup/turntable/landscape/tt_case_and_lighting.png');
+    expect(plan.optional).toContain('/digital-dj-setup/sounds/vinyl_loop.wav');
+    expect(plan.optional).not.toContain('/digital-dj-setup/assets/user-audio-preview-456.mp3');
   });
 
   it('does not cache user-selected audio URLs, cross-origin requests or writes', () => {
@@ -155,6 +178,17 @@ describe('PWA app-shell caching policy', () => {
     expect(firstCacheName).toBeTruthy();
     expect(secondCacheName).toBeTruthy();
     expect(firstCacheName).not.toBe(secondCacheName);
+  });
+
+  it('installs boot-critical resources before best-effort assets and never lets optional failures block the shell', () => {
+    const source = createServiceWorkerSource(['assets/app-a1b2.js', 'assets/app-c3d4.css']);
+
+    expect(source).toContain('const CRITICAL_PRECACHE_URLS =');
+    expect(source).toContain('const OPTIONAL_PRECACHE_URLS =');
+    expect(source).toContain('await Promise.all(CRITICAL_PRECACHE_URLS.map((url) => cachePrecacheResource(cache, url)))');
+    expect(source).toContain('await Promise.allSettled(');
+    expect(source).toContain('OPTIONAL_PRECACHE_URLS.map((url) => cachePrecacheResource(cache, url))');
+    expect(source).toContain('await self.skipWaiting()');
   });
 
   it('generates offline navigation fallback and a versioned cache', () => {
