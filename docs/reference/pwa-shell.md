@@ -46,7 +46,7 @@ The workflow is manual by design. It deploys only when explicitly run, and build
 - The separate `OFFLINE CACHE READY` footer indicator appears only when an active service worker controls the page and the exact current HTML, JavaScript and CSS entry resources are present in Cache Storage. `OFFLINE CACHE NOT READY` means the app should not yet be relied on for offline launch.
 - Offline shell availability is conditional on a successful online visit that installs the service worker and completes the initial app-shell cache population. A resource that was not included in the app build cannot be fetched while offline.
 
-The service worker is generated during the Vite production build from the actual output asset list. It uses a versioned cache and removes older app-shell caches after an update. Optional precache fetches are bounded to eight seconds each so a slow media request cannot hold the worker installation indefinitely. Development mode does not register it, avoiding stale assets while running Vite locally.
+The service worker is generated during the Vite production build from the actual output asset list. It uses a versioned cache and removes older app-shell caches after an update. Precache fetches are bounded to eight seconds each so a slow request cannot hold the worker installation indefinitely. If a required HTML, manifest, JavaScript or CSS resource cannot be fetched in that window, the worker deliberately does not activate and the readiness indicator remains not ready. Development mode does not register it, avoiding stale assets while running Vite locally.
 
 ## Device acceptance checklist
 
