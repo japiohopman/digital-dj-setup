@@ -8,15 +8,18 @@ import { DevKit } from './components/devkit/DevKit';
 import { BATTLE_AMMO_TRACKS, WorkspaceMenu, type BattleAmmoTrack } from './components/workspace/WorkspaceMenu';
 import type { DeckDiagnosticsSnapshot } from './components/devkit/types';
 import './components/Turntable.css';
+import { inspectAppShellReadiness } from './pwa/appShellReadiness';
 
 type ActiveDeck = 'a' | 'b';
 type ActiveView = ActiveDeck | 'mixer';
+type OfflineCacheState = 'checking' | 'ready' | 'not-ready' | 'unsupported';
 
 export function App() {
   const [activeDeck, setActiveDeck] = useState<ActiveDeck>('a');
   const [isOnline, setIsOnline] = useState(
     () => typeof navigator === 'undefined' || navigator.onLine,
   );
+  const [offlineCacheState, setOfflineCacheState] = useState<OfflineCacheState>('checking');
   const [activeView, setActiveView] = useState<ActiveView>(() => {
     if (typeof window === 'undefined') return 'a';
     return new URLSearchParams(window.location.search).get('view') === 'mixer' ? 'mixer' : 'a';
@@ -101,6 +104,54 @@ export function App() {
   const transportB = useDeckTransport(deckBAudioOptions);
 
   useEffect(() => () => mixerAudioGraph.dispose(), [mixerAudioGraph]);
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator) || !('caches' in window)) {
+      setOfflineCacheState('unsupported');
+      return;
+    }
+
+    let isMounted = true;
+    const requiredResourceUrls = [
+      new URL(import.meta.env.BASE_URL, window.location.origin).href,
+      ...Array.from(
+        document.querySelectorAll<HTMLScriptElement>('script[type="module"][src]'),
+        (script) => script.src,
+      ),
+      ...Array.from(
+        document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"][href]'),
+        (stylesheet) => stylesheet.href,
+      ),
+    ];
+    const timeoutId = window.setTimeout(() => {
+      if (isMounted) setOfflineCacheState('not-ready');
+    }, 10000);
+
+    const checkOfflineReadiness = () => {
+      void inspectAppShellReadiness(
+        navigator.serviceWorker,
+        window.caches,
+        requiredResourceUrls,
+      ).then((status) => {
+        if (!isMounted) return;
+        window.clearTimeout(timeoutId);
+        setOfflineCacheState(status.ready ? 'ready' : 'not-ready');
+      }).catch(() => {
+        if (!isMounted) return;
+        window.clearTimeout(timeoutId);
+        setOfflineCacheState('not-ready');
+      });
+    };
+
+    navigator.serviceWorker.addEventListener('controllerchange', checkOfflineReadiness);
+    checkOfflineReadiness();
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timeoutId);
+      navigator.serviceWorker.removeEventListener('controllerchange', checkOfflineReadiness);
+    };
+  }, []);
 
   useEffect(() => {
     /** Keeps the small app-shell status current as connectivity changes. */
@@ -235,6 +286,14 @@ export function App() {
       <footer className="app-footer">
         <span className={`app-footer__status${isAudioActive ? ' is-active' : ''}`} />
         WEB AUDIO ENGINE CONNECTED <span aria-hidden="true">·</span> INDEPENDENT DUAL TRANSPORT
+        <span
+          className={`app-footer__offline-cache is-${offlineCacheState}`}
+          role="status"
+          aria-label={offlineCacheState === 'ready' ? 'Offline app cache ready' : 'Offline app cache not ready'}
+          title="This checks that the active service worker controls this page and the current HTML, JavaScript and CSS are cached."
+        >
+          {offlineCacheState === 'ready' ? 'OFFLINE CACHE READY' : offlineCacheState === 'checking' ? 'OFFLINE CACHE CHECKING' : 'OFFLINE CACHE NOT READY'}
+        </span>
       </footer>
     </main>
   );
