@@ -49,6 +49,7 @@ function createServiceWorkerHarness(
         self,
         caches,
         fetch: fetchResource,
+        URL,
         AbortController,
         setTimeout,
         clearTimeout: globalThis.clearTimeout,
