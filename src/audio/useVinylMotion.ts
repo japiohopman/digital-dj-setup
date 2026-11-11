@@ -421,7 +421,6 @@ export function useVinylMotion({
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
       activePointerIdRef.current = null;
-      activeGestureModeRef.current = null;
       draggingFromRef.current = null;
       cleanupGestureRef.current = null;
 
