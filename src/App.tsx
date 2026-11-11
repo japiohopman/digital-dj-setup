@@ -8,15 +8,18 @@ import { DevKit } from './components/devkit/DevKit';
 import { BATTLE_AMMO_TRACKS, WorkspaceMenu, type BattleAmmoTrack } from './components/workspace/WorkspaceMenu';
 import type { DeckDiagnosticsSnapshot } from './components/devkit/types';
 import './components/Turntable.css';
+import { inspectAppShellReadiness } from './pwa/appShellReadiness';
 
 type ActiveDeck = 'a' | 'b';
 type ActiveView = ActiveDeck | 'mixer';
+type OfflineCacheState = 'checking' | 'ready' | 'not-ready' | 'unsupported';
 
 export function App() {
   const [activeDeck, setActiveDeck] = useState<ActiveDeck>('a');
   const [isOnline, setIsOnline] = useState(
     () => typeof navigator === 'undefined' || navigator.onLine,
   );
+  const [offlineCacheState, setOfflineCacheState] = useState<OfflineCacheState>('checking');
   const [activeView, setActiveView] = useState<ActiveView>(() => {
     if (typeof window === 'undefined') return 'a';
     return new URLSearchParams(window.location.search).get('view') === 'mixer' ? 'mixer' : 'a';
@@ -101,6 +104,64 @@ export function App() {
   const transportB = useDeckTransport(deckBAudioOptions);
 
   useEffect(() => () => mixerAudioGraph.dispose(), [mixerAudioGraph]);
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator) || !('caches' in window)) {
+      setOfflineCacheState('unsupported');
+      return;
+    }
+
+    let isMounted = true;
+    let checkSequence = 0;
+    const requiredResourceUrls = [
+      new URL(import.meta.env.BASE_URL, window.location.origin).href,
+      ...Array.from(
+        document.querySelectorAll<HTMLScriptElement>('script[type="module"][src]'),
+        (script) => script.src,
+      ),
+      ...Array.from(
+        document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"][href]'),
+        (stylesheet) => stylesheet.href,
+      ),
+    ];
+
+    const checkOfflineReadiness = () => {
+      const currentSequence = ++checkSequence;
+      let timedOut = false;
+      setOfflineCacheState('checking');
+
+      // Each check owns its timer so overlapping controller changes cannot clear another check's timeout.
+      const timeoutId = window.setTimeout(() => {
+        timedOut = true;
+        if (isMounted && currentSequence === checkSequence) {
+          setOfflineCacheState('not-ready');
+        }
+      }, 10000);
+
+      void inspectAppShellReadiness(
+        navigator.serviceWorker,
+        window.caches,
+        requiredResourceUrls,
+      ).then((status) => {
+        window.clearTimeout(timeoutId);
+        if (!isMounted || timedOut || currentSequence !== checkSequence) return;
+        setOfflineCacheState(status.ready ? 'ready' : 'not-ready');
+      }).catch(() => {
+        window.clearTimeout(timeoutId);
+        if (!isMounted || timedOut || currentSequence !== checkSequence) return;
+        setOfflineCacheState('not-ready');
+      });
+    };
+
+    navigator.serviceWorker.addEventListener('controllerchange', checkOfflineReadiness);
+    checkOfflineReadiness();
+
+    return () => {
+      isMounted = false;
+      checkSequence += 1;
+      navigator.serviceWorker.removeEventListener('controllerchange', checkOfflineReadiness);
+    };
+  }, []);
 
   useEffect(() => {
     /** Keeps the small app-shell status current as connectivity changes. */
@@ -235,7 +296,21 @@ export function App() {
       <footer className="app-footer">
         <span className={`app-footer__status${isAudioActive ? ' is-active' : ''}`} />
         WEB AUDIO ENGINE CONNECTED <span aria-hidden="true">·</span> INDEPENDENT DUAL TRANSPORT
+        <span
+          className={`app-footer__offline-cache is-${offlineCacheState}`}
+          role="status"
+          title="This checks that the active service worker controls this page and the current HTML, JavaScript and CSS are cached."
+        >
+          {offlineCacheState === 'ready' ? 'OFFLINE CACHE READY' : offlineCacheState === 'checking' ? 'OFFLINE CACHE CHECKING' : offlineCacheState === 'unsupported' ? 'OFFLINE CACHE UNAVAILABLE' : 'OFFLINE CACHE NOT READY'}
+        </span>
       </footer>
+      <aside
+        className={`app-offline-cache-landscape is-${offlineCacheState}`}
+        role="status"
+        aria-live="polite"
+      >
+        {offlineCacheState === 'ready' ? 'OFFLINE CACHE READY' : offlineCacheState === 'checking' ? 'OFFLINE CACHE CHECKING' : offlineCacheState === 'unsupported' ? 'OFFLINE CACHE UNAVAILABLE' : 'OFFLINE CACHE NOT READY'}
+      </aside>
     </main>
   );
 }
