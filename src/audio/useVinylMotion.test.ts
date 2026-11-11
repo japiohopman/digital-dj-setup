@@ -4,6 +4,8 @@ import type { DeckTransport } from './types';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 
 import {
+  applyRecordAngularDelta,
+  clampManualAngularVelocity,
   calculateScratchSpeedMagnitude,
   calculateScratchTrackPosition,
   calculateScratchTrackPositionFromGesture,
@@ -31,6 +33,19 @@ describe('vinyl scratch motion helpers', () => {
     expect(resolveScratchDirection(0.04, isReversed)).toBe(false);
   });
 
+  it('preserves inherited negative record phases but clamps reverse motion at the zero boundary', () => {
+    expect(applyRecordAngularDelta(0.01, -0.02)).toBe(0);
+    expect(applyRecordAngularDelta(-0.02, -0.01)).toBeCloseTo(-0.03);
+    expect(applyRecordAngularDelta(-0.02, 0.03)).toBeCloseTo(0.01);
+  });
+
+  it('bounds pointer-derived release velocity without changing ordinary drag speeds', () => {
+    expect(clampManualAngularVelocity(1)).toBe(0.02);
+    expect(clampManualAngularVelocity(-1)).toBe(-0.02);
+    expect(clampManualAngularVelocity(0.01)).toBe(0.01);
+    expect(clampManualAngularVelocity(Number.NaN)).toBe(0);
+  });
+
   it('keeps scratch speed magnitude independent from playback direction', () => {
     expect(calculateScratchSpeedMagnitude(-0.02, 0.01)).toBeCloseTo(2);
     expect(calculateScratchSpeedMagnitude(0.02, 0.01)).toBeCloseTo(2);
@@ -51,6 +66,230 @@ describe('vinyl scratch motion helpers', () => {
   });
 });
 
+
+describe('useVinylMotion transport and phase regression', () => {
+  beforeEach(() => {
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('does not reinterpret the final scratch position as an external seek after release', () => {
+    let latestScratchPosition = 25;
+    const dispatch = vi.fn((event: { type: string; position?: number }) => {
+      if (event.type === 'SCRATCH_MOVED' && typeof event.position === 'number') {
+        latestScratchPosition = event.position;
+      }
+      return true;
+    });
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      getBoundingClientRect: vi.fn(() => ({
+        left: 0, top: 0, width: 100, height: 100,
+        right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}),
+      })),
+    });
+
+    const { result, rerender, unmount } = renderHook(
+      ({ currentTime }) => useVinylMotion({
+        isPowered: true,
+        isMotorOn: true,
+        speedRpm: 33,
+        pitch: 0,
+        motorState: 'running',
+        transportPhase: 'playing',
+        transport: {
+          isLoaded: true,
+          duration: 120,
+          currentTime,
+          getCurrentTime: () => currentTime,
+        } as unknown as DeckTransport,
+        hasRecord: true,
+        dispatch,
+      }),
+      { initialProps: { currentTime: 25 } },
+    );
+    result.current.discRef.current = target;
+
+    const pointerDown = {
+      button: 0, isPrimary: true, preventDefault: vi.fn(),
+      pointerId: 31, clientX: 75, clientY: 50, currentTarget: target,
+    } as unknown as ReactPointerEvent<HTMLDivElement>;
+    act(() => result.current.onPointerDown(pointerDown));
+    expect(result.current.isScratching).toBe(true);
+
+    const pointerMove = new Event('pointermove', { cancelable: true }) as Event & {
+      pointerId: number; clientX: number; clientY: number;
+    };
+    Object.defineProperties(pointerMove, {
+      pointerId: { value: 31 },
+      clientX: { value: 50 },
+      clientY: { value: 75 },
+    });
+    act(() => window.dispatchEvent(pointerMove));
+    const recordAngleAtRelease = result.current.angle;
+
+    // A large transport-time update during the active scratch is not a seek.
+    rerender({ currentTime: 45 });
+    expect(result.current.angle).toBe(recordAngleAtRelease);
+
+    const pointerUp = new Event('pointerup') as Event & {
+      pointerId: number; clientX: number; clientY: number;
+    };
+    Object.defineProperties(pointerUp, {
+      pointerId: { value: 31 },
+      clientX: { value: 50 },
+      clientY: { value: 75 },
+    });
+    act(() => window.dispatchEvent(pointerUp));
+    expect(result.current.isScratching).toBe(false);
+
+    // The final pointer-up position is dispatched after the local scratch ref
+    // is cleared. Its transport update must not replace the visual record angle.
+    rerender({ currentTime: latestScratchPosition });
+    expect(result.current.angle).toBe(recordAngleAtRelease);
+
+    unmount();
+  });
+
+  it('ends an empty-slipmat gesture when a record is loaded mid-gesture', () => {
+    const dispatch = vi.fn(() => true);
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      getBoundingClientRect: vi.fn(() => ({
+        left: 0, top: 0, width: 100, height: 100,
+        right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}),
+      })),
+    });
+    const { result, rerender, unmount } = renderHook(
+      ({ hasRecord }) => useVinylMotion({
+        isPowered: true,
+        isMotorOn: true,
+        speedRpm: 33,
+        pitch: 0,
+        motorState: 'running',
+        transportPhase: 'idle',
+        transport: { isLoaded: true, duration: 120, currentTime: 0 } as unknown as DeckTransport,
+        hasRecord,
+        dispatch,
+      }),
+      { initialProps: { hasRecord: false } },
+    );
+    result.current.slipmatRef.current = target;
+
+    const pointerDown = {
+      button: 0, isPrimary: true, preventDefault: vi.fn(),
+      pointerId: 32, clientX: 75, clientY: 50, currentTarget: target,
+    } as unknown as ReactPointerEvent<HTMLDivElement>;
+    act(() => result.current.onEmptyPlatterPointerDown(pointerDown));
+
+    const pointerMove = new Event('pointermove', { cancelable: true }) as Event & {
+      pointerId: number; clientX: number; clientY: number;
+    };
+    Object.defineProperties(pointerMove, {
+      pointerId: { value: 32 }, clientX: { value: 50 }, clientY: { value: 25 },
+    });
+    act(() => window.dispatchEvent(pointerMove));
+    const phaseAtLoad = result.current.platterAngle;
+    expect(result.current.isPlatterDragging).toBe(true);
+
+    rerender({ hasRecord: true });
+    expect(result.current.isPlatterDragging).toBe(false);
+    expect(result.current.angle).toBeCloseTo(phaseAtLoad);
+
+    const laterMove = new Event('pointermove', { cancelable: true }) as Event & {
+      pointerId: number; clientX: number; clientY: number;
+    };
+    Object.defineProperties(laterMove, {
+      pointerId: { value: 32 }, clientX: { value: 25 }, clientY: { value: 50 },
+    });
+    act(() => window.dispatchEvent(laterMove));
+    expect(result.current.platterAngle).toBe(phaseAtLoad);
+    expect(result.current.angle).toBeCloseTo(phaseAtLoad);
+
+    unmount();
+  });
+
+  it('preserves a negative platter phase when a record is loaded and scratched in reverse', () => {
+    const dispatch = vi.fn(() => true);
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      getBoundingClientRect: vi.fn(() => ({
+        left: 0, top: 0, width: 100, height: 100,
+        right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}),
+      })),
+    });
+    const transport = {
+      isLoaded: true,
+      duration: 120,
+      currentTime: 0,
+      getCurrentTime: () => 0,
+    } as unknown as DeckTransport;
+    const { result, rerender, unmount } = renderHook(
+      ({ hasRecord }) => useVinylMotion({
+        isPowered: true,
+        isMotorOn: true,
+        speedRpm: 33,
+        pitch: 0,
+        motorState: 'running',
+        transportPhase: 'idle',
+        transport,
+        hasRecord,
+        dispatch,
+      }),
+      { initialProps: { hasRecord: false } },
+    );
+    result.current.slipmatRef.current = target;
+
+    const emptyDown = {
+      button: 0, isPrimary: true, preventDefault: vi.fn(),
+      pointerId: 33, clientX: 75, clientY: 50, currentTarget: target,
+    } as unknown as ReactPointerEvent<HTMLDivElement>;
+    act(() => result.current.onEmptyPlatterPointerDown(emptyDown));
+    const emptyMove = new Event('pointermove', { cancelable: true }) as Event & {
+      pointerId: number; clientX: number; clientY: number;
+    };
+    Object.defineProperties(emptyMove, {
+      pointerId: { value: 33 }, clientX: { value: 50 }, clientY: { value: 25 },
+    });
+    act(() => window.dispatchEvent(emptyMove));
+    const negativePlatterPhase = result.current.platterAngle;
+    expect(negativePlatterPhase).toBeLessThan(0);
+
+    const emptyUp = new Event('pointerup') as Event & {
+      pointerId: number; clientX: number; clientY: number;
+    };
+    Object.defineProperties(emptyUp, {
+      pointerId: { value: 33 }, clientX: { value: 50 }, clientY: { value: 25 },
+    });
+    act(() => window.dispatchEvent(emptyUp));
+    rerender({ hasRecord: true });
+    expect(result.current.angle).toBeCloseTo(negativePlatterPhase);
+
+    result.current.discRef.current = target;
+    const recordDown = {
+      button: 0, isPrimary: true, preventDefault: vi.fn(),
+      pointerId: 34, clientX: 75, clientY: 50, currentTarget: target,
+    } as unknown as ReactPointerEvent<HTMLDivElement>;
+    act(() => result.current.onPointerDown(recordDown));
+    const recordMove = new Event('pointermove', { cancelable: true }) as Event & {
+      pointerId: number; clientX: number; clientY: number;
+    };
+    Object.defineProperties(recordMove, {
+      pointerId: { value: 34 }, clientX: { value: 50 }, clientY: { value: 25 },
+    });
+    act(() => window.dispatchEvent(recordMove));
+    expect(result.current.angle).toBeLessThan(negativePlatterPhase);
+
+    unmount();
+  });
+});
 
 describe('useVinylMotion physical platter input', () => {
   beforeEach(() => {
@@ -388,6 +627,7 @@ describe('useVinylMotion physical platter input', () => {
     });
     act(() => window.dispatchEvent(pointerMove));
     const recordAfterScratchMove = result.current.angle;
+    expect(recordAfterScratchMove).not.toBe(recordBeforeScratch);
     stepFrame();
 
     expect(result.current.platterAngle).toBeGreaterThan(platterBeforeScratch);

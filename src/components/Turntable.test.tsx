@@ -442,7 +442,7 @@ describe('Turntable interactive controls', () => {
           deckLabel="DECK A"
           transport={mockTransport}
           initiallyPowered
-          initiallyMotorOn
+          initiallyMotorOn={false}
           initiallyHasRecord={false}
         />,
       );
@@ -450,6 +450,8 @@ describe('Turntable interactive controls', () => {
 
     const surface = container.querySelector('.slipmat-holder') as HTMLDivElement;
     const slipmat = container.querySelector('.slipmat') as HTMLDivElement;
+    const platter = container.querySelector('.platter') as HTMLDivElement;
+    const rotationBeforeGesture = platter.style.transform;
     vi.spyOn(slipmat, 'getBoundingClientRect').mockReturnValue({
       left: 0, top: 0, width: 100, height: 100,
       right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}),
@@ -475,7 +477,9 @@ describe('Turntable interactive controls', () => {
     });
     await act(async () => window.dispatchEvent(pointerMove));
 
-    expect(container.querySelector('.platter')?.getAttribute('style')).toContain('rotate(');
+    const rotationAfterGesture = platter.style.transform;
+    expect(rotationAfterGesture).toContain('rotate(');
+    expect(rotationAfterGesture).not.toBe(rotationBeforeGesture);
     expect(scratch).not.toHaveBeenCalled();
     expect(endScratch).not.toHaveBeenCalled();
 

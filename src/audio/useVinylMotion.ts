@@ -27,7 +27,26 @@ const TWO_PI = Math.PI * 2;
 const normalizeDelta = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 const RESUME_DURATION_MS = 240;
 const STATIONARY_POINTER_MS = 80;
+// Application interaction limit: cap hand-driven catch-up speed to avoid
+// extreme angular velocity from pointer events delivered in very short intervals.
+const MAX_MANUAL_ANGULAR_VELOCITY = 0.02;
 
+/** Keeps record motion at or above its zero boundary without erasing an inherited negative phase. */
+export function applyRecordAngularDelta(currentAngle: number, deltaAngle: number): number {
+  const nextAngle = currentAngle + deltaAngle;
+  return currentAngle >= 0 ? Math.max(0, nextAngle) : nextAngle;
+}
+
+/** Bounds hand-driven angular velocity while preserving ordinary drag speeds. */
+export function clampManualAngularVelocity(velocity: number): number {
+  if (!Number.isFinite(velocity)) return 0;
+  return Math.max(
+    -MAX_MANUAL_ANGULAR_VELOCITY,
+    Math.min(MAX_MANUAL_ANGULAR_VELOCITY, velocity),
+  );
+}
+
+/** Eases a manually moved surface's velocity back to the current motor speed. */
 function getResumedAngularVelocity(
   targetVelocity: number,
   resume: AngularResume | null,
@@ -125,6 +144,8 @@ export function useVinylMotion({
   const isScratchingRef = useRef(false);
   const isPlatterDraggingRef = useRef(false);
   const activePointerIdRef = useRef<number | null>(null);
+  const activeGestureModeRef = useRef<GestureMode | null>(null);
+  const scratchReleasePositionRef = useRef<number | null>(null);
   const draggingFromRef = useRef<{ x: number; y: number } | null>(null);
   const lastPointerAngleRef = useRef(0);
   const lastPointerMoveAtRef = useRef(0);
@@ -169,6 +190,9 @@ export function useVinylMotion({
   // itself is never reset by loading/unloading a track.
   useEffect(() => {
     if (hasRecord && !hadRecordRef.current) {
+      if (activeGestureModeRef.current === 'empty-platter') {
+        cleanupGestureRef.current?.(false);
+      }
       recordAngleRef.current = platterAngleRef.current;
       recordAnglePreviousRef.current = recordAngleRef.current;
       recordResumeRef.current = null;
@@ -183,10 +207,30 @@ export function useVinylMotion({
   }, [hasRecord]);
 
   useEffect(() => {
-    if (!transport || !hasRecord || isScratchingRef.current) return;
+    if (!transport || !hasRecord) return;
     const currentTime = transport.currentTime;
     const previousTime = lastTransportTimeRef.current;
     lastTransportTimeRef.current = currentTime;
+
+    // Keep the baseline moving with scratch-driven transport updates. They are
+    // not external seeks and must never reposition the independent record layer.
+    if (isScratchingRef.current) return;
+
+    // The final SCRATCH_MOVED is dispatched as the pointer is released. Ignore
+    // that one expected transport update even though the local gesture has ended.
+    const releasedPosition = scratchReleasePositionRef.current;
+    if (releasedPosition !== null) {
+      const matchesScratchRelease = Math.abs(currentTime - releasedPosition) <= 0.1;
+      const isExternalSeek = currentTime === 0 && previousTime > 0 ||
+        Math.abs(currentTime - previousTime) > 1.5;
+      if (matchesScratchRelease) {
+        scratchReleasePositionRef.current = null;
+        return;
+      }
+      if (!isExternalSeek) return;
+      scratchReleasePositionRef.current = null;
+    }
+
     const resetToStart = currentTime === 0 && previousTime > 0;
     const jumpedToAnotherPosition = Math.abs(currentTime - previousTime) > 1.5;
     if (resetToStart || jumpedToAnotherPosition) {
@@ -256,7 +300,10 @@ export function useVinylMotion({
         const recordMotion = getResumedAngularVelocity(targetMotorVelocity, recordResumeRef.current, now);
         recordResumeRef.current = recordMotion.resume;
         if (Math.abs(recordMotion.velocity) > 0.000001) {
-          recordAngleRef.current += recordMotion.velocity * dt;
+          recordAngleRef.current = applyRecordAngularDelta(
+            recordAngleRef.current,
+            recordMotion.velocity * dt,
+          );
           setAngle(recordAngleRef.current);
         }
       } else {
@@ -337,6 +384,8 @@ export function useVinylMotion({
 
     const pointerAngle = Math.atan2(e.clientY - centerRef.current.y, e.clientX - centerRef.current.x);
     activePointerIdRef.current = e.pointerId;
+    activeGestureModeRef.current = mode;
+    if (mode === 'record') scratchReleasePositionRef.current = null;
     draggingFromRef.current = { x: e.clientX, y: e.clientY };
     lastPointerAngleRef.current = pointerAngle;
     lastPointerMoveAtRef.current = performance.now();
@@ -376,13 +425,14 @@ export function useVinylMotion({
 
       if (Math.abs(rotationDelta) > 1e-8) {
         if (mode === 'record') {
-          // Preserve the existing lower visual boundary for reverse scratches.
-          const nextAngle = Math.max(0, recordAngleRef.current + rotationDelta);
-          manualAngularVelocityRef.current = (nextAngle - recordAngleRef.current) / elapsed;
+          const nextAngle = applyRecordAngularDelta(recordAngleRef.current, rotationDelta);
+          manualAngularVelocityRef.current = clampManualAngularVelocity(
+            (nextAngle - recordAngleRef.current) / elapsed,
+          );
           recordAngleRef.current = nextAngle;
           setAngle(recordAngleRef.current);
         } else {
-          manualAngularVelocityRef.current = rotationDelta / elapsed;
+          manualAngularVelocityRef.current = clampManualAngularVelocity(rotationDelta / elapsed);
           platterAngleRef.current += rotationDelta;
           recordAngleRef.current = platterAngleRef.current;
           recordAnglePreviousRef.current = recordAngleRef.current;
@@ -426,6 +476,7 @@ export function useVinylMotion({
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
       activePointerIdRef.current = null;
+      activeGestureModeRef.current = null;
       draggingFromRef.current = null;
       cleanupGestureRef.current = null;
 
@@ -442,17 +493,19 @@ export function useVinylMotion({
       if (dispatchEnd && mode === 'record') {
         // Include the last pointer position even when pointerup lands between
         // animation frames; endScratch resumes at the visible record timecode.
+        const releasePosition = calculateScratchTrackPositionFromGesture(
+          scratchStartPositionRef.current,
+          recordAngleRef.current,
+          scratchStartVisualAngleRef.current,
+          effectiveRps,
+          transport?.duration ?? 0,
+        );
+        scratchReleasePositionRef.current = releasePosition;
         dispatch({
           type: 'SCRATCH_MOVED',
           speed: 0,
           reversed: lastScratchDirectionRef.current,
-          position: calculateScratchTrackPositionFromGesture(
-            scratchStartPositionRef.current,
-            recordAngleRef.current,
-            scratchStartVisualAngleRef.current,
-            effectiveRps,
-            transport?.duration ?? 0,
-          ),
+          position: releasePosition,
         });
         dispatch({ type: 'SCRATCH_ENDED' });
       }
@@ -462,7 +515,7 @@ export function useVinylMotion({
         const elapsedSinceMove = now - lastPointerMoveAtRef.current;
         const fromAngularVelocity = elapsedSinceMove > STATIONARY_POINTER_MS
           ? 0
-          : manualAngularVelocityRef.current;
+          : clampManualAngularVelocity(manualAngularVelocityRef.current);
         const resume: AngularResume = {
           startedAt: now,
           fromAngularVelocity,
