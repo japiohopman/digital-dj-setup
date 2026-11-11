@@ -464,3 +464,21 @@ textarea {
     display: none;
   }
 }
+
+
+.app-footer__offline-cache {
+  margin-left: auto;
+  color: #899393;
+  font-size: 0.52rem;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.app-footer__offline-cache.is-ready {
+  color: #86c99a;
+}
+
+.app-footer__offline-cache.is-not-ready,
+.app-footer__offline-cache.is-unsupported {
+  color: #e6ad70;
+}
