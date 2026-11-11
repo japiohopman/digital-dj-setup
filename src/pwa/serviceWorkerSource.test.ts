@@ -45,7 +45,7 @@ describe('PWA app-shell caching policy', () => {
     expect(plan.critical).toContain('/digital-dj-setup/assets/index-d4e5f6.css');
     expect(plan.critical).not.toContain('/digital-dj-setup/turntable-123.png');
 
-    expect(plan.optional).toContain('/digital-dj-setup/turntable-123.png');
+    expect(plan.optional).toContain('/digital-dj-setup/assets/turntable-123.png');
     expect(plan.optional).toContain('/digital-dj-setup/assets/local-font-456.woff2');
     expect(plan.optional).toContain('/digital-dj-setup/turntable/landscape/tt_case_and_lighting.png');
     expect(plan.optional).toContain('/digital-dj-setup/sounds/vinyl_loop.wav');
