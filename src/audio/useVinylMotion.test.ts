@@ -167,7 +167,7 @@ describe('useVinylMotion transport and phase regression', () => {
     };
 
     act(() => window.dispatchEvent(pointerMove(41, 50, 75)));
-    act(() => window.dispatchEvent(pointerMove(42, 50, 25)));
+    act(() => window.dispatchEvent(pointerMove(42, 50, 75)));
 
     expect(result.current.deckA.angle).not.toBe(0);
     expect(result.current.deckB.angle).not.toBe(0);
@@ -187,7 +187,7 @@ describe('useVinylMotion transport and phase regression', () => {
     };
 
     act(() => window.dispatchEvent(pointerUp(41, 50, 75)));
-    act(() => window.dispatchEvent(pointerUp(42, 50, 25)));
+    act(() => window.dispatchEvent(pointerUp(42, 50, 75)));
 
     expect(result.current.deckA.isScratching).toBe(false);
     expect(result.current.deckB.isScratching).toBe(false);
