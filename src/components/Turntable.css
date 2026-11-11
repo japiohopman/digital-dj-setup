@@ -696,6 +696,25 @@
   border-radius: 50%;
 }
 
+/* The visible empty slipmat is the input surface when no record is loaded.
+   The hidden record hit-area must not sit above it and steal pointer events. */
+.turntable:not(.has-record) .record-holder {
+  pointer-events: none;
+}
+
+.turntable:not(.has-record) .slipmat-holder {
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.turntable.has-record .slipmat-holder {
+  pointer-events: none;
+}
+
+.turntable.is-platter-dragging .slipmat-holder {
+  cursor: grabbing;
+}
+
 .turntable .record-drop-overlay {
   position: absolute;
   top: 6.3%;

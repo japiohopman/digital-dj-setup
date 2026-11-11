@@ -405,6 +405,100 @@ describe('Turntable interactive controls', () => {
     container.remove();
   });
 
+  it('uses the empty slipmat as a silent manual platter surface', async () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    const scratch = vi.fn();
+    const endScratch = vi.fn();
+    const mockTransport: DeckTransport = {
+      isStylusDown: false,
+      trackName: null,
+      metadata: null,
+      duration: 0,
+      currentTime: 0,
+      playbackState: 'idle',
+      isPlaying: false,
+      isLoaded: false,
+      error: null,
+      loadTrack: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+      togglePlayPause: vi.fn(),
+      scratch,
+      endScratch,
+      seek: vi.fn(),
+      setPlaybackRate: vi.fn(),
+      coastDown: vi.fn(),
+      cancelCoastDown: vi.fn(),
+      spinUp: vi.fn(),
+      setStylusContact: vi.fn(),
+    };
+
+    await act(async () => {
+      root.render(
+        <Turntable
+          deckLabel="DECK A"
+          transport={mockTransport}
+          initiallyPowered
+          initiallyMotorOn={false}
+          initiallyHasRecord={false}
+        />,
+      );
+    });
+
+    const surface = container.querySelector('.slipmat-holder') as HTMLDivElement;
+    const slipmat = container.querySelector('.slipmat') as HTMLDivElement;
+    const platter = container.querySelector('.platter') as HTMLDivElement;
+    const rotationBeforeGesture = platter.style.transform;
+    vi.spyOn(slipmat, 'getBoundingClientRect').mockReturnValue({
+      left: 0, top: 0, width: 100, height: 100,
+      right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect);
+
+    const pointerDown = new Event('pointerdown', { bubbles: true, cancelable: true });
+    Object.defineProperties(pointerDown, {
+      button: { value: 0 },
+      isPrimary: { value: true },
+      pointerId: { value: 21 },
+      clientX: { value: 75 },
+      clientY: { value: 50 },
+    });
+    await act(async () => surface.dispatchEvent(pointerDown));
+
+    expect(container.querySelector('.turntable')?.classList.contains('is-platter-dragging')).toBe(true);
+
+    const pointerMove = new Event('pointermove', { bubbles: true, cancelable: true });
+    Object.defineProperties(pointerMove, {
+      pointerId: { value: 21 },
+      clientX: { value: 50 },
+      clientY: { value: 25 },
+    });
+    await act(async () => window.dispatchEvent(pointerMove));
+
+    const rotationAfterGesture = platter.style.transform;
+    expect(rotationAfterGesture).toContain('rotate(');
+    expect(rotationAfterGesture).not.toBe(rotationBeforeGesture);
+    expect(scratch).not.toHaveBeenCalled();
+    expect(endScratch).not.toHaveBeenCalled();
+
+    const pointerUp = new Event('pointerup');
+    Object.defineProperties(pointerUp, {
+      pointerId: { value: 21 },
+      clientX: { value: 50 },
+      clientY: { value: 25 },
+    });
+    await act(async () => window.dispatchEvent(pointerUp));
+
+    expect(container.querySelector('.turntable')?.classList.contains('is-platter-dragging')).toBe(false);
+    expect(scratch).not.toHaveBeenCalled();
+    expect(endScratch).not.toHaveBeenCalled();
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
   it('handles play, pause, and stop button clicks', async () => {
     const container = document.createElement('div');
     document.body.appendChild(container);

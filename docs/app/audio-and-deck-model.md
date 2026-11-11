@@ -50,6 +50,12 @@ This means channel level and crossfader controls affect all audible layers belon
 
 The crossfader's equal-power sine/cosine curve, centre response and CUT-IN simulation range are app choices. Consult [Shared mixer audio routing](../reference/audio-routing.md) before changing them.
 
+## Platter, slipmat and record layers
+
+The platter and slipmat share one continuous motor-driven angular phase. The record has its own phase: it normally follows the motor speed, but can be held and moved independently while scratching. The platter/slipmat continue turning underneath the held record. Releasing the record eases its angular velocity back to the motor speed without snapping its position to the platter phase.
+
+With no record loaded, the slipmat accepts a manual push/pull gesture. That gesture changes only the visible platter/slipmat phase; it does not dispatch a scratch event, change transport state or produce audio. Loading a record aligns the new record to the platter's current phase without resetting the platter.
+
 ## Gesture and tonearm layers
 
 - [src/audio/useVinylMotion.ts](../../src/audio/useVinylMotion.ts) interprets pointer movement on the record as rotation, scratch direction, scratch speed and playback position. It dispatches high-level deck events and keeps high-frequency gesture calculations out of React's central app state.
