@@ -155,7 +155,7 @@ export function createServiceWorkerSource(
     "    clearTimeout(timeoutId);",
     "  }",
     "}",
-    "",,
+    "",
     "self.addEventListener('install', (event) => {",
     "  event.waitUntil((async () => {",
     "    const cache = await caches.open(CACHE_NAME);",
