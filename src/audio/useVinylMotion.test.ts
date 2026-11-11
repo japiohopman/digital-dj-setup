@@ -53,7 +53,7 @@ describe('vinyl scratch motion helpers', () => {
     expect(calculateScratchSpeedMagnitude(0.02, 0)).toBe(0);
   });
 
-  it('maps gesture-relative platter movement to timecode in both directions', () => {
+  it('maps gesture-relative record-angle movement to timecode in both directions', () => {
     const rps = 33.3333 / 60;
     const secondsPerRotation = 2 * Math.PI * rps;
     expect(calculateScratchTrackPosition(42 * secondsPerRotation, rps, 100)).toBeCloseTo(42);
@@ -75,6 +75,35 @@ describe('useVinylMotion transport and phase regression', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('still synchronizes the record phase after an unrelated transport seek', () => {
+    const dispatch = vi.fn(() => true);
+    const makeTransport = (currentTime: number) => ({
+      isLoaded: true,
+      duration: 120,
+      currentTime,
+    }) as unknown as DeckTransport;
+    const { result, rerender, unmount } = renderHook(
+      ({ currentTime }) => useVinylMotion({
+        isPowered: true,
+        isMotorOn: true,
+        speedRpm: 33,
+        pitch: 0,
+        motorState: 'running',
+        transportPhase: 'playing',
+        transport: makeTransport(currentTime),
+        hasRecord: true,
+        dispatch,
+      }),
+      { initialProps: { currentTime: 10 } },
+    );
+
+    rerender({ currentTime: 15 });
+    const expectedRecordAngle = 15 * (33.3333 / 60) * Math.PI * 2;
+    expect(result.current.angle).toBeCloseTo(expectedRecordAngle);
+
+    unmount();
   });
 
   it('does not reinterpret the final scratch position as an external seek after release', () => {

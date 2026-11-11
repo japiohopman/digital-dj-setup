@@ -79,18 +79,18 @@ export function calculateScratchSpeedMagnitude(deltaAngle: number, expectedAngle
 
 /**
  * Mirrors the CodePen's single-source-of-truth timecode:
- * elapsed seconds = absolute platter angle / (2π × platter rotations per second).
+ * elapsed seconds = absolute record angle / (2π × record rotations per second).
  */
 export function calculateScratchTrackPosition(
-  platterAngle: number,
+  recordAngle: number,
   effectiveRps: number,
   duration: number,
 ): number {
-  if (!Number.isFinite(platterAngle) || !Number.isFinite(effectiveRps) ||
+  if (!Number.isFinite(recordAngle) || !Number.isFinite(effectiveRps) ||
     effectiveRps <= 0 || !Number.isFinite(duration) || duration < 0) {
     return 0;
   }
-  return Math.max(0, Math.min(duration, platterAngle / (TWO_PI * effectiveRps)));
+  return Math.max(0, Math.min(duration, recordAngle / (TWO_PI * effectiveRps)));
 }
 
 /**
