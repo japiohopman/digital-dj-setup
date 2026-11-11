@@ -187,6 +187,8 @@ describe('PWA app-shell caching policy', () => {
     expect(source).toContain('const OPTIONAL_PRECACHE_URLS =');
     expect(source).toContain('await Promise.all(CRITICAL_PRECACHE_URLS.map((url) => cachePrecacheResource(cache, url)))');
     expect(source).toContain('await Promise.allSettled(');
+    expect(source).toContain('setTimeout(() => controller.abort(), 8000)');
+    expect(source).toContain('clearTimeout(timeoutId)');
     expect(source).toContain('OPTIONAL_PRECACHE_URLS.map((url) => cachePrecacheResource(cache, url))');
     expect(source).toContain('await self.skipWaiting()');
   });
