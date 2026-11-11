@@ -171,11 +171,13 @@ export function useVinylMotion({
     if (hasRecord && !hadRecordRef.current) {
       recordAngleRef.current = platterAngleRef.current;
       recordAnglePreviousRef.current = recordAngleRef.current;
+      recordResumeRef.current = null;
       setAngle(recordAngleRef.current);
       lastTransportTimeRef.current = transport?.currentTime ?? 0;
     } else if (!hasRecord) {
       recordAngleRef.current = platterAngleRef.current;
       recordAnglePreviousRef.current = recordAngleRef.current;
+      recordResumeRef.current = null;
     }
     hadRecordRef.current = hasRecord;
   }, [hasRecord]);
@@ -373,11 +375,14 @@ export function useVinylMotion({
       const elapsed = Math.max(1, now - lastPointerMoveAtRef.current);
 
       if (Math.abs(rotationDelta) > 1e-8) {
-        manualAngularVelocityRef.current = rotationDelta / elapsed;
         if (mode === 'record') {
-          recordAngleRef.current += rotationDelta;
+          // Preserve the existing lower visual boundary for reverse scratches.
+          const nextAngle = Math.max(0, recordAngleRef.current + rotationDelta);
+          manualAngularVelocityRef.current = (nextAngle - recordAngleRef.current) / elapsed;
+          recordAngleRef.current = nextAngle;
           setAngle(recordAngleRef.current);
         } else {
+          manualAngularVelocityRef.current = rotationDelta / elapsed;
           platterAngleRef.current += rotationDelta;
           recordAngleRef.current = platterAngleRef.current;
           recordAnglePreviousRef.current = recordAngleRef.current;
