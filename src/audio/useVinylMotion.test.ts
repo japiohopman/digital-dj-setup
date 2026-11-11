@@ -253,6 +253,67 @@ describe('useVinylMotion physical platter input', () => {
     unmount();
   });
 
+  it('keeps platter phase continuous when a record is loaded and unloaded', () => {
+    vi.useFakeTimers();
+    const frames: Array<{ id: number; callback: FrameRequestCallback }> = [];
+    let nextFrameId = 0;
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      const id = ++nextFrameId;
+      frames.push({ id, callback });
+      return id;
+    }));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn((id: number) => {
+      const index = frames.findIndex((frame) => frame.id === id);
+      if (index >= 0) frames.splice(index, 1);
+    }));
+
+    const dispatch = vi.fn(() => true);
+    const transport = {
+      isLoaded: false,
+      duration: 120,
+      currentTime: 0,
+    } as unknown as DeckTransport;
+    const { result, rerender, unmount } = renderHook(
+      ({ hasRecord }) => useVinylMotion({
+        isPowered: true,
+        isMotorOn: true,
+        speedRpm: 33,
+        pitch: 0,
+        motorState: 'running',
+        transportPhase: 'idle',
+        transport,
+        hasRecord,
+        dispatch,
+      }),
+      { initialProps: { hasRecord: false } },
+    );
+
+    const stepFrame = () => {
+      act(() => {
+        vi.advanceTimersByTime(16);
+        const frame = frames.shift();
+        expect(frame).toBeDefined();
+        frame?.callback(performance.now());
+      });
+    };
+
+    stepFrame();
+    const phaseBeforeLoad = result.current.platterAngle;
+    expect(phaseBeforeLoad).toBeGreaterThan(0);
+
+    rerender({ hasRecord: true });
+    expect(result.current.platterAngle).toBe(phaseBeforeLoad);
+    expect(result.current.angle).toBeCloseTo(phaseBeforeLoad);
+
+    rerender({ hasRecord: false });
+    expect(result.current.platterAngle).toBe(phaseBeforeLoad);
+    stepFrame();
+    expect(result.current.platterAngle).toBeGreaterThan(phaseBeforeLoad);
+
+    unmount();
+    vi.useRealTimers();
+  });
+
   it('keeps the motor-driven platter moving while a loaded record is independently scratched', () => {
     vi.useFakeTimers();
     const frames: FrameRequestCallback[] = [];
