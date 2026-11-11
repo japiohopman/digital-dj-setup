@@ -1,6 +1,6 @@
 # Audio and deck model
 
-## Three related but separate lifecycles
+## Separate deck state dimensions
 
 A deck is not represented by a single playing/stopped boolean. The state machine keeps separate values for:
 
@@ -8,7 +8,7 @@ A deck is not represented by a single playing/stopped boolean. The state machine
 - **Motor:** the Start / Stop switch and motor phase (stopped, spinning up, running or coasting).
 - **Track:** whether a track is empty, loading, ready or in error.
 - **Transport:** whether programme playback is idle, paused, playing, scratching or ended.
-- **Tonearm:** parked, lifted, dragging, needle-down or off-record states as defined by the tonearm model.
+- **Tonearm position/contact:** parked, lifted, needle-down or off-record. A separate arm-interaction flag reports whether the arm is idle or currently being dragged.
 - **Needle validity:** whether the stylus is in a playable groove and whether the current record has already received its first valid drop.
 
 The pure state machine lives in [src/state/deckMachine.ts](../../src/state/deckMachine.ts). It defines typed events and guarded transitions. Invalid events are rejected rather than allowing the deck to enter contradictory states.

@@ -44,7 +44,7 @@ The current turntable surface exposes these controls:
 - **Target light:** toggles the turntable target light while powered.
 - **Pitch:** adjusts the displayed pitch control across its ±8 range and affects the effective playback rate used by the vinyl-motion interaction.
 - **Tonearm:** pick up, drag, cue, drop or park the arm using the interactive tonearm and cartridge targets.
-- **Record:** drag the record surface to manipulate playback. The app calculates scratch direction, speed and track position from the gesture; reverse movement is part of the same interaction model.
+- **Record:** drag the record surface to manipulate playback. The app calculates scratch direction, speed and track position from the gesture; reverse movement is part of the same interaction model. When the record surface has keyboard focus, ArrowLeft and ArrowRight seek backward or forward in two-second increments.
 
 Programme audio is gated by the deck's track/record/transport and stylus-contact state. A record-surface sound effect is modelled separately from the programme audio path. The tonearm and motor are not interchangeable controls: lifting the stylus does not mean the platter motor has stopped.
 
@@ -63,6 +63,6 @@ The mixer controls change the signal path; they do not replace the underlying de
 
 - Select the **TOOLS** toggle above the mixer.
 - Press **Escape** to close the overlay.
-- **Alt+D** toggles the overlay in browsers that deliver that shortcut to the page. Chromium may reserve Alt+D for the address bar; **Alt+Shift+D** is documented as a fallback for the development workflow.
+- **Alt+D** toggles the overlay in browsers that deliver that shortcut to the page. Some browsers, including Chromium configurations, may reserve Alt+D for browser navigation; use the visible TOOLS button in those cases.
 
 The overlay hosts both deck track loaders, the bundled crate and development-only widgets when running a development build. The widgets are not available in the production app.
