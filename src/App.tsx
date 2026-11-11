@@ -112,6 +112,7 @@ export function App() {
     }
 
     let isMounted = true;
+    let checkSequence = 0;
     const requiredResourceUrls = [
       new URL(import.meta.env.BASE_URL, window.location.origin).href,
       ...Array.from(
@@ -123,22 +124,31 @@ export function App() {
         (stylesheet) => stylesheet.href,
       ),
     ];
-    const timeoutId = window.setTimeout(() => {
-      if (isMounted) setOfflineCacheState('not-ready');
-    }, 10000);
 
     const checkOfflineReadiness = () => {
+      const currentSequence = ++checkSequence;
+      let timedOut = false;
+      setOfflineCacheState('checking');
+
+      // Each check owns its timer so overlapping controller changes cannot clear another check's timeout.
+      const timeoutId = window.setTimeout(() => {
+        timedOut = true;
+        if (isMounted && currentSequence === checkSequence) {
+          setOfflineCacheState('not-ready');
+        }
+      }, 10000);
+
       void inspectAppShellReadiness(
         navigator.serviceWorker,
         window.caches,
         requiredResourceUrls,
       ).then((status) => {
-        if (!isMounted) return;
         window.clearTimeout(timeoutId);
+        if (!isMounted || timedOut || currentSequence !== checkSequence) return;
         setOfflineCacheState(status.ready ? 'ready' : 'not-ready');
       }).catch(() => {
-        if (!isMounted) return;
         window.clearTimeout(timeoutId);
+        if (!isMounted || timedOut || currentSequence !== checkSequence) return;
         setOfflineCacheState('not-ready');
       });
     };
@@ -148,7 +158,7 @@ export function App() {
 
     return () => {
       isMounted = false;
-      window.clearTimeout(timeoutId);
+      checkSequence += 1;
       navigator.serviceWorker.removeEventListener('controllerchange', checkOfflineReadiness);
     };
   }, []);
@@ -289,12 +299,18 @@ export function App() {
         <span
           className={`app-footer__offline-cache is-${offlineCacheState}`}
           role="status"
-          aria-label={offlineCacheState === 'ready' ? 'Offline app cache ready' : 'Offline app cache not ready'}
           title="This checks that the active service worker controls this page and the current HTML, JavaScript and CSS are cached."
         >
-          {offlineCacheState === 'ready' ? 'OFFLINE CACHE READY' : offlineCacheState === 'checking' ? 'OFFLINE CACHE CHECKING' : 'OFFLINE CACHE NOT READY'}
+          {offlineCacheState === 'ready' ? 'OFFLINE CACHE READY' : offlineCacheState === 'checking' ? 'OFFLINE CACHE CHECKING' : offlineCacheState === 'unsupported' ? 'OFFLINE CACHE UNAVAILABLE' : 'OFFLINE CACHE NOT READY'}
         </span>
       </footer>
+      <aside
+        className={`app-offline-cache-landscape is-${offlineCacheState}`}
+        role="status"
+        aria-live="polite"
+      >
+        {offlineCacheState === 'ready' ? 'OFFLINE CACHE READY' : offlineCacheState === 'checking' ? 'OFFLINE CACHE CHECKING' : offlineCacheState === 'unsupported' ? 'OFFLINE CACHE UNAVAILABLE' : 'OFFLINE CACHE NOT READY'}
+      </aside>
     </main>
   );
 }
