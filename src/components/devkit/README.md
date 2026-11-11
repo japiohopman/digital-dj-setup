@@ -7,7 +7,6 @@ This folder contains developer-only diagnostics. It is imported from `App.tsx` o
 - Open the shared **TOOLS** popover using the button above the mixer.
 - The popover contains the track loaders and, in development builds, the developer diagnostics.
 - **Alt+D** toggles the popover where the browser allows the app to receive that shortcut.
-- **Alt+Shift+D** is the fallback in Chromium browser windows, where Alt+D is normally reserved for the address bar.
 - Press **Escape** to close the popover.
 
 ## Adding a widget
