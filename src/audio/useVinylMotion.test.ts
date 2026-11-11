@@ -78,8 +78,8 @@ describe('useVinylMotion transport and phase regression', () => {
   });
 
   it('allows two decks to scratch independently with simultaneous touch pointers', () => {
-    const dispatchA = vi.fn((_event: { type: string }) => true);
-    const dispatchB = vi.fn((_event: { type: string }) => true);
+    const dispatchA = vi.fn((event: { type: string }) => event.type.length > 0);
+    const dispatchB = vi.fn((event: { type: string }) => event.type.length > 0);
     const makeTarget = () => Object.assign(document.createElement('div'), {
       setPointerCapture: vi.fn(),
       releasePointerCapture: vi.fn(),
