@@ -130,9 +130,13 @@ export function Turntable({
 
   const {
     angle: vinylAngle,
+    platterAngle,
     isScratching,
+    isPlatterDragging,
     discRef,
+    slipmatRef,
     onPointerDown: onVinylPointerDown,
+    onEmptyPlatterPointerDown,
   } = useVinylMotion({
     isPowered,
     isMotorOn,
@@ -141,6 +145,7 @@ export function Turntable({
     motorState,
     transportPhase: machine.transport,
     transport,
+    hasRecord,
     dispatch,
     centerElementRef: recordRef,
   });
@@ -352,6 +357,7 @@ export function Turntable({
     hasRecord ? 'has-record' : '',
     hasSlipmat ? 'has-slipmat' : '',
     isScratching ? 'is-scratching' : '',
+    isPlatterDragging ? 'is-platter-dragging' : '',
     motorState === 'coasting' ? 'coasting' : '',
     motorState === 'spinning-up' ? 'spinning-up' : '',
     machine.track === 'loading' ? 'track-loading' : '',
@@ -366,7 +372,10 @@ export function Turntable({
   };
 
   // Direct rotation style applied from continuous physics angle
-  const rotateTransformStyle: CSSProperties = {
+  const platterRotateTransformStyle: CSSProperties = {
+    transform: `rotate(${platterAngle}rad)`,
+  };
+  const recordRotateTransformStyle: CSSProperties = {
     transform: `rotate(${vinylAngle}rad)`,
   };
 
@@ -462,10 +471,17 @@ export function Turntable({
       />
 
       <div className="bd">
-        <div className="platter" style={rotateTransformStyle} />
+        <div className="platter" style={platterRotateTransformStyle} />
 
-        <div className="slipmat-holder">
-          <div className="slipmat" style={rotateTransformStyle} />
+        <div
+          className="slipmat-holder"
+          onPointerDown={onEmptyPlatterPointerDown}
+          onDragOver={handleRecordDragOver}
+          onDragLeave={handleRecordDragLeave}
+          onDrop={handleRecordDrop}
+          aria-label={deckLabel + ' empty platter and slipmat surface'}
+        >
+          <div className="slipmat" ref={slipmatRef} style={platterRotateTransformStyle} />
         </div>
 
         <div
@@ -493,7 +509,7 @@ export function Turntable({
           aria-valuenow={Math.round(transport?.currentTime || 0)}
           aria-valuetext={`${formatTime(transport?.currentTime || 0)} of ${formatTime(transport?.duration || 0)}`}
         >
-          <div className="record" ref={recordRef} style={rotateTransformStyle}>
+          <div className="record" ref={recordRef} style={recordRotateTransformStyle}>
             {transport?.metadata?.artworkUrl ? (
               <div
                 className="record-artwork"
@@ -531,10 +547,10 @@ export function Turntable({
               <span>DROP AUDIO HERE</span>
             </div>
           )}
-          <div className="record-grooves" style={rotateTransformStyle} />
+          <div className="record-grooves" style={recordRotateTransformStyle} />
         </div>
 
-        <div className="spindle" style={rotateTransformStyle} />
+        <div className="spindle" style={platterRotateTransformStyle} />
 
         <div className="power-light" aria-hidden="true" />
 

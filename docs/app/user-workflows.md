@@ -36,6 +36,10 @@ Track files selected by the user are read locally by the browser. They are not u
 
 ## Operate a deck
 
+When no record is loaded, the visible slipmat is also a manual surface: hold it and drag around its centre to stop, pull or push the platter/slipmat visually. On release, it eases back to the motor's current speed. This empty-platter interaction is silent and does not start programme playback, scratch audio or needle-contact sounds.
+
+## Operate a deck
+
 The current turntable surface exposes these controls:
 
 - **Power:** toggles the deck's power state.

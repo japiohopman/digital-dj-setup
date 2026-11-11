@@ -188,6 +188,166 @@ describe('useVinylMotion physical platter input', () => {
     expect(dispatch).not.toHaveBeenCalledWith({ type: 'SCRATCH_STARTED' });
   });
 
+  it('lets an empty slipmat be held, pushed and pulled without dispatching scratch audio', () => {
+    const dispatch = vi.fn(() => true);
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      getBoundingClientRect: vi.fn(() => ({
+        left: 0, top: 0, width: 100, height: 100,
+        right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}),
+      })),
+    });
+    const { result, unmount } = renderHook(() => useVinylMotion({
+      isPowered: true,
+      isMotorOn: true,
+      speedRpm: 33,
+      pitch: 0,
+      motorState: 'running',
+      transportPhase: 'idle',
+      hasRecord: false,
+      dispatch,
+    }));
+    result.current.slipmatRef.current = target;
+
+    const pointerDown = {
+      button: 0,
+      isPrimary: true,
+      preventDefault: vi.fn(),
+      pointerId: 11,
+      clientX: 75,
+      clientY: 50,
+      currentTarget: target,
+    } as unknown as ReactPointerEvent<HTMLDivElement>;
+
+    act(() => result.current.onEmptyPlatterPointerDown(pointerDown));
+    expect(result.current.isPlatterDragging).toBe(true);
+
+    const pointerMove = new Event('pointermove', { cancelable: true }) as Event & {
+      pointerId: number; clientX: number; clientY: number;
+    };
+    Object.defineProperties(pointerMove, {
+      pointerId: { value: 11 },
+      clientX: { value: 50 },
+      clientY: { value: 25 },
+    });
+    act(() => window.dispatchEvent(pointerMove));
+
+    expect(result.current.platterAngle).toBeCloseTo(-Math.PI / 2);
+    expect(result.current.angle).toBe(0);
+    expect(dispatch).not.toHaveBeenCalledWith({ type: 'SCRATCH_STARTED' });
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'SCRATCH_MOVED' }));
+
+    const pointerUp = new Event('pointerup') as Event & {
+      pointerId: number; clientX: number; clientY: number;
+    };
+    Object.defineProperties(pointerUp, {
+      pointerId: { value: 11 },
+      clientX: { value: 50 },
+      clientY: { value: 25 },
+    });
+    act(() => window.dispatchEvent(pointerUp));
+
+    expect(result.current.isPlatterDragging).toBe(false);
+    expect(dispatch).not.toHaveBeenCalledWith({ type: 'SCRATCH_ENDED' });
+    unmount();
+  });
+
+  it('keeps the motor-driven platter moving while a loaded record is independently scratched', () => {
+    vi.useFakeTimers();
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    }));
+    const dispatch = vi.fn(() => true);
+    const transport = {
+      isLoaded: true,
+      duration: 100,
+      currentTime: 0,
+      getCurrentTime: vi.fn(() => 0),
+    } as unknown as DeckTransport;
+    const target = Object.assign(document.createElement('div'), {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      getBoundingClientRect: vi.fn(() => ({
+        left: 0, top: 0, width: 100, height: 100,
+        right: 100, bottom: 100, x: 0, y: 0, toJSON: () => ({}),
+      })),
+    });
+    const { result, unmount } = renderHook(() => useVinylMotion({
+      isPowered: true,
+      isMotorOn: true,
+      speedRpm: 33,
+      pitch: 0,
+      motorState: 'running',
+      transportPhase: 'playing',
+      transport,
+      hasRecord: true,
+      dispatch,
+    }));
+    result.current.discRef.current = target;
+
+    const stepFrame = () => {
+      act(() => {
+        vi.advanceTimersByTime(16);
+        const callback = frames.shift();
+        expect(callback).toBeDefined();
+        callback?.(performance.now());
+      });
+    };
+
+    stepFrame();
+    const platterBeforeScratch = result.current.platterAngle;
+    const recordBeforeScratch = result.current.angle;
+
+    const pointerDown = {
+      button: 0,
+      isPrimary: true,
+      preventDefault: vi.fn(),
+      pointerId: 12,
+      clientX: 75,
+      clientY: 50,
+      currentTarget: target,
+    } as unknown as ReactPointerEvent<HTMLDivElement>;
+    act(() => result.current.onPointerDown(pointerDown));
+    expect(result.current.isScratching).toBe(true);
+
+    stepFrame();
+    expect(result.current.platterAngle).toBeGreaterThan(platterBeforeScratch);
+    expect(result.current.angle).toBe(recordBeforeScratch);
+
+    const pointerMove = new Event('pointermove', { cancelable: true }) as Event & {
+      pointerId: number; clientX: number; clientY: number;
+    };
+    Object.defineProperties(pointerMove, {
+      pointerId: { value: 12 },
+      clientX: { value: 50 },
+      clientY: { value: 25 },
+    });
+    act(() => window.dispatchEvent(pointerMove));
+    const recordAfterScratchMove = result.current.angle;
+    stepFrame();
+
+    expect(result.current.platterAngle).toBeGreaterThan(platterBeforeScratch);
+    expect(result.current.angle).toBe(recordAfterScratchMove);
+    expect(result.current.isScratching).toBe(true);
+
+    const pointerUp = new Event('pointerup') as Event & {
+      pointerId: number; clientX: number; clientY: number;
+    };
+    Object.defineProperties(pointerUp, {
+      pointerId: { value: 12 },
+      clientX: { value: 50 },
+      clientY: { value: 25 },
+    });
+    act(() => window.dispatchEvent(pointerUp));
+    expect(result.current.isScratching).toBe(false);
+
+    unmount();
+    vi.useRealTimers();
+  });
+
   it('cancels local pointer ownership when the machine ends scratching externally', () => {
     const dispatch = vi.fn((event: { type: string }) => event.type !== 'BLOCKED');
     const target = Object.assign(document.createElement('div'), {

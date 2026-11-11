@@ -129,6 +129,20 @@ The scratch implementation anchors the transport position to the live playhead w
 
 Effective rotations per second are derived from selected rpm and pitch. This keeps the visual platter gesture and scratch timecode on one calculation path. See `src/audio/useVinylMotion.ts`.
 
+### Independent rotation phases (Issue #26)
+
+The visual surface has two separate angular phases:
+
+- **Platter / slipmat phase:** one continuous motor-driven angle. The platter and slipmat share this phase and keep moving during a loaded-record scratch gesture. Loading or unloading a record does not reset it.
+- **Record phase:** follows the platter's rotational speed during ordinary running, but can be held and moved independently while scratching. On release it eases back to the motor's current angular speed without snapping to the platter's current angle.
+- **Empty slipmat interaction:** with no record loaded, a pointer gesture holds and rotates the visible platter/slipmat phase. It is a visual/mechanical interaction only; it does not dispatch deck scratch/transport events or produce programme, needle-contact or scratch audio.
+
+The current app catch-up easing after a manual surface release is **240 ms**. This is an application interaction choice, not a Technics specification. The empty-platter gesture uses the same pointer-angle delta handling as the record gesture, but does not enter the deck's scratching state.
+
+Implementation: `src/audio/useVinylMotion.ts` owns both phases and pointer physics; `src/components/Turntable.tsx` binds the platter/slipmat to the motor phase and the record/grooves to the record phase. Regression tests live in `src/audio/useVinylMotion.test.ts`.
+
+The motor start-up / coast simulation still uses the separate 450 ms / 1,200 ms values above. The empty-platter and record-release easing does not alter the deck's motor state, RPM selection, tonearm state or audio transport.
+
 ## 5. Source register
 
 1. **Technics SL-1200MK2 operating instructions**, Panasonic-hosted PDF, printed p. 6 — operating sequence, cueing, end-of-side procedure and electronic-brake warning.  
