@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+// @ts-expect-error Node's built-in vm module is used by the Node-based Vitest runner.
+import { runInNewContext } from 'node:vm';
 
 import {
   createServiceWorkerSource,
@@ -6,6 +8,67 @@ import {
   getPrecacheUrls,
   shouldCacheRuntimeRequest,
 } from './serviceWorkerSource';
+
+type FakeWorkerResponse = { ok: boolean };
+type WorkerEvent = { waitUntil: (promise: Promise<unknown>) => void };
+type WorkerListener = (event: WorkerEvent) => void;
+
+function createServiceWorkerHarness(
+  fetchResource: (url: string, init?: RequestInit) => Promise<FakeWorkerResponse>,
+  timers: { setTimeout?: (callback: () => void) => number } = {},
+) {
+  const listeners = new Map<string, WorkerListener>();
+  const cachedResources = new Map<string, FakeWorkerResponse>();
+  const cache = {
+    put: vi.fn(async (request: RequestInfo | URL, response: FakeWorkerResponse) => {
+      cachedResources.set(String(request), response);
+    }),
+  };
+  const self = {
+    location: { origin: 'https://dj.example' },
+    addEventListener: (type: string, listener: WorkerListener) => listeners.set(type, listener),
+    skipWaiting: vi.fn(async () => undefined),
+    clients: { claim: vi.fn(async () => undefined) },
+  };
+  const caches = {
+    open: vi.fn(async () => cache),
+    keys: vi.fn(async () => [] as string[]),
+    delete: vi.fn(async () => true),
+    match: vi.fn(async (request: RequestInfo | URL) => cachedResources.get(String(request))),
+  };
+  const setTimeout = timers.setTimeout ?? ((callback: () => void) => globalThis.setTimeout(callback, 8000) as unknown as number);
+
+  return {
+    listeners,
+    self,
+    caches,
+    cache,
+    cachedResources,
+    execute(source: string) {
+      runInNewContext(source, {
+        self,
+        caches,
+        fetch: fetchResource,
+        AbortController,
+        setTimeout,
+        clearTimeout: globalThis.clearTimeout,
+        console,
+      });
+    },
+  };
+}
+
+function captureInstallPromise(harness: ReturnType<typeof createServiceWorkerHarness>): Promise<unknown> {
+  let installPromise: Promise<unknown> | undefined;
+  harness.listeners.get('install')?.({
+    waitUntil: (promise) => {
+      installPromise = promise;
+    },
+  });
+  if (!installPromise) throw new Error('The generated worker did not register an install promise.');
+  return installPromise;
+}
+
 
 describe('PWA app-shell caching policy', () => {
   it('pre-caches the app shell, app-owned UI assets and hashed build assets', () => {
@@ -191,6 +254,70 @@ describe('PWA app-shell caching policy', () => {
     expect(source).toContain('clearTimeout(timeoutId)');
     expect(source).toContain('OPTIONAL_PRECACHE_URLS.map((url) => cachePrecacheResource(cache, url))');
     expect(source).toContain('await self.skipWaiting()');
+  });
+
+  it('rejects installation when a boot-critical resource cannot be cached', async () => {
+    const fetchResource = vi.fn(async (url: string) => {
+      if (url.endsWith('/assets/app.js')) throw new Error('critical resource unavailable');
+      return { ok: true };
+    });
+    const worker = createServiceWorkerHarness(fetchResource);
+    worker.execute(createServiceWorkerSource(['assets/app.js']));
+
+    await expect(captureInstallPromise(worker)).rejects.toThrow('critical resource unavailable');
+    expect(worker.self.skipWaiting).not.toHaveBeenCalled();
+  });
+
+  it('continues installation and activation when an optional asset cannot be cached', async () => {
+    const fetchResource = vi.fn(async (url: string) => {
+      if (url.includes('/turntable/')) throw new Error('optional artwork unavailable');
+      return { ok: true };
+    });
+    const worker = createServiceWorkerHarness(fetchResource);
+    worker.execute(createServiceWorkerSource(['assets/app.js']));
+
+    await expect(captureInstallPromise(worker)).resolves.toBeUndefined();
+    expect(worker.self.skipWaiting).toHaveBeenCalledOnce();
+
+    let activationPromise: Promise<unknown> | undefined;
+    worker.listeners.get('activate')?.({
+      waitUntil: (promise) => {
+        activationPromise = promise;
+      },
+    });
+    await expect(activationPromise).resolves.toBeUndefined();
+    expect(worker.self.clients.claim).toHaveBeenCalledOnce();
+  });
+
+  it('aborts a precache request when its eight-second timeout expires', async () => {
+    const scheduledTimeouts: Array<() => void> = [];
+    const receivedSignals: AbortSignal[] = [];
+    const fetchResource = vi.fn((_url: string, init?: RequestInit) =>
+      new Promise<FakeWorkerResponse>((_resolve, reject) => {
+        const signal = init?.signal;
+        if (!signal) {
+          reject(new Error('fetch did not receive an abort signal'));
+          return;
+        }
+        receivedSignals.push(signal);
+        signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+      }),
+    );
+    const worker = createServiceWorkerHarness(fetchResource, {
+      setTimeout: (callback) => {
+        scheduledTimeouts.push(callback);
+        return scheduledTimeouts.length;
+      },
+    });
+    worker.execute(createServiceWorkerSource(['assets/app.js']));
+    const installPromise = captureInstallPromise(worker);
+
+    await vi.waitFor(() => expect(receivedSignals.length).toBeGreaterThan(0));
+    expect(scheduledTimeouts.length).toBeGreaterThan(0);
+    scheduledTimeouts[0]?.();
+
+    await expect(installPromise).rejects.toThrow('aborted');
+    expect(receivedSignals[0]?.aborted).toBe(true);
   });
 
   it('generates offline navigation fallback and a versioned cache', () => {
