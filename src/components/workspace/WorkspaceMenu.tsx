@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 
+import { UiIcon } from '../ui/UiIcon';
+
 import './WorkspaceMenu.css';
 
 export type WorkspaceDeckId = 'a' | 'b';
@@ -285,7 +287,7 @@ export function WorkspaceMenu({
         aria-controls="workspace-tools-menu"
         onClick={() => setIsOpen((current) => !current)}
       >
-        <span className="workspace-menu__trigger-icon" aria-hidden="true">☰</span>
+        <UiIcon name="albumCrate" className="workspace-menu__trigger-icon" />
         <span>TOOLS</span>
         <span className="workspace-menu__trigger-caret" aria-hidden="true">{isOpen ? '▲' : '▼'}</span>
       </button>

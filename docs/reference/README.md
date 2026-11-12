@@ -11,6 +11,10 @@ Use this folder as the compact source-of-truth index for recurring hardware fact
 
 - [Shared mixer audio routing](audio-routing.md) — shared Web Audio context ownership, independent deck channels, analyser taps and Phase 0/1 boundaries.
 
+## UI assets
+
+- [Owned UI SVG icon registry](ui-icons.md) — where app-owned icons live, how semantic names are registered, and how to use them accessibly.
+
 ## Working rules
 
 - Check this index before starting a new search about turntable mechanics or re-deriving existing geometry.

@@ -39,6 +39,7 @@ The workflow is manual by design. It deploys only when explicitly run, and build
 ## Offline behaviour
 
 - The app shell, built JavaScript/CSS and manifest are critical precache resources. Turntable artwork, icons and application-owned needle/vinyl sounds are cached best-effort; their failure cannot block installation of the offline app shell.
+- Public app-owned UI SVGs are added individually to `PUBLIC_APP_ASSETS`; the album-crate overlay icon is included there as an optional precache resource.
 - Navigation is network-first while online and falls back to the cached app shell when offline.
 - Only same-origin application assets are cached. No third-party resources or API responses are cached.
 - User-selected audio files remain local File/Blob objects. They are not sent to a server and are never added to the service-worker cache.
