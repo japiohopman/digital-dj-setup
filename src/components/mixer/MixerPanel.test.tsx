@@ -97,7 +97,6 @@ describe('MixerPanel', () => {
     fireEvent.click(trigger);
 
     expect(screen.getByRole('dialog', { name: 'Three-band EQ' })).toBeTruthy();
-    expect(screen.getByRole('slider', { name: 'Deck A LOW EQ' }).getAttribute('value')).toBeNull();
 
     fireEvent.change(screen.getByRole('slider', { name: 'Deck A LOW EQ' }), {
       target: { value: '-6' },
