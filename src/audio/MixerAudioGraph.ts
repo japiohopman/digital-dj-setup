@@ -18,9 +18,9 @@ export interface MixerAudioGraphOptions {
 }
 
 export interface MixerMeterLevels {
-  /** RMS programme level for Deck A, normalized from 0 to 1. */
+  /** RMS Deck A signal after channel level, EQ and crossfader, normalized from 0 to 1. */
   a: number;
-  /** RMS programme level for Deck B, normalized from 0 to 1. */
+  /** RMS Deck B signal after channel level, EQ and crossfader, normalized from 0 to 1. */
   b: number;
   /** RMS level after the shared master output gain, normalized from 0 to 1. */
   master: number;
@@ -39,7 +39,7 @@ interface DeckChannelPath {
  * App-owned shared Web Audio graph for the two independent deck engines.
  *
  * Deck engines own their own buffers, sources and transport state. This graph
- * owns the shared AudioContext, channel routing, analysers and master output.
+ * owns the shared AudioContext, channel routing, EQ filters, analysers and master output.
  */
 export class MixerAudioGraph {
   private readonly contextFactory: () => AudioContext;
@@ -112,7 +112,7 @@ export class MixerAudioGraph {
     return this.getDeckPath(deckId, context).input;
   }
 
-  /** Returns the post-channel/post-crossfader analyser for a deck. */
+  /** Returns the post-channel/post-EQ/post-crossfader analyser for a deck. */
   public getDeckAnalyser(deckId: MixerDeckId): AnalyserNode {
     return this.getDeckPath(deckId, this.getAudioContext()).analyser;
   }
