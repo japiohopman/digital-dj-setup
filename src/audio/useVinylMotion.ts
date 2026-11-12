@@ -350,7 +350,8 @@ export function useVinylMotion({
   }, [motorState, dispatch, radsPerMs, effectiveRps, transport?.duration, hasRecord]);
 
   const startGesture = useCallback((e: ReactPointerEvent<HTMLDivElement>, mode: GestureMode) => {
-    if (e.button !== 0 || e.isPrimary === false) return;
+    // Each deck owns its own active pointer; allow non-primary touches so a second finger can control the other deck.
+    if (e.button !== 0) return;
     if (activePointerIdRef.current !== null) return;
 
     if (mode === 'record') {

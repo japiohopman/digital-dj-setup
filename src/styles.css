@@ -464,3 +464,56 @@ textarea {
     display: none;
   }
 }
+
+
+.app-footer__offline-cache {
+  margin-left: auto;
+  color: #899393;
+  font-size: 0.52rem;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+
+.app-footer__offline-cache.is-ready {
+  color: #86c99a;
+}
+
+.app-footer__offline-cache.is-not-ready,
+.app-footer__offline-cache.is-unsupported {
+  color: #e6ad70;
+}
+
+
+.app-offline-cache-landscape {
+  display: none;
+}
+
+@media (orientation: landscape) {
+  .app-offline-cache-landscape {
+    position: fixed;
+    z-index: 20000;
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    display: block;
+    max-width: calc(100vw - 16px);
+    padding: 5px 7px;
+    border: 1px solid rgb(205 211 208 / 18%);
+    border-radius: 3px;
+    background: rgb(16 20 22 / 88%);
+    color: #899393;
+    font-size: 0.48rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    line-height: 1.2;
+    pointer-events: none;
+  }
+
+  .app-offline-cache-landscape.is-ready {
+    color: #86c99a;
+  }
+
+  .app-offline-cache-landscape.is-not-ready,
+  .app-offline-cache-landscape.is-unsupported {
+    color: #e6ad70;
+  }
+}

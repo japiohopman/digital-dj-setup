@@ -33,6 +33,9 @@ describe('App dual-deck workspace', () => {
     expect(markup).toContain('DECK B Technics-inspired turntable');
     expect(markup).toContain('WEB AUDIO ENGINE CONNECTED');
     expect(markup).toContain('INDEPENDENT DUAL TRANSPORT');
+    expect(markup).toContain('app-offline-cache-landscape');
+    expect(markup).toContain('OFFLINE CACHE CHECKING');
+    expect(markup).toContain('role="status"');
     expect(markup.match(/class="turntable power-on motor-on has-slipmat"/g)).toHaveLength(2);
     expect(markup).toContain('aria-label="Developer tools"');
     expect(markup).toContain('DEVKIT');
