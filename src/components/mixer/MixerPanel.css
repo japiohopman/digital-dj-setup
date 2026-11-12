@@ -17,11 +17,11 @@
     inset 0 1px rgb(255 255 255 / 38%);
 }
 
-/* Dark upper strip: one three-band EQ bank per deck, master and CUT-IN on the right. */
+/* Dark upper strip: a bypassed TRIM marker and three working EQ bands per deck, plus MASTER/CUT-IN. */
 .mixer-panel__header {
   display: grid;
-  min-height: 132px;
-  flex: 0 0 132px;
+  min-height: 148px;
+  flex: 0 0 148px;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 60px;
   align-items: stretch;
   gap: 2px;
@@ -91,7 +91,7 @@
   display: grid;
   min-height: 0;
   flex: 1 1 auto;
-  grid-template-rows: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(0, 1fr));
   align-items: center;
   justify-content: stretch;
   gap: 0;
@@ -192,8 +192,8 @@
   display: grid;
   width: 100%;
   min-width: 0;
-  height: 36px;
-  grid-template-columns: minmax(14px, 1fr) 38px minmax(22px, 1fr);
+  height: 30px;
+  grid-template-columns: minmax(14px, 1fr) 36px minmax(22px, 1fr);
   align-items: center;
   justify-items: center;
   gap: 1px;
@@ -206,20 +206,49 @@
 }
 
 .mixer-rotary--eq .mixer-rotary__dial {
-  width: 30px;
-  height: 30px;
-  flex-basis: 30px;
+  width: 24px;
+  height: 24px;
+  flex-basis: 24px;
 }
 
 .mixer-rotary--eq .mixer-rotary__input {
   inset: -4px;
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
 }
 
 .mixer-rotary--eq .mixer-rotary__value {
   justify-self: start;
-  font-size: 0.38rem;
+  font-size: 0.36rem;
+}
+
+.mixer-rotary--trim-placeholder {
+  cursor: default;
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.mixer-rotary--trim-placeholder .mixer-rotary__label {
+  color: #c9a36d;
+}
+
+.mixer-rotary--trim-placeholder .mixer-rotary__face {
+  border-color: #333b3d;
+  background:
+    radial-gradient(circle at 34% 28%, rgb(255 255 255 / 14%), transparent 28%),
+    radial-gradient(circle at 50% 48%, #42494b 0%, #2c3234 58%, #151a1b 100%);
+  box-shadow: inset 0 1px rgb(255 255 255 / 12%), inset 0 -2px 4px rgb(0 0 0 / 52%);
+}
+
+.mixer-rotary--trim-placeholder .mixer-rotary__face i {
+  background: #c9a36d;
+  box-shadow: none;
+}
+
+.mixer-rotary--trim-placeholder .mixer-rotary__value {
+  color: #c9a36d;
+  font-size: 0.32rem;
+  letter-spacing: 0.015em;
 }
 
 .mixer-utility {
@@ -623,8 +652,8 @@
   }
 
   .mixer-panel__header {
-    min-height: 132px;
-    flex-basis: 132px;
+    min-height: 140px;
+    flex-basis: 140px;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 54px;
     padding: 3px 2px;
   }
@@ -643,6 +672,31 @@
   .mixer-eq-bank__reset {
     min-width: 24px;
     min-height: 22px;
+    font-size: 0.31rem;
+  }
+
+  .mixer-rotary--eq {
+    height: 29px;
+    grid-template-columns: 13px minmax(21px, 1fr) 18px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__label {
+    font-size: 0.33rem;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__dial {
+    width: 22px;
+    height: 22px;
+    flex-basis: 22px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__input {
+    inset: -4px;
+    width: 30px;
+    height: 30px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__value {
     font-size: 0.31rem;
   }
 
@@ -775,8 +829,8 @@
   }
 
   .mixer-panel__header {
-    min-height: 132px;
-    flex-basis: 132px;
+    min-height: 148px;
+    flex-basis: 148px;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 58px;
   }
 }
@@ -793,20 +847,28 @@
   }
 
   .mixer-rotary--eq {
-    height: 30px;
-    grid-template-columns: 13px minmax(25px, 1fr) 19px;
+    height: 25px;
+    grid-template-columns: 12px minmax(19px, 1fr) 17px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__label {
+    font-size: 0.3rem;
   }
 
   .mixer-rotary--eq .mixer-rotary__dial {
-    width: 25px;
-    height: 25px;
-    flex-basis: 25px;
+    width: 19px;
+    height: 19px;
+    flex-basis: 19px;
   }
 
   .mixer-rotary--eq .mixer-rotary__input {
     inset: -4px;
-    width: 34px;
-    height: 34px;
+    width: 27px;
+    height: 27px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__value {
+    font-size: 0.28rem;
   }
 
   .mixer-panel__channels {

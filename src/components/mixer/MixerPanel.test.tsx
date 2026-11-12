@@ -72,6 +72,15 @@ describe('MixerPanel', () => {
     expect(deckABank?.querySelector('.mixer-eq-bank__controls--vertical')).toBeTruthy();
     expect(deckBBank?.querySelector('.mixer-eq-bank__controls--vertical')).toBeTruthy();
 
+    expect(screen.getByRole('img', {
+      name: 'Deck A TRIM bypassed; input passes at unity gain',
+    })).toBeTruthy();
+    expect(screen.getByRole('img', {
+      name: 'Deck B TRIM bypassed; input passes at unity gain',
+    })).toBeTruthy();
+    expect(deckABank?.querySelector('.mixer-rotary--trim-placeholder input')).toBeNull();
+    expect(deckBBank?.querySelector('.mixer-rotary--trim-placeholder input')).toBeNull();
+
     for (const name of [
       'Deck A LOW EQ',
       'Deck A MID EQ',

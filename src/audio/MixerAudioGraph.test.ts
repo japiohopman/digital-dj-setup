@@ -91,6 +91,8 @@ describe('MixerAudioGraph', () => {
     const channelInputB = inputB as unknown as MockGainNode;
     expect(channelInputA).toBe(context.createdGains[1]);
     expect(channelInputB).toBe(context.createdGains[4]);
+    expect(channelInputA.gain.value).toBe(1);
+    expect(channelInputB.gain.value).toBe(1);
 
     const masterAnalyser = context.createdAnalysers[0];
     const deckAnalyserA = graph.getDeckAnalyser('a');
