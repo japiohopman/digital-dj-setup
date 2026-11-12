@@ -83,6 +83,7 @@ describe('PWA app-shell caching policy', () => {
 
     expect(urls).toContain('/');
     expect(urls).toContain('/manifest.webmanifest');
+    expect(urls).toContain('/icons/UI/album_crate.svg');
     expect(urls).toContain('/turntable/landscape/tt_case_and_lighting.png');
     expect(urls).toContain('/sounds/vinyl_loop.wav');
     expect(urls).toContain('/sounds/battle_amo/scratch_making_me_itch.mp3');
@@ -110,6 +111,7 @@ describe('PWA app-shell caching policy', () => {
     expect(plan.critical).not.toContain('/digital-dj-setup/turntable-123.png');
 
     expect(plan.optional).toContain('/digital-dj-setup/assets/turntable-123.png');
+    expect(plan.optional).toContain('/digital-dj-setup/icons/UI/album_crate.svg');
     expect(plan.optional).toContain('/digital-dj-setup/assets/local-font-456.woff2');
     expect(plan.optional).toContain('/digital-dj-setup/turntable/landscape/tt_case_and_lighting.png');
     expect(plan.optional).toContain('/digital-dj-setup/sounds/vinyl_loop.wav');
@@ -144,6 +146,15 @@ describe('PWA app-shell caching policy', () => {
       'https://dj.example',
       'https://dj.example',
     )).toBe(false);
+  });
+
+  it('allows the app-owned album crate SVG to be cached as a same-origin image', () => {
+    expect(shouldCacheRuntimeRequest(
+      { method: 'GET', destination: 'image' },
+      '/icons/UI/album_crate.svg',
+      'https://dj.example',
+      'https://dj.example',
+    )).toBe(true);
   });
 
   it('allows the app-owned sound effects and turntable art to work offline', () => {
@@ -181,6 +192,7 @@ describe('PWA app-shell caching policy', () => {
 
     expect(urls).toContain('/digital-dj-setup/');
     expect(urls).toContain('/digital-dj-setup/manifest.webmanifest');
+    expect(urls).toContain('/digital-dj-setup/icons/UI/album_crate.svg');
     expect(urls).toContain('/digital-dj-setup/turntable/landscape/tt_case_and_lighting.png');
     expect(urls).toContain('/digital-dj-setup/sounds/vinyl_loop.wav');
     expect(urls).toContain('/digital-dj-setup/sounds/battle_amo/scratch_making_me_itch.mp3');
