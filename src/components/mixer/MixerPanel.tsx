@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   MixerAudioGraph,
@@ -25,6 +25,60 @@ const formatEqGain = (gainDb: number): string =>
 /** Converts a normalized RMS meter level into a display-safe decibel value. */
 const toDecibels = (level: number): number =>
   level <= 0.0001 ? -60 : Math.max(-60, Math.min(0, 20 * Math.log10(level)));
+
+/** A real, accessible range control styled as a compact rotary mixer knob. */
+function MixerRotary({
+  id,
+  label,
+  accessibleName,
+  value,
+  min,
+  max,
+  step,
+  valueText,
+  formatValue,
+  onChange,
+  className,
+}: {
+  id: string;
+  label: string;
+  accessibleName: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  valueText: string;
+  formatValue: (value: number) => string;
+  onChange: (value: number) => void;
+  className: string;
+}) {
+  const progress = (value - min) / (max - min);
+  const angle = -135 + progress * 270;
+
+  return (
+    <div className={'mixer-rotary ' + className}>
+      <label className="mixer-rotary__label" htmlFor={id}>{label}</label>
+      <div className="mixer-rotary__dial">
+        <input
+          id={id}
+          className="mixer-rotary__input"
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(event) => onChange(Number(event.target.value))}
+          aria-label={accessibleName}
+          aria-valuetext={valueText}
+        />
+        <span className="mixer-rotary__face" aria-hidden="true">
+          <i style={{ transform: 'rotate(' + angle + 'deg)' }} />
+        </span>
+      </div>
+      <output className="mixer-rotary__value" htmlFor={id}>{formatValue(value)}</output>
+    </div>
+  );
+}
 
 /** Renders one accessible RMS meter and its matching visual segments. */
 function MixerMeter({ label, level, className = '' }: {
@@ -70,8 +124,9 @@ function MixerMeter({ label, level, className = '' }: {
 /**
  * Two-channel mixer faceplate inspired by the Vestax PMC-05 Pro III.
  *
- * Provides independent deck levels, per-deck three-band EQ, an equal-power
- * crossfader, final master level and live RMS meters. The graph owns audio nodes.
+ * Each deck has its own three-band rotary EQ above its channel fader. The
+ * central bridge contains the live A / MASTER / B meters; master and CUT-IN
+ * are stacked in the far-right utility column. The graph owns all audio nodes.
  */
 export function MixerPanel({ audioGraph }: MixerPanelProps) {
   const [channelLevels, setChannelLevels] = useState<Record<MixerDeckId, number>>({
@@ -94,10 +149,6 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
   const [masterLevelPercent, setMasterLevelPercent] = useState(
     Math.round(audioGraph.getMasterLevel() * 100),
   );
-  const [isEqOpen, setIsEqOpen] = useState(false);
-  const eqTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const eqCloseButtonRef = useRef<HTMLButtonElement | null>(null);
-  const eqDialogRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -112,45 +163,6 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
     }, 80);
     return () => window.clearInterval(intervalId);
   }, [audioGraph]);
-
-  useEffect(() => {
-    if (!isEqOpen) return;
-
-    eqCloseButtonRef.current?.focus();
-
-    /** Keeps keyboard focus inside the EQ panel and supports Escape to close. */
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        setIsEqOpen(false);
-        return;
-      }
-
-      if (event.key !== 'Tab') return;
-      const focusable = eqDialogRef.current?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]):not([tabindex="-1"]), [href], [tabindex]:not([tabindex="-1"])',
-      );
-      if (!focusable?.length) return;
-
-      const first = focusable.item(0);
-      const last = focusable.item(focusable.length - 1);
-      if (!first || !last) return;
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      eqTriggerRef.current?.focus();
-    };
-  }, [isEqOpen]);
 
   /** Updates one channel EQ band without touching deck transport or tonearm state. */
   const updateDeckEq = (deckId: MixerDeckId, band: MixerEqBand, gainDb: number) => {
@@ -178,9 +190,11 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
     audioGraph.setMasterLevel(nextPercent / 100);
   };
 
-  /** Closes the EQ panel only when the user clicks its backdrop. */
-  const handleEqOverlayClick = (event: MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) setIsEqOpen(false);
+  /** Updates the symmetric silent travel zone at the two ends of the crossfader. */
+  const updateCutLag = (percent: number) => {
+    const nextPercent = Math.max(0, Math.min(100, percent));
+    setCutLagPercent(nextPercent);
+    audioGraph.setCrossfaderCutLag(nextPercent / 100);
   };
 
   /** Updates one deck's mixer gain without changing its transport state. */
@@ -197,13 +211,6 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
     audioGraph.setCrossfaderPosition(nextPercent / 100);
   };
 
-  /** Sets the symmetric silent travel zone at the two ends of the crossfader. */
-  const updateCutLag = (percent: number) => {
-    const nextPercent = Math.max(0, Math.min(100, percent));
-    setCutLagPercent(nextPercent);
-    audioGraph.setCrossfaderCutLag(nextPercent / 100);
-  };
-
   const crossfaderValueText = crossfaderPercent === 0
     ? 'Hard left, Deck A only'
     : crossfaderPercent === 100
@@ -218,67 +225,77 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
 
   return (
     <section className="mixer-panel" id="mixer-panel" aria-label="Digital DJ mixer">
-      <header className="mixer-panel__header" role="group" aria-label="Mixer rotary controls">
-        <div className="mixer-cut-control mixer-cut-control--header">
-          <label className="mixer-cut-control__label" htmlFor="mixer-cut-lag">CUT-IN</label>
-          <div className="mixer-cut-control__dial">
-            <input
-              id="mixer-cut-lag"
-              className="mixer-cut-control__input"
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value={cutLagPercent}
-              onChange={(event) => updateCutLag(Number(event.target.value))}
-              aria-label="Crossfader cut lag"
-              aria-valuetext={cutLagValueText}
-            />
-            <span className="mixer-cut-control__face" aria-hidden="true">
-              <i style={{ transform: `rotate(${cutLagPercent * 2.7 - 135}deg)` }} />
-            </span>
-          </div>
-          <output htmlFor="mixer-cut-lag">
-            {cutLagPercent === 0 ? 'MIN' : String(cutLagPercent) + '%'}
-          </output>
-        </div>
-
-        <div className="mixer-cut-control mixer-cut-control--header mixer-master-control">
-          <label className="mixer-cut-control__label" htmlFor="mixer-master-level">MASTER</label>
-          <div className="mixer-cut-control__dial">
-            <input
-              id="mixer-master-level"
-              className="mixer-cut-control__input"
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value={masterLevelPercent}
-              onChange={(event) => updateMasterLevel(Number(event.target.value))}
-              aria-label="Master output level"
-              aria-valuetext={String(masterLevelPercent) + '% of maximum output'}
-            />
-            <span className="mixer-cut-control__face" aria-hidden="true">
-              <i style={{ transform: `rotate(${masterLevelPercent * 2.7 - 135}deg)` }} />
-            </span>
-          </div>
-          <output htmlFor="mixer-master-level">{masterLevelPercent}%</output>
-        </div>
-
-        <div className="mixer-eq-trigger-control">
-          <span className="mixer-cut-control__label">CHANNEL EQ</span>
-          <button
-            ref={eqTriggerRef}
-            type="button"
-            className="mixer-eq-trigger"
-            aria-haspopup="dialog"
-            aria-expanded={isEqOpen}
-            aria-controls="mixer-eq-dialog"
-            onClick={() => setIsEqOpen(true)}
+      <header className="mixer-panel__header" aria-label="Mixer channel and utility controls">
+        {MIXER_DECKS.map((deckId) => (
+          <section
+            key={deckId}
+            className={'mixer-eq-bank mixer-eq-bank--' + deckId}
+            aria-label={'Deck ' + deckId.toUpperCase() + ' equalizer controls'}
           >
-            EQ
-          </button>
-        </div>
+            <div className="mixer-eq-bank__heading">
+              <span><i>{deckId === 'a' ? '01' : '02'}</i> DECK {deckId.toUpperCase()}</span>
+              <button
+                type="button"
+                className="mixer-eq-bank__reset"
+                onClick={() => resetDeckEq(deckId)}
+                aria-label={'Reset Deck ' + deckId.toUpperCase() + ' EQ'}
+              >
+                RESET
+              </button>
+            </div>
+            <div className="mixer-eq-bank__controls">
+              {EQ_BANDS.map((band) => {
+                const gainDb = deckEq[deckId][band];
+                const formattedGain = formatEqGain(gainDb);
+                return (
+                  <MixerRotary
+                    key={band}
+                    id={'mixer-eq-' + deckId + '-' + band}
+                    label={band.toUpperCase()}
+                    accessibleName={'Deck ' + deckId.toUpperCase() + ' ' + band.toUpperCase() + ' EQ'}
+                    value={gainDb}
+                    min={-12}
+                    max={12}
+                    step={1}
+                    valueText={formattedGain + ' decibels'}
+                    formatValue={formatEqGain}
+                    onChange={(value) => updateDeckEq(deckId, band, value)}
+                    className="mixer-rotary--eq"
+                  />
+                );
+              })}
+            </div>
+          </section>
+        ))}
+
+        <section className="mixer-utility" aria-label="Master and crossfader utility controls">
+          <MixerRotary
+            id="mixer-master-level"
+            label="MASTER"
+            accessibleName="Master output level"
+            value={masterLevelPercent}
+            min={0}
+            max={100}
+            step={1}
+            valueText={String(masterLevelPercent) + '% of maximum output'}
+            formatValue={(value) => String(value) + '%'}
+            onChange={updateMasterLevel}
+            className="mixer-rotary--utility mixer-rotary--master"
+          />
+          <MixerRotary
+            id="mixer-cut-lag"
+            label="CUT-IN"
+            accessibleName="Crossfader cut lag"
+            value={cutLagPercent}
+            min={0}
+            max={100}
+            step={1}
+            valueText={cutLagValueText}
+            formatValue={(value) => value === 0 ? 'MIN' : String(value) + '%'}
+            onChange={updateCutLag}
+            className="mixer-rotary--utility mixer-rotary--cut-in"
+          />
+        </section>
       </header>
 
       <div className="mixer-panel__faceplate">
@@ -361,85 +378,6 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
           </div>
         </section>
       </div>
-
-      {isEqOpen && (
-        <div className="mixer-eq-overlay" onClick={handleEqOverlayClick}>
-          <section
-            id="mixer-eq-dialog"
-            className="mixer-eq-dialog"
-            ref={eqDialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="mixer-eq-title"
-          >
-            <header className="mixer-eq-dialog__header">
-              <div>
-                <span className="mixer-eq-dialog__eyebrow">CHANNEL PROCESSING</span>
-                <h2 id="mixer-eq-title">Three-band EQ</h2>
-              </div>
-              <button
-                ref={eqCloseButtonRef}
-                type="button"
-                className="mixer-eq-dialog__close"
-                onClick={() => setIsEqOpen(false)}
-                aria-label="Close equalizer panel"
-              >
-                ×
-              </button>
-            </header>
-
-            <div className="mixer-eq-dialog__decks">
-              {MIXER_DECKS.map((deckId) => (
-                <section
-                  key={deckId}
-                  className={'mixer-eq-deck mixer-eq-deck--' + deckId}
-                  aria-label={'Deck ' + deckId.toUpperCase() + ' equalizer'}
-                >
-                  <header className="mixer-eq-deck__header">
-                    <div>
-                      <span className="mixer-eq-deck__number">{deckId === 'a' ? '01' : '02'}</span>
-                      <strong>DECK {deckId.toUpperCase()}</strong>
-                    </div>
-                    <button
-                      type="button"
-                      className="mixer-eq-deck__reset"
-                      onClick={() => resetDeckEq(deckId)}
-                      aria-label={'Reset Deck ' + deckId.toUpperCase() + ' EQ'}
-                    >
-                      RESET
-                    </button>
-                  </header>
-                  <div className="mixer-eq-deck__bands">
-                    {EQ_BANDS.map((band) => {
-                      const gainDb = deckEq[deckId][band];
-                      const valueText = formatEqGain(gainDb);
-                      return (
-                        <label className="mixer-eq-band" key={band}>
-                          <span className="mixer-eq-band__label">{band.toUpperCase()}</span>
-                          <input
-                            type="range"
-                            min="-12"
-                            max="12"
-                            step="1"
-                            value={gainDb}
-                            onChange={(event) => updateDeckEq(deckId, band, Number(event.target.value))}
-                            aria-label={'Deck ' + deckId.toUpperCase() + ' ' + band.toUpperCase() + ' EQ'}
-                            aria-valuetext={valueText + ' decibels'}
-                          />
-                          <output>{valueText} dB</output>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </section>
-              ))}
-            </div>
-            <p className="mixer-eq-dialog__note">
-              0 dB is flat. Negative values cut; positive values boost. Each deck is adjusted independently.
-            </p>
-          </section>
-        </div>
-      )}
     </section>
   );
 }
