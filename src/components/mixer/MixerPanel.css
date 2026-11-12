@@ -1,6 +1,6 @@
-/* Minimal two-deck mixer faceplate following the user's Figma layout. */
+/* Vestax-inspired two-channel faceplate; the Figma workspace composition remains authoritative. */
 .mixer-panel {
-  --mixer-fader-travel: clamp(76px, 16vh, 160px);
+  --mixer-fader-travel: clamp(76px, 13vh, 132px);
   display: flex;
   width: 100%;
   max-width: 430px;
@@ -17,52 +17,122 @@
     inset 0 1px rgb(255 255 255 / 38%);
 }
 
+/* Dark upper strip: one three-band EQ bank per deck, master and CUT-IN on the right. */
 .mixer-panel__header {
-  display: flex;
-  min-height: 46px;
-  flex: 0 0 46px;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 5px;
+  display: grid;
+  min-height: 88px;
+  flex: 0 0 88px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 60px;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px;
   border-bottom: 1px solid #07090a;
-  background: linear-gradient(180deg, #252a2b, #101416 70%);
   color: #f1f0ec;
+  background: linear-gradient(180deg, #252a2b, #101416 70%);
 }
 
-.mixer-cut-control {
+.mixer-eq-bank {
   display: flex;
   min-width: 0;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 0 2px;
+  border-right: 1px solid rgb(255 255 255 / 12%);
 }
 
-.mixer-cut-control__label,
-.mixer-cut-control output {
-  color: #d7dcda;
-  font-family: 'SF Mono', Monaco, monospace;
-  font-size: 0.49rem;
+.mixer-eq-bank__heading {
+  display: flex;
+  min-height: 17px;
+  flex: 0 0 17px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: #e7e5df;
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+  font-size: 0.46rem;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.mixer-eq-bank__heading i {
+  color: #c9a36d;
+  font-style: normal;
+}
+
+.mixer-eq-bank__reset {
+  min-width: 28px;
+  min-height: 24px;
+  padding: 2px 3px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 2px;
+  color: #bfc3c0;
+  background: rgb(255 255 255 / 4%);
+  font: 800 0.34rem/1 'SF Mono', Monaco, Consolas, monospace;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mixer-eq-bank__reset:hover {
+  border-color: rgb(213 173 112 / 65%);
+  color: #f0d5a8;
+}
+
+.mixer-eq-bank__reset:focus-visible,
+.mixer-rotary__input:focus-visible,
+.mixer-channel__fader input:focus-visible,
+.mixer-crossfader input:focus-visible {
+  outline: 2px solid #f2c574;
+  outline-offset: 2px;
+}
+
+.mixer-eq-bank__controls {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 1px;
+}
+
+.mixer-rotary {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+}
+
+.mixer-rotary__label {
+  display: block;
+  min-width: 0;
+  color: #d7dcda;
+  font-size: 0.43rem;
+  font-weight: 900;
+  letter-spacing: 0.045em;
+  line-height: 1.1;
   text-align: center;
   white-space: nowrap;
 }
 
-.mixer-cut-control__dial {
+.mixer-rotary__dial {
   position: relative;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
   border-radius: 50%;
 }
 
-.mixer-cut-control__input {
+.mixer-rotary__input {
   position: absolute;
   z-index: 2;
-  inset: -2px;
-  width: 44px;
-  height: 44px;
+  inset: -4px;
+  width: 42px;
+  height: 42px;
   margin: 0;
   appearance: none;
   -webkit-appearance: none;
@@ -71,9 +141,9 @@
   touch-action: none;
 }
 
-.mixer-cut-control__face {
+.mixer-rotary__face {
   position: absolute;
-  inset: 4px;
+  inset: 2px;
   display: block;
   overflow: hidden;
   border: 2px solid #080b0c;
@@ -88,7 +158,7 @@
   pointer-events: none;
 }
 
-.mixer-cut-control__face i {
+.mixer-rotary__face i {
   position: absolute;
   top: 2px;
   left: calc(50% - 1px);
@@ -100,11 +170,77 @@
   transform-origin: 50% 12px;
 }
 
-.mixer-cut-control__input:focus-visible + .mixer-cut-control__face {
+.mixer-rotary__input:focus-visible + .mixer-rotary__face {
   outline: 2px solid #e5b35e;
   outline-offset: 3px;
 }
 
+.mixer-rotary__value {
+  display: block;
+  min-height: 0.85em;
+  color: #e1c292;
+  font-size: 0.4rem;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.mixer-rotary--eq {
+  width: 34px;
+  flex: 0 1 34px;
+}
+
+.mixer-rotary--eq .mixer-rotary__label {
+  font-size: 0.42rem;
+}
+
+.mixer-utility {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+  gap: 1px;
+  padding-left: 2px;
+}
+
+.mixer-rotary--utility {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: 32px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  justify-items: center;
+  column-gap: 0;
+  row-gap: 0;
+}
+
+.mixer-rotary--utility .mixer-rotary__label {
+  grid-column: 1 / -1;
+  font-size: 0.4rem;
+}
+
+.mixer-rotary--utility .mixer-rotary__dial {
+  width: 30px;
+  height: 30px;
+  flex-basis: 30px;
+}
+
+.mixer-rotary--utility .mixer-rotary__input {
+  inset: -5px;
+  width: 40px;
+  height: 40px;
+}
+
+.mixer-rotary--utility .mixer-rotary__value {
+  font-size: 0.38rem;
+  overflow: hidden;
+}
+
+/* Brushed-aluminium channel area, with full-height faders and meter bridge. */
 .mixer-panel__faceplate {
   display: flex;
   min-height: 0;
@@ -125,9 +261,9 @@
 
 .mixer-panel__channels {
   display: grid;
-  min-height: calc(var(--mixer-fader-travel) + 28px);
+  min-height: calc(var(--mixer-fader-travel) + 27px);
   flex: 1 1 auto;
-  grid-template-columns: minmax(0, 1fr) minmax(48px, 0.9fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(58px, 0.82fr) minmax(0, 1fr);
   align-items: stretch;
   gap: 2px;
   padding: 0;
@@ -138,14 +274,14 @@
   min-width: 0;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
   padding: 1px 0;
 }
 
 .mixer-channel__identity {
   display: flex;
   width: 100%;
-  min-height: 17px;
+  min-height: 18px;
+  flex: 0 0 18px;
   align-items: center;
   justify-content: center;
   gap: 3px;
@@ -188,6 +324,7 @@
   width: 44px;
   height: var(--mixer-fader-travel);
   min-height: 60px;
+  max-height: 140px;
   margin: 0;
   padding: 0;
   appearance: none;
@@ -197,13 +334,6 @@
   touch-action: pan-x;
   cursor: pointer;
   background: transparent;
-}
-
-.mixer-channel__fader input:focus-visible,
-.mixer-crossfader input:focus-visible {
-  outline: 2px solid #a84335;
-  outline-offset: 1px;
-  border-radius: 4px;
 }
 
 .mixer-channel__fader input::-webkit-slider-runnable-track {
@@ -248,6 +378,7 @@
   font-family: 'SF Mono', Monaco, monospace;
   font-size: 0.41rem;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .mixer-meter-bridge {
@@ -256,7 +387,7 @@
   min-height: 0;
   align-items: stretch;
   justify-content: center;
-  padding: 2px 0;
+  padding: 2px 3px;
   border-left: 1px solid rgb(37 43 45 / 15%);
   border-right: 1px solid rgb(37 43 45 / 15%);
   background: rgb(48 54 56 / 7%);
@@ -269,14 +400,14 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
   justify-items: center;
-  gap: 1px;
+  gap: 3px;
 }
 
 .mixer-meter {
   display: grid;
   width: 100%;
   min-width: 0;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   justify-items: center;
   align-items: center;
   gap: 2px;
@@ -285,7 +416,7 @@
 .mixer-meter__label {
   color: #252b2d;
   font-family: 'SF Mono', Monaco, monospace;
-  font-size: 0.33rem;
+  font-size: 0.37rem;
   font-weight: 900;
   letter-spacing: 0;
   line-height: 1;
@@ -293,16 +424,17 @@
 
 .mixer-meter__segments {
   display: flex;
-  width: 10px;
+  width: 12px;
   min-height: 0;
   height: 100%;
   flex-direction: column-reverse;
   justify-content: flex-start;
   gap: 2px;
-  padding: 1px;
-  border: 1px solid rgb(20 25 27 / 22%);
+  padding: 2px;
+  border: 1px solid rgb(20 25 27 / 26%);
   border-radius: 7px;
   background: rgb(20 25 27 / 12%);
+  box-shadow: inset 0 0 2px rgb(0 0 0 / 24%);
 }
 
 .mixer-meter__segment {
@@ -335,7 +467,7 @@
   min-height: 0.8em;
   color: #303638;
   font-family: 'SF Mono', Monaco, monospace;
-  font-size: 0.32rem;
+  font-size: 0.34rem;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -343,8 +475,8 @@
 .mixer-crossfader {
   display: flex;
   min-width: 0;
-  min-height: 58px;
-  flex: 0 0 58px;
+  min-height: 54px;
+  flex: 0 0 54px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -389,7 +521,7 @@
   display: block;
   width: var(--mixer-fader-travel);
   max-width: 100%;
-  height: 44px;
+  height: 42px;
   margin: 0;
   padding: 0;
   appearance: none;
@@ -452,9 +584,9 @@
   background: rgb(32 38 40 / 72%);
 }
 
-@media (orientation: landscape) {
+@media (orientation: landscape) and (max-width: 900px) {
   .mixer-panel {
-    --mixer-fader-travel: clamp(76px, 17vh, 124px);
+    --mixer-fader-travel: clamp(68px, 20vh, 102px);
     height: 76%;
     max-width: none;
     align-self: flex-end;
@@ -463,20 +595,109 @@
   }
 
   .mixer-panel__header {
-    min-height: 42px;
-    flex-basis: 42px;
+    min-height: 132px;
+    flex-basis: 132px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 54px;
+    padding: 3px 2px;
   }
 
-  .mixer-cut-control__dial {
+  .mixer-eq-bank {
+    padding: 0 1px;
+  }
+
+  .mixer-eq-bank__heading {
+    min-height: 16px;
+    flex-basis: 16px;
+    justify-content: center;
+    font-size: 0.4rem;
+  }
+
+  .mixer-eq-bank__reset {
+    min-width: 24px;
+    min-height: 22px;
+    font-size: 0.31rem;
+  }
+
+  .mixer-eq-bank__controls {
+    display: grid;
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    align-items: center;
+    justify-content: stretch;
+    gap: 0;
+  }
+
+  .mixer-rotary--eq {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    height: 36px;
+    grid-template-columns: 14px minmax(27px, 1fr) 20px;
+    align-items: center;
+    justify-items: center;
+    gap: 0;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__label {
+    font-size: 0.35rem;
+    text-align: left;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__dial {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__input {
+    inset: -5px;
     width: 38px;
     height: 38px;
-    flex-basis: 38px;
   }
 
-  .mixer-cut-control__input {
-    inset: -3px;
-    width: 44px;
-    height: 44px;
+  .mixer-rotary--eq .mixer-rotary__face {
+    inset: 1px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__face i {
+    top: 1px;
+    height: 6px;
+    transform-origin: 50% 10px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__value {
+    font-size: 0.34rem;
+  }
+
+  .mixer-utility {
+    gap: 2px;
+    padding-left: 1px;
+  }
+
+  .mixer-rotary--utility {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .mixer-rotary--utility .mixer-rotary__label {
+    font-size: 0.36rem;
+  }
+
+  .mixer-rotary--utility .mixer-rotary__dial {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+  }
+
+  .mixer-rotary--utility .mixer-rotary__input {
+    inset: -5px;
+    width: 38px;
+    height: 38px;
+  }
+
+  .mixer-rotary--utility .mixer-rotary__value {
+    font-size: 0.34rem;
   }
 
   .mixer-panel__faceplate {
@@ -485,13 +706,14 @@
   }
 
   .mixer-panel__channels {
-    min-height: calc(var(--mixer-fader-travel) + 25px);
-    grid-template-columns: minmax(0, 1fr) minmax(44px, 0.85fr) minmax(0, 1fr);
+    min-height: calc(var(--mixer-fader-travel) + 24px);
+    grid-template-columns: minmax(0, 1fr) minmax(52px, 0.82fr) minmax(0, 1fr);
     gap: 1px;
   }
 
   .mixer-channel__identity {
-    min-height: 14px;
+    min-height: 15px;
+    flex-basis: 15px;
     gap: 2px;
   }
 
@@ -500,10 +722,7 @@
     font-size: 0.4rem;
   }
 
-  .mixer-channel__fader-label {
-    font-size: 0.36rem;
-  }
-
+  .mixer-channel__fader-label,
   .mixer-channel__value {
     font-size: 0.36rem;
   }
@@ -512,22 +731,108 @@
     font-size: 0.3rem;
   }
 
+  .mixer-meter__segments {
+    width: 10px;
+    gap: 1px;
+    padding: 1px;
+  }
+
   .mixer-meter__readout {
     font-size: 0.29rem;
   }
 
-  .mixer-meter__segments {
-    width: 9px;
-    gap: 1px;
-  }
-
   .mixer-crossfader {
-    min-height: 54px;
-    flex-basis: 54px;
+    min-height: 50px;
+    flex-basis: 50px;
   }
 
   .mixer-crossfader input {
-    height: 42px;
+    height: 40px;
+  }
+}
+
+/* Keep the three small rotary hit areas separate on narrow portrait phones. */
+@media (orientation: portrait) and (max-width: 360px) {
+  .mixer-panel__header {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 54px;
+    gap: 1px;
+    padding: 3px 2px;
+  }
+
+  .mixer-eq-bank__heading {
+    font-size: 0.41rem;
+  }
+
+  .mixer-rotary--eq {
+    width: 31px;
+    flex-basis: 31px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__dial {
+    width: 31px;
+    height: 31px;
+    flex-basis: 31px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__input {
+    inset: -3px;
+    width: 37px;
+    height: 37px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__label,
+  .mixer-rotary--eq .mixer-rotary__value {
+    font-size: 0.37rem;
+  }
+}
+
+@media (orientation: landscape) and (min-width: 901px) {
+  .mixer-panel {
+    --mixer-fader-travel: clamp(76px, 17vh, 124px);
+    height: 76%;
+    max-width: 270px;
+    align-self: flex-end;
+    margin-top: auto;
+    border-radius: 3px;
+  }
+
+  .mixer-panel__header {
+    min-height: 88px;
+    flex-basis: 88px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 58px;
+  }
+
+  .mixer-rotary--eq {
+    width: 30px;
+    flex-basis: 30px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__dial {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__input {
+    inset: -4px;
+    width: 38px;
+    height: 38px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 360px) and (max-width: 900px) {
+  .mixer-panel {
+    --mixer-fader-travel: 68px;
+    height: 84%;
+  }
+
+  .mixer-panel__header {
+    min-height: 120px;
+    flex-basis: 120px;
+  }
+
+  .mixer-panel__channels {
+    min-height: 88px;
   }
 }
 
@@ -535,319 +840,6 @@
   .mixer-panel *,
   .mixer-panel *::before,
   .mixer-panel *::after {
-    transition: none !important;
-    animation: none !important;
-  }
-}
-
-
-/* Preserve a clear touch zone for TOOLS while keeping every mixer control visible on short phones. */
-@media (orientation: landscape) and (max-height: 400px) {
-  .mixer-panel {
-    height: 84%;
-  }
-}
-
-/* Phase 2: compact top-strip output controls and a responsive deck EQ overlay. */
-.mixer-panel__header {
-  display: grid;
-  min-height: 76px;
-  flex: 0 0 76px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: center;
-  justify-items: center;
-  gap: 2px;
-  padding: 3px 4px;
-}
-
-.mixer-cut-control--header {
-  min-width: 0;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.mixer-cut-control--header .mixer-cut-control__label,
-.mixer-cut-control--header output,
-.mixer-eq-trigger-control .mixer-cut-control__label {
-  font-size: 0.43rem;
-  line-height: 1;
-}
-
-.mixer-cut-control--header .mixer-cut-control__dial {
-  width: 36px;
-  height: 36px;
-  flex-basis: 36px;
-}
-
-.mixer-cut-control--header .mixer-cut-control__input {
-  inset: -4px;
-  width: 44px;
-  height: 44px;
-}
-
-.mixer-cut-control--header output {
-  min-height: 0.8em;
-  color: #e1c292;
-  font-variant-numeric: tabular-nums;
-}
-
-.mixer-eq-trigger-control {
-  display: grid;
-  min-width: 0;
-  justify-items: center;
-  align-content: center;
-  gap: 2px;
-}
-
-.mixer-eq-trigger {
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 1px solid rgb(213 173 112 / 65%);
-  border-radius: 50%;
-  color: #f0d5a8;
-  background: radial-gradient(circle at 34% 28%, #4a5152, #1b2022 68%);
-  box-shadow: 0 2px 4px rgb(0 0 0 / 42%), inset 0 1px rgb(255 255 255 / 15%);
-  font: 900 0.55rem/1 'SF Mono', Monaco, Consolas, monospace;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.mixer-eq-trigger[aria-expanded='true'],
-.mixer-eq-trigger:hover {
-  border-color: #f0d5a8;
-  background: radial-gradient(circle at 34% 28%, #6a573b, #27231d 68%);
-}
-
-.mixer-eq-trigger:focus-visible,
-.mixer-eq-dialog button:focus-visible,
-.mixer-eq-dialog input:focus-visible {
-  outline: 2px solid #f2c574;
-  outline-offset: 3px;
-}
-
-.mixer-eq-overlay {
-  position: fixed;
-  z-index: 50000;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding:
-    max(12px, env(safe-area-inset-top))
-    max(12px, env(safe-area-inset-right))
-    max(12px, env(safe-area-inset-bottom))
-    max(12px, env(safe-area-inset-left));
-  background: rgb(4 7 9 / 76%);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
-}
-
-.mixer-eq-dialog {
-  display: grid;
-  width: min(720px, 100%);
-  max-height: 100%;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  overflow: auto;
-  border: 1px solid rgb(205 165 102 / 60%);
-  border-radius: 8px;
-  color: #ece8df;
-  background: linear-gradient(145deg, #202729, #111617 68%);
-  box-shadow: 0 22px 80px rgb(0 0 0 / 62%), inset 0 1px rgb(255 255 255 / 8%);
-  font-family: 'SF Mono', Monaco, Consolas, monospace;
-}
-
-.mixer-eq-dialog__header {
-  display: flex;
-  min-height: 64px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgb(255 255 255 / 11%);
-  background: linear-gradient(105deg, rgb(55 63 64 / 78%), rgb(20 25 27 / 85%));
-}
-
-.mixer-eq-dialog__eyebrow {
-  display: block;
-  color: #c9a36d;
-  font-size: 0.53rem;
-  font-weight: 900;
-  letter-spacing: 0.15em;
-}
-
-.mixer-eq-dialog__header h2 {
-  margin: 4px 0 0;
-  color: #f5efe4;
-  font-family: 'Arial Narrow', 'Roboto Condensed', sans-serif;
-  font-size: 1.45rem;
-  font-weight: 900;
-  letter-spacing: 0.07em;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.mixer-eq-dialog__close {
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
-  border: 1px solid rgb(255 255 255 / 18%);
-  border-radius: 4px;
-  color: #ead7b7;
-  background: rgb(255 255 255 / 5%);
-  font-size: 1.5rem;
-  line-height: 1;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.mixer-eq-dialog__decks {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  padding: 14px;
-}
-
-.mixer-eq-deck {
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 5px;
-  background: linear-gradient(120deg, rgb(255 255 255 / 5%), rgb(255 255 255 / 2%));
-}
-
-.mixer-eq-deck__header {
-  display: flex;
-  min-height: 34px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgb(255 255 255 / 11%);
-}
-
-.mixer-eq-deck__header > div {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 8px;
-}
-
-.mixer-eq-deck__number {
-  color: #c9a36d;
-  font-size: 0.54rem;
-}
-
-.mixer-eq-deck__header strong {
-  color: #f0d5a8;
-  font-size: 0.68rem;
-  letter-spacing: 0.12em;
-}
-
-.mixer-eq-deck__reset {
-  min-width: 54px;
-  min-height: 34px;
-  padding: 6px 8px;
-  border: 1px solid rgb(255 255 255 / 16%);
-  border-radius: 3px;
-  color: #c8c9c4;
-  background: rgb(255 255 255 / 5%);
-  font: 800 0.47rem/1 'SF Mono', Monaco, Consolas, monospace;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.mixer-eq-deck__reset:hover {
-  border-color: rgb(213 173 112 / 60%);
-  color: #f0d5a8;
-}
-
-.mixer-eq-deck__bands {
-  display: grid;
-  gap: 5px;
-  padding-top: 8px;
-}
-
-.mixer-eq-band {
-  display: grid;
-  min-width: 0;
-  min-height: 48px;
-  grid-template-columns: 42px minmax(0, 1fr) 48px;
-  align-items: center;
-  gap: 8px;
-}
-
-.mixer-eq-band__label {
-  color: #c8cbc8;
-  font-size: 0.58rem;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-}
-
-.mixer-eq-band input {
-  width: 100%;
-  min-width: 0;
-  height: 44px;
-  margin: 0;
-  padding: 0;
-  accent-color: #c59a58;
-  cursor: pointer;
-  touch-action: pan-y;
-}
-
-.mixer-eq-band output {
-  color: #e8d2ad;
-  font-size: 0.56rem;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.mixer-eq-dialog__note {
-  margin: 0;
-  padding: 10px 16px 13px;
-  border-top: 1px solid rgb(255 255 255 / 9%);
-  color: rgb(229 231 235 / 57%);
-  font-family: Arial, sans-serif;
-  font-size: 0.72rem;
-  line-height: 1.4;
-}
-
-@media (orientation: landscape) {
-  .mixer-panel__header {
-    min-height: 76px;
-    flex-basis: 76px;
-    padding: 3px;
-  }
-}
-
-@media (max-width: 620px) {
-  .mixer-eq-dialog__decks {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-    padding: 10px;
-  }
-
-  .mixer-eq-deck {
-    padding: 9px 10px;
-  }
-
-  .mixer-eq-dialog__header {
-    min-height: 58px;
-    padding: 9px 12px;
-  }
-
-  .mixer-eq-dialog__header h2 {
-    font-size: 1.25rem;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mixer-eq-overlay,
-  .mixer-eq-dialog,
-  .mixer-eq-dialog * {
     transition: none !important;
     animation: none !important;
   }
