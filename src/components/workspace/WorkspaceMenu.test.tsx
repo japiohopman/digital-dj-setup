@@ -6,6 +6,18 @@ import { WorkspaceMenu } from './WorkspaceMenu';
 describe('WorkspaceMenu', () => {
   afterEach(cleanup);
 
+  it('uses the registered album crate SVG in the overlay trigger', () => {
+    render(<WorkspaceMenu onTrackControlsTargetChange={() => undefined} />);
+
+    const trigger = screen.getByRole('button', { name: 'Open workspace tools' });
+    const icon = trigger.querySelector('img.workspace-menu__trigger-icon');
+
+    expect(icon?.getAttribute('src')).toBe(`${import.meta.env.BASE_URL}icons/UI/album_crate.svg`);
+    expect(icon?.getAttribute('alt')).toBe('');
+    expect(icon?.getAttribute('aria-hidden')).toBe('true');
+    expect(trigger.textContent).not.toContain('☰');
+  });
+
   it('opens the full-screen library and closes with Escape while restoring focus', () => {
     const onTrackControlsTargetChange = vi.fn();
     render(
