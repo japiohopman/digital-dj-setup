@@ -27,9 +27,12 @@
 }
 
 .workspace-menu__trigger-icon {
-  color: #d5ad70;
-  font-size: 0.72rem;
-  line-height: 1;
+  display: block;
+  width: 21px;
+  height: 21px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  filter: brightness(0) saturate(100%) invert(77%) sepia(21%) saturate(760%) hue-rotate(356deg) brightness(98%) contrast(88%);
 }
 
 .workspace-menu__trigger-caret {
