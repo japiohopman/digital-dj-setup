@@ -303,6 +303,8 @@ export class MixerAudioGraph {
     }
 
     const input = context.createGain();
+    // TRIM is optional: every deck input must pass at unity when TRIM is bypassed.
+    input.gain.value = 1;
     const channelGain = context.createGain();
     const lowEq = context.createBiquadFilter();
     const midEq = context.createBiquadFilter();

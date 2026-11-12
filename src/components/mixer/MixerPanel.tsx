@@ -80,6 +80,26 @@ function MixerRotary({
   );
 }
 
+/** Shows the optional TRIM position as a fixed unity/bypass placeholder, not a control. */
+function MixerTrimPlaceholder({ deckId }: { deckId: MixerDeckId }) {
+  return (
+    <div
+      className="mixer-rotary mixer-rotary--eq mixer-rotary--trim-placeholder"
+      role="img"
+      aria-label={'Deck ' + deckId.toUpperCase() + ' TRIM bypassed; input passes at unity gain'}
+      title="TRIM is bypassed. Deck input passes through at unity gain (0 dB)."
+    >
+      <span className="mixer-rotary__label">TRIM</span>
+      <span className="mixer-rotary__dial" aria-hidden="true">
+        <span className="mixer-rotary__face">
+          <i />
+        </span>
+      </span>
+      <span className="mixer-rotary__value" aria-hidden="true">BYPASS</span>
+    </div>
+  );
+}
+
 /** Renders one accessible RMS meter and its matching visual segments. */
 function MixerMeter({ label, level, className = '' }: {
   label: string;
@@ -244,6 +264,7 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
               </button>
             </div>
             <div className="mixer-eq-bank__controls mixer-eq-bank__controls--vertical">
+              <MixerTrimPlaceholder deckId={deckId} />
               {EQ_BANDS.map((band) => {
                 const gainDb = deckEq[deckId][band];
                 const formattedGain = formatEqGain(gainDb);
