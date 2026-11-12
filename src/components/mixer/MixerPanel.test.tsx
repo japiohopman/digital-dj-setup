@@ -69,6 +69,8 @@ describe('MixerPanel', () => {
     const deckBBank = document.querySelector('.mixer-eq-bank--b');
     expect(deckABank?.querySelectorAll('input[type="range"]')).toHaveLength(3);
     expect(deckBBank?.querySelectorAll('input[type="range"]')).toHaveLength(3);
+    expect(deckABank?.querySelector('.mixer-eq-bank__controls--vertical')).toBeTruthy();
+    expect(deckBBank?.querySelector('.mixer-eq-bank__controls--vertical')).toBeTruthy();
 
     for (const name of [
       'Deck A LOW EQ',

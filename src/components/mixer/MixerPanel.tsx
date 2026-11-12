@@ -243,7 +243,7 @@ export function MixerPanel({ audioGraph }: MixerPanelProps) {
                 RESET
               </button>
             </div>
-            <div className="mixer-eq-bank__controls">
+            <div className="mixer-eq-bank__controls mixer-eq-bank__controls--vertical">
               {EQ_BANDS.map((band) => {
                 const gainDb = deckEq[deckId][band];
                 const formattedGain = formatEqGain(gainDb);
