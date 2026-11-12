@@ -20,8 +20,8 @@
 /* Dark upper strip: one three-band EQ bank per deck, master and CUT-IN on the right. */
 .mixer-panel__header {
   display: grid;
-  min-height: 88px;
-  flex: 0 0 88px;
+  min-height: 132px;
+  flex: 0 0 132px;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 60px;
   align-items: stretch;
   gap: 2px;
@@ -87,13 +87,14 @@
   outline-offset: 2px;
 }
 
-.mixer-eq-bank__controls {
-  display: flex;
+.mixer-eq-bank__controls--vertical {
+  display: grid;
   min-height: 0;
   flex: 1 1 auto;
+  grid-template-rows: repeat(3, minmax(0, 1fr));
   align-items: center;
-  justify-content: space-evenly;
-  gap: 1px;
+  justify-content: stretch;
+  gap: 0;
 }
 
 .mixer-rotary {
@@ -188,12 +189,37 @@
 }
 
 .mixer-rotary--eq {
-  width: 34px;
-  flex: 0 1 34px;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  grid-template-columns: minmax(14px, 1fr) 38px minmax(22px, 1fr);
+  align-items: center;
+  justify-items: center;
+  gap: 1px;
 }
 
 .mixer-rotary--eq .mixer-rotary__label {
+  justify-self: end;
   font-size: 0.42rem;
+  text-align: right;
+}
+
+.mixer-rotary--eq .mixer-rotary__dial {
+  width: 30px;
+  height: 30px;
+  flex-basis: 30px;
+}
+
+.mixer-rotary--eq .mixer-rotary__input {
+  inset: -4px;
+  width: 38px;
+  height: 38px;
+}
+
+.mixer-rotary--eq .mixer-rotary__value {
+  justify-self: start;
+  font-size: 0.38rem;
 }
 
 .mixer-utility {
@@ -620,56 +646,6 @@
     font-size: 0.31rem;
   }
 
-  .mixer-eq-bank__controls {
-    display: grid;
-    grid-template-rows: repeat(3, minmax(0, 1fr));
-    align-items: center;
-    justify-content: stretch;
-    gap: 0;
-  }
-
-  .mixer-rotary--eq {
-    display: grid;
-    width: 100%;
-    min-width: 0;
-    height: 36px;
-    grid-template-columns: 14px minmax(27px, 1fr) 20px;
-    align-items: center;
-    justify-items: center;
-    gap: 0;
-  }
-
-  .mixer-rotary--eq .mixer-rotary__label {
-    font-size: 0.35rem;
-    text-align: left;
-  }
-
-  .mixer-rotary--eq .mixer-rotary__dial {
-    width: 28px;
-    height: 28px;
-    flex-basis: 28px;
-  }
-
-  .mixer-rotary--eq .mixer-rotary__input {
-    inset: -5px;
-    width: 38px;
-    height: 38px;
-  }
-
-  .mixer-rotary--eq .mixer-rotary__face {
-    inset: 1px;
-  }
-
-  .mixer-rotary--eq .mixer-rotary__face i {
-    top: 1px;
-    height: 6px;
-    transform-origin: 50% 10px;
-  }
-
-  .mixer-rotary--eq .mixer-rotary__value {
-    font-size: 0.34rem;
-  }
-
   .mixer-utility {
     gap: 2px;
     padding-left: 1px;
@@ -799,26 +775,9 @@
   }
 
   .mixer-panel__header {
-    min-height: 88px;
-    flex-basis: 88px;
+    min-height: 132px;
+    flex-basis: 132px;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 58px;
-  }
-
-  .mixer-rotary--eq {
-    width: 30px;
-    flex-basis: 30px;
-  }
-
-  .mixer-rotary--eq .mixer-rotary__dial {
-    width: 30px;
-    height: 30px;
-    flex-basis: 30px;
-  }
-
-  .mixer-rotary--eq .mixer-rotary__input {
-    inset: -4px;
-    width: 38px;
-    height: 38px;
   }
 }
 
@@ -831,6 +790,23 @@
   .mixer-panel__header {
     min-height: 120px;
     flex-basis: 120px;
+  }
+
+  .mixer-rotary--eq {
+    height: 30px;
+    grid-template-columns: 13px minmax(25px, 1fr) 19px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__dial {
+    width: 25px;
+    height: 25px;
+    flex-basis: 25px;
+  }
+
+  .mixer-rotary--eq .mixer-rotary__input {
+    inset: -4px;
+    width: 34px;
+    height: 34px;
   }
 
   .mixer-panel__channels {
