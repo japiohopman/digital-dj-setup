@@ -11,6 +11,7 @@ export const PUBLIC_APP_ASSETS = [
   '/favicon.svg',
   '/icons/app-192.png',
   '/icons/app-512.png',
+  '/icons/UI/album_crate.svg',
   '/turntable/platter.png',
   '/turntable/record-grooves-1440x1440-white.png',
   '/turntable/slipmat.jpg',
