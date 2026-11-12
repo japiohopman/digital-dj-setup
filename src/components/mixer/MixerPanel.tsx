@@ -70,8 +70,8 @@ function MixerMeter({ label, level, className = '' }: {
 /**
  * Two-channel mixer faceplate inspired by the Vestax PMC-05 Pro III.
  *
- * Provides independent deck levels, an equal-power crossfader and live RMS
- * meters. The graph owns all audio-node changes and remains lazy until playback.
+ * Provides independent deck levels, per-deck three-band EQ, an equal-power
+ * crossfader, final master level and live RMS meters. The graph owns audio nodes.
  */
 export function MixerPanel({ audioGraph }: MixerPanelProps) {
   const [channelLevels, setChannelLevels] = useState<Record<MixerDeckId, number>>({
