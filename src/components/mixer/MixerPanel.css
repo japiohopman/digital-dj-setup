@@ -426,7 +426,9 @@
   display: flex;
   width: 12px;
   min-height: 0;
-  height: 100%;
+  height: var(--mixer-fader-travel);
+  max-height: 140px;
+  align-self: center;
   flex-direction: column-reverse;
   justify-content: flex-start;
   gap: 2px;
