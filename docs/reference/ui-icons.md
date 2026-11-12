@@ -6,7 +6,8 @@ The app uses its own SVG assets from `public/icons/`. Keep them organised by pur
 
 1. Add the SVG to the appropriate folder under `public/icons/`.
 2. Add a semantic key and its public path to `UI_ICON_PATHS` in `src/components/ui/UiIcon.tsx`.
-3. Use the shared component where the icon belongs:
+3. Add the same public path to `PUBLIC_APP_ASSETS` in `src/pwa/serviceWorkerSource.ts` so the public SVG is available offline after installation.
+4. Use the shared component where the icon belongs:
 
    ```tsx
    <UiIcon name="albumCrate" className="workspace-menu__trigger-icon" />
