@@ -103,6 +103,15 @@ class MockAudioContext {
     return node as unknown as GainNode;
   });
 
+  createBiquadFilter = vi.fn(() => ({
+    type: 'lowpass',
+    frequency: new MockAudioParam(),
+    Q: new MockAudioParam(),
+    gain: new MockAudioParam(),
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  }) as unknown as BiquadFilterNode);
+
   createAnalyser = vi.fn(() => ({
     fftSize: 2048,
     connect: vi.fn(),

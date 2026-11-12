@@ -11,7 +11,11 @@ describe('MixerPanel', () => {
       getChannelLevel: vi.fn(() => 1),
       getCrossfaderPosition: vi.fn(() => 0.5),
       getCrossfaderCutLag: vi.fn(() => 0),
+      getDeckEq: vi.fn(() => ({ low: 0, mid: 0, high: 0 })),
+      getMasterLevel: vi.fn(() => 1),
       getMeterLevels: vi.fn(() => ({ a: 0, b: 0, master: 0 })),
+      setDeckEq: vi.fn(),
+      setMasterLevel: vi.fn(),
       setChannelLevel: vi.fn(),
       setCrossfaderPosition: vi.fn(),
       setCrossfaderCutLag: vi.fn(),
@@ -48,12 +52,83 @@ describe('MixerPanel', () => {
     ).toBe('Center, both Deck A and Deck B');
   });
 
+  it('routes master output changes to the final gain control', () => {
+    const audioGraph = {
+      getChannelLevel: vi.fn(() => 1),
+      getCrossfaderPosition: vi.fn(() => 0.5),
+      getCrossfaderCutLag: vi.fn(() => 0),
+      getDeckEq: vi.fn(() => ({ low: 0, mid: 0, high: 0 })),
+      getMasterLevel: vi.fn(() => 1),
+      getMeterLevels: vi.fn(() => ({ a: 0, b: 0, master: 0 })),
+      setDeckEq: vi.fn(),
+      setMasterLevel: vi.fn(),
+      setChannelLevel: vi.fn(),
+      setCrossfaderPosition: vi.fn(),
+      setCrossfaderCutLag: vi.fn(),
+    } as unknown as MixerAudioGraph;
+
+    render(<MixerPanel audioGraph={audioGraph} />);
+
+    fireEvent.change(screen.getByRole('slider', { name: 'Master output level' }), {
+      target: { value: '65' },
+    });
+    expect(audioGraph.setMasterLevel).toHaveBeenCalledWith(0.65);
+    expect(audioGraph.setChannelLevel).not.toHaveBeenCalled();
+  });
+
+  it('opens the EQ panel, adjusts each deck independently and restores focus on Escape', () => {
+    const audioGraph = {
+      getChannelLevel: vi.fn(() => 1),
+      getCrossfaderPosition: vi.fn(() => 0.5),
+      getCrossfaderCutLag: vi.fn(() => 0),
+      getDeckEq: vi.fn(() => ({ low: 0, mid: 0, high: 0 })),
+      getMasterLevel: vi.fn(() => 1),
+      getMeterLevels: vi.fn(() => ({ a: 0, b: 0, master: 0 })),
+      setDeckEq: vi.fn(),
+      setMasterLevel: vi.fn(),
+      setChannelLevel: vi.fn(),
+      setCrossfaderPosition: vi.fn(),
+      setCrossfaderCutLag: vi.fn(),
+    } as unknown as MixerAudioGraph;
+
+    render(<MixerPanel audioGraph={audioGraph} />);
+
+    const trigger = screen.getByRole('button', { name: 'EQ' });
+    fireEvent.click(trigger);
+
+    expect(screen.getByRole('dialog', { name: 'Three-band EQ' })).toBeTruthy();
+
+    fireEvent.change(screen.getByRole('slider', { name: 'Deck A LOW EQ' }), {
+      target: { value: '-6' },
+    });
+    expect(audioGraph.setDeckEq).toHaveBeenCalledWith('a', 'low', -6);
+
+    fireEvent.change(screen.getByRole('slider', { name: 'Deck B HIGH EQ' }), {
+      target: { value: '5' },
+    });
+    expect(audioGraph.setDeckEq).toHaveBeenCalledWith('b', 'high', 5);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Deck A EQ' }));
+    expect(audioGraph.setDeckEq).toHaveBeenCalledWith('a', 'low', 0);
+    expect(audioGraph.setDeckEq).toHaveBeenCalledWith('a', 'mid', 0);
+    expect(audioGraph.setDeckEq).toHaveBeenCalledWith('a', 'high', 0);
+    expect(audioGraph.setDeckEq).not.toHaveBeenCalledWith('b', 'high', 0);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Three-band EQ' })).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it('exposes three real signal meters with accessible decibel readouts', () => {
     const audioGraph = {
       getChannelLevel: vi.fn(() => 1),
       getCrossfaderPosition: vi.fn(() => 0.5),
       getCrossfaderCutLag: vi.fn(() => 0),
+      getDeckEq: vi.fn(() => ({ low: 0, mid: 0, high: 0 })),
+      getMasterLevel: vi.fn(() => 1),
       getMeterLevels: vi.fn(() => ({ a: 0.25, b: 0.5, master: 0.75 })),
+      setDeckEq: vi.fn(),
+      setMasterLevel: vi.fn(),
       setChannelLevel: vi.fn(),
       setCrossfaderPosition: vi.fn(),
       setCrossfaderCutLag: vi.fn(),
@@ -76,7 +151,11 @@ describe('MixerPanel', () => {
       getChannelLevel: vi.fn(() => 1),
       getCrossfaderPosition: vi.fn(() => 0.5),
       getCrossfaderCutLag: vi.fn(() => 0),
+      getDeckEq: vi.fn(() => ({ low: 0, mid: 0, high: 0 })),
+      getMasterLevel: vi.fn(() => 1),
       getMeterLevels: vi.fn(() => ({ a: 0.002, b: 0.25, master: 0.25 })),
+      setDeckEq: vi.fn(),
+      setMasterLevel: vi.fn(),
       setChannelLevel: vi.fn(),
       setCrossfaderPosition: vi.fn(),
       setCrossfaderCutLag: vi.fn(),

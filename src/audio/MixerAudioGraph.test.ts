@@ -11,6 +11,13 @@ class MockGainNode extends MockAudioNode {
   gain = { value: 1 };
 }
 
+class MockBiquadFilterNode extends MockAudioNode {
+  type: BiquadFilterType = 'lowpass';
+  frequency = { value: 350 };
+  Q = { value: 1 };
+  gain = { value: 0 };
+}
+
 class MockAnalyserNode extends MockAudioNode {
   fftSize = 2048;
   sampleValue = 0;
@@ -21,6 +28,7 @@ class MockAudioContext {
   state: AudioContextState = 'suspended';
   destination = new MockAudioNode();
   createdGains: MockGainNode[] = [];
+  createdFilters: MockBiquadFilterNode[] = [];
   createdAnalysers: MockAnalyserNode[] = [];
   close = vi.fn(async () => {
     this.state = 'closed';
@@ -30,6 +38,12 @@ class MockAudioContext {
     const node = new MockGainNode();
     this.createdGains.push(node);
     return node as unknown as GainNode;
+  });
+
+  createBiquadFilter = vi.fn(() => {
+    const node = new MockBiquadFilterNode();
+    this.createdFilters.push(node);
+    return node as unknown as BiquadFilterNode;
   });
 
   createAnalyser = vi.fn(() => {
@@ -85,13 +99,21 @@ describe('MixerAudioGraph', () => {
     expect(masterGain?.connect).toHaveBeenCalledWith(masterAnalyser);
     expect(masterAnalyser?.connect).toHaveBeenCalledWith(context.destination);
 
+    const [lowEqA, midEqA, highEqA, lowEqB, midEqB, highEqB] = context.createdFilters;
+
     expect(channelInputA.connect).toHaveBeenCalledWith(context.createdGains[2]);
-    expect(context.createdGains[2]?.connect).toHaveBeenCalledWith(context.createdGains[3]);
+    expect(context.createdGains[2]?.connect).toHaveBeenCalledWith(lowEqA);
+    expect(lowEqA?.connect).toHaveBeenCalledWith(midEqA);
+    expect(midEqA?.connect).toHaveBeenCalledWith(highEqA);
+    expect(highEqA?.connect).toHaveBeenCalledWith(context.createdGains[3]);
     expect(context.createdGains[3]?.connect).toHaveBeenCalledWith(deckAnalyserA);
     expect(deckAnalyserA.connect).toHaveBeenCalledWith(masterGain);
 
     expect(channelInputB.connect).toHaveBeenCalledWith(context.createdGains[5]);
-    expect(context.createdGains[5]?.connect).toHaveBeenCalledWith(context.createdGains[6]);
+    expect(context.createdGains[5]?.connect).toHaveBeenCalledWith(lowEqB);
+    expect(lowEqB?.connect).toHaveBeenCalledWith(midEqB);
+    expect(midEqB?.connect).toHaveBeenCalledWith(highEqB);
+    expect(highEqB?.connect).toHaveBeenCalledWith(context.createdGains[6]);
     expect(context.createdGains[6]?.connect).toHaveBeenCalledWith(deckAnalyserB);
     expect(deckAnalyserB.connect).toHaveBeenCalledWith(masterGain);
 
@@ -153,6 +175,83 @@ describe('MixerAudioGraph', () => {
     graph.setCrossfaderPosition(1);
     expect(crossfaderGainA?.gain.value).toBeCloseTo(0);
     expect(crossfaderGainB?.gain.value).toBeCloseTo(1);
+    graph.dispose();
+  });
+
+  it('stores independent three-band EQ settings before audio starts and applies the correct filter topology', () => {
+    const context = new MockAudioContext();
+    const factory = vi.fn(() => context as unknown as AudioContext);
+    const graph = new MixerAudioGraph({ audioContextFactory: factory });
+
+    graph.setDeckEq('a', 'low', -8);
+    graph.setDeckEq('a', 'mid', 4);
+    graph.setDeckEq('a', 'high', 9);
+    graph.setDeckEq('b', 'low', 2);
+    graph.setDeckEq('b', 'mid', -3);
+    graph.setDeckEq('b', 'high', 6);
+
+    expect(factory).not.toHaveBeenCalled();
+    expect(graph.getDeckEq('a')).toEqual({ low: -8, mid: 4, high: 9 });
+    expect(graph.getDeckEq('b')).toEqual({ low: 2, mid: -3, high: 6 });
+
+    const optionsA = graph.createDeckAudioOptions('a');
+    const optionsB = graph.createDeckAudioOptions('b');
+    const contextA = optionsA.audioContextProvider?.();
+    const contextB = optionsB.audioContextProvider?.();
+    optionsA.outputNodeProvider?.(contextA!);
+    optionsB.outputNodeProvider?.(contextB!);
+
+    const [lowEqA, midEqA, highEqA, lowEqB, midEqB, highEqB] = context.createdFilters;
+    expect(lowEqA?.type).toBe('lowshelf');
+    expect(lowEqA?.frequency.value).toBe(250);
+    expect(midEqA?.type).toBe('peaking');
+    expect(midEqA?.frequency.value).toBe(1000);
+    expect(midEqA?.Q.value).toBe(0.8);
+    expect(highEqA?.type).toBe('highshelf');
+    expect(highEqA?.frequency.value).toBe(10000);
+    expect(lowEqA?.gain.value).toBe(-8);
+    expect(midEqA?.gain.value).toBe(4);
+    expect(highEqA?.gain.value).toBe(9);
+    expect(lowEqB?.gain.value).toBe(2);
+    expect(midEqB?.gain.value).toBe(-3);
+    expect(highEqB?.gain.value).toBe(6);
+
+    graph.setDeckEq('a', 'mid', 20);
+    expect(lowEqA?.gain.value).toBe(-8);
+    expect(midEqA?.gain.value).toBe(12);
+    expect(highEqA?.gain.value).toBe(9);
+    expect(midEqB?.gain.value).toBe(-3);
+    graph.dispose();
+  });
+
+  it('applies the master output level only after both deck channel paths and retains it before audio starts', () => {
+    const context = new MockAudioContext();
+    const factory = vi.fn(() => context as unknown as AudioContext);
+    const graph = new MixerAudioGraph({ audioContextFactory: factory });
+
+    graph.setMasterLevel(0.65);
+    expect(factory).not.toHaveBeenCalled();
+    expect(graph.getMasterLevel()).toBe(0.65);
+
+    const optionsA = graph.createDeckAudioOptions('a');
+    const optionsB = graph.createDeckAudioOptions('b');
+    const contextA = optionsA.audioContextProvider?.();
+    const contextB = optionsB.audioContextProvider?.();
+    optionsA.outputNodeProvider?.(contextA!);
+    optionsB.outputNodeProvider?.(contextB!);
+
+    const masterGain = context.createdGains[0];
+    expect(masterGain?.gain.value).toBe(0.65);
+    expect(masterGain?.connect).toHaveBeenCalledWith(context.createdAnalysers[0]);
+    expect(context.createdAnalysers[0]?.connect).toHaveBeenCalledWith(context.destination);
+
+    graph.setMasterLevel(0.3);
+    expect(graph.getMasterLevel()).toBe(0.3);
+    expect(masterGain?.gain.value).toBe(0.3);
+    expect(context.createdGains[2]?.gain.value).toBe(1);
+    expect(context.createdGains[3]?.gain.value).toBeCloseTo(Math.SQRT1_2);
+    expect(context.createdGains[5]?.gain.value).toBe(1);
+    expect(context.createdGains[6]?.gain.value).toBeCloseTo(Math.SQRT1_2);
     graph.dispose();
   });
 
