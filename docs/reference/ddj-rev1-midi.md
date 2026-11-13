@@ -1,6 +1,6 @@
 # Pioneer DDJ-REV1 — MIDI discovery
 
-**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Three physical button captures have been repeated and recorded below: left-deck PLAY/PAUSE and CUE, plus right-deck PLAY/PAUSE. Remaining controls still need to be captured and identified; no control mapping is implemented or implied.
+**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Four physical button captures have been repeated and recorded below: PLAY/PAUSE and CUE on both decks. Remaining controls still need to be captured and identified; no control mapping is implemented or implied.
 
 ## Target and scope
 
@@ -53,6 +53,8 @@ Do not map a message to an app action until the physical capture is repeatable a
 | Left deck CUE — release | DDJ-REV1 input (exact displayed label not recorded) | `90 0C 00` | Note On with velocity 0 (release semantics) | 1 | Observed in five repeated press/release cycles |
 | Right deck PLAY/PAUSE — press | DDJ-REV1 input (exact displayed label not recorded) | `91 0B 7F` | Note On, note number 11, velocity 127 | 2 | Observed in five repeated press/release cycles |
 | Right deck PLAY/PAUSE — release | DDJ-REV1 input (exact displayed label not recorded) | `91 0B 00` | Note On with velocity 0 (release semantics) | 2 | Observed in five repeated press/release cycles |
+| Right deck CUE — press | DDJ-REV1 input (exact displayed label not recorded) | `91 0C 7F` | Note On, note number 12, velocity 127 | 2 | Observed in five repeated press/release cycles |
+| Right deck CUE — release | DDJ-REV1 input (exact displayed label not recorded) | `91 0C 00` | Note On with velocity 0 (release semantics) | 2 | Observed in five repeated press/release cycles |
 | Left deck PLAY/PAUSE — release | DDJ-REV1 input (exact displayed label not recorded) | `90 0B 00` | Note On with velocity 0 (release semantics) | 1 | Observed in five repeated press/release cycles |
 
 ## Architecture boundary
