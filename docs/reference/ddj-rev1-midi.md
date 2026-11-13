@@ -1,6 +1,6 @@
 # Pioneer DDJ-REV1 — MIDI discovery
 
-**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Four physical button captures (PLAY/PAUSE and CUE on both decks) and both channel faders have been captured. The official Pioneer MIDI message list identifies CC 19/51 as the 14-bit channel-fader MSB/LSB pair. Remaining controls still need to be captured and identified; no app control mapping is implemented or implied.
+**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Four physical button captures (PLAY/PAUSE and CUE on both decks), both channel faders, and the crossfader have been captured. Pioneer’s official MIDI message list identifies the channel faders as CC 19/51 and the crossfader as CC 31/63 (14-bit MSB/LSB pairs). Remaining controls still need to be captured and identified; no app control mapping is implemented or implied.
 
 ## Target and scope
 
@@ -33,7 +33,7 @@ Do not map a message to an app action until the physical capture is repeatable a
 
 ## Observed MIDI inventory
 
-**Connection smoke test (13 November 2026):** The DDJ-REV1 is detected by the local browser MIDI inspector and incoming messages appear after the controller is connected through a working USB port (the port previously used by the mouse). This confirms live USB-MIDI communication. The four transport buttons and left channel fader have now been isolated in physical captures. The fader capture is limited to the inspector's most recent 40 messages, so a complete end-to-end value curve has not yet been preserved.
+**Connection smoke test (13 November 2026):** The DDJ-REV1 is detected by the local browser MIDI inspector and incoming messages appear after the controller is connected through a working USB port (the port previously used by the mouse). This confirms live USB-MIDI communication. The four transport buttons, both channel faders, and crossfader have now been isolated in physical captures. Fader and crossfader captures are limited to the inspector's most recent 40 messages, so complete end-to-end value curves have not yet been preserved.
 
 ### Capture discipline
 
@@ -58,6 +58,7 @@ Do not map a message to an app action until the physical capture is repeatable a
 | Left deck PLAY/PAUSE — release | DDJ-REV1 input (exact displayed label not recorded) | `90 0B 00` | Note On with velocity 0 (release semantics) | 1 | Observed in five repeated press/release cycles |
 | Left deck channel fader — slide | DDJ-REV1 input (exact displayed label not recorded) | `B0 13 xx` + `B0 33 xx` | Control Change; CC 19 MSB + CC 51 LSB (14-bit pair) | 1 | Physical capture emitted both CCs. Captured CC 19 MSB values ranged `78`–`7F`; CC 51 LSB values included `00`–`7F`. The 40-message view truncated the full sweep. Pioneer identifies this pair as CH FADER; bottom=min, top=max. |
 | Right deck channel fader — slide | DDJ-REV1 input (exact displayed label not recorded) | `B1 13 xx` + `B1 33 xx` | Control Change; CC 19 MSB + CC 51 LSB (14-bit pair) | 2 | Physical capture emitted both CCs. Captured CC 19 MSB values ranged `78`–`7F`; CC 51 LSB values included `00`–`7F`. The 40-message view truncated the full sweep. Matches the left fader with channel 2. Pioneer identifies this pair as CH FADER; bottom=min, top=max. |
+| Crossfader — slide left ↔ right | DDJ-REV1 input (exact displayed label not recorded) | `B6 1F xx` + `B6 3F xx` | Control Change; CC 31 MSB + CC 63 LSB (14-bit pair) | 7 | Physical capture emitted both CCs. The supplied 40-message window includes CC 31 values `00`–`07` and CC 63 values `00`–`7F`; it does not preserve a complete sweep. Pioneer identifies this as MIXER → CROSSFADER; left=min, right=max. |
 
 ## Architecture boundary
 
