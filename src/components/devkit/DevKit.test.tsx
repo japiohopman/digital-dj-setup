@@ -13,7 +13,9 @@ describe('DevKit', () => {
     expect(screen.getByText('DEVKIT')).toBeTruthy();
     expect(screen.getByRole('checkbox', { name: 'Arm angle meter' })).toBeTruthy();
     expect(screen.getByRole('checkbox', { name: 'Deck state trace' })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'MIDI inspector (DDJ-REV1)' })).toBeTruthy();
     expect(screen.queryByTestId('tonearm-angle-readout')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'MIDI inspector' })).toBeNull();
   });
 
   it('toggles the live arm meter and retains its measurement controls', () => {
@@ -65,5 +67,18 @@ describe('DevKit', () => {
     expect(screen.getByRole('region', { name: 'DECK B state trace' })).toBeTruthy();
     fireEvent.click(screen.getByText(/DECK B STATE/));
     expect(document.body.querySelector('[data-dev-widget="deck-state-trace"]')?.textContent).toContain('valid lead-in drop');
+  });
+
+  it('mounts the raw MIDI inspector only when its DevKit option is enabled', () => {
+    render(<DevKit activeDeckLabel="DECK A" activeArmAngle={0} />);
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'MIDI inspector (DDJ-REV1)' }));
+
+    expect(screen.getByRole('region', { name: 'MIDI inspector' })).toBeTruthy();
+    expect(screen.getByText('NOT CONNECTED')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'REQUEST MIDI ACCESS' }));
+    expect(screen.getByText('WEB MIDI UNAVAILABLE')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain('Web MIDI is not available');
   });
 });

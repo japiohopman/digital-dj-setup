@@ -43,6 +43,7 @@ The authoritative mixer composition is the user's Figma prototype frame 41:36: t
 - Keep explanations practical and brief. Prefer the next concrete action over long theoretical descriptions.
 - Ask only when a product decision is genuinely blocking; otherwise make a conservative, clearly documented choice.
 - The user has delegated merge authority to the assistant for this repository. Merge a PR once its scope and acceptance criteria are met, CI is green and the review finds no unresolved blockers. Do not ask the user to click Merge or repeat approval for a PR that meets those conditions.
+- Jules dispatch is inactive in this project from 11 November 2026. Do not include @Jules instructions or depend on Jules; implement directly in the active branch / PR unless the user explicitly changes this rule.
 
 ## Current project order
 

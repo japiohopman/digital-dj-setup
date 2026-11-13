@@ -11,6 +11,10 @@ Use this folder as the compact source-of-truth index for recurring hardware fact
 
 - [Shared mixer audio routing](audio-routing.md) — shared Web Audio context ownership, independent deck channels, analyser taps and Phase 0/1 boundaries.
 
+## Hardware integration
+
+- [Pioneer DJ DDJ-REV1 MIDI discovery](ddj-rev1-midi.md) — Web MIDI prerequisites, explicit permission, raw message capture procedure, architecture boundary and physical-device inventory.
+
 ## UI assets
 
 - [Owned UI SVG icon registry](ui-icons.md) — where app-owned icons live, how semantic names are registered, and how to use them accessibly.

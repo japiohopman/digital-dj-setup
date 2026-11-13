@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { ArmAngleMeter } from './widgets/ArmAngleMeter';
 import { DeckStateTrace } from './widgets/DeckStateTrace';
+import { MidiInspector } from './widgets/MidiInspector';
 import type { DeckDiagnosticsSnapshot } from './types';
 import './DevKit.css';
 import './widgets/ArmAngleMeter.css';
@@ -16,6 +17,7 @@ export interface DevKitProps {
 const DEV_WIDGETS = [
   { id: 'arm-angle-meter', label: 'Arm angle meter' },
   { id: 'deck-state-trace', label: 'Deck state trace' },
+  { id: 'midi-inspector', label: 'MIDI inspector (DDJ-REV1)' },
 ] as const;
 type DevWidgetId = (typeof DEV_WIDGETS)[number]['id'];
 
@@ -66,6 +68,7 @@ export function DevKit({
       {enabledWidgetIds.has('deck-state-trace') && activeDeckDiagnostics && (
         <DeckStateTrace deckLabel={activeDeckLabel} snapshot={activeDeckDiagnostics} />
       )}
+      {enabledWidgetIds.has('midi-inspector') && <MidiInspector />}
     </aside>
   );
 }

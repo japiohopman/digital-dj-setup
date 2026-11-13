@@ -53,4 +53,6 @@ Add tests with each feature where practical. The initial bootstrap may have no t
 
 ## Agent dispatch
 
-If Jules is used, dispatch implementation work in a clearly labelled @Jules section in the pull request body. Issues are for planning and tracking; do not use an issue comment as a Jules dispatch channel.
+- Jules dispatch is inactive for this repository from 11 November 2026. Do not add @Jules sections, send work to Jules, or assume a Jules branch will appear.
+- Implement directly in the active issue branch and pull request, following the one-issue / one-PR workflow.
+- Revisit this rule only if the user explicitly re-enables Jules or chooses another implementation agent.
