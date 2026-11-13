@@ -113,6 +113,21 @@ describe('MidiConnectionService', () => {
     expect(service.getSnapshot().error).toContain('permission was denied');
   });
 
+  it('refreshes the live device list after a controller is connected', async () => {
+    const inputs: MidiPortLike[] = [];
+    const access = new FakeAccess(mapOf(inputs), mapOf([]));
+    const service = new MidiConnectionService(async () => access);
+
+    await service.requestAccess();
+    expect(service.getSnapshot().inputs).toHaveLength(0);
+
+    inputs.push(new FakePort('rev1-in', 'DDJ-REV1', 'input'));
+    service.refreshPorts();
+
+    expect(service.getSnapshot().inputs).toHaveLength(1);
+    expect(service.getSnapshot().inputs[0]?.name).toBe('DDJ-REV1');
+  });
+
   it('opens the explicitly selected input and records raw bytes, type, channel and timestamp', async () => {
     const input = new FakePort('rev1-in', 'DDJ-REV1', 'input');
     const access = new FakeAccess(mapOf([input]), mapOf([]));

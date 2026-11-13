@@ -210,7 +210,7 @@ export class MidiConnectionService {
     this.listeners.clear();
   };
 
-  private refreshPorts(): void {
+  refreshPorts(): void {
     if (!this.access) return;
     this.update({
       inputs: Array.from(this.access.inputs.values(), summarizePort),

@@ -164,3 +164,44 @@
   color: rgba(229, 231, 235, 0.45);
   font-size: 0.42rem;
 }
+
+.midi-inspector__no-devices {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(230, 160, 154, 0.3);
+  border-radius: 4px;
+  background: rgba(120, 43, 37, 0.12);
+}
+
+.midi-inspector__no-devices strong {
+  color: #e6a09a;
+  font-size: 0.48rem;
+  letter-spacing: 0.06em;
+}
+
+.midi-inspector__no-devices p {
+  margin: 0;
+  color: rgba(229, 231, 235, 0.7);
+  font-size: 0.47rem;
+  line-height: 1.5;
+}
+
+.midi-inspector__no-devices button,
+.midi-inspector__ports button {
+  min-height: 30px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 3px;
+  color: #e5e7eb;
+  background: rgba(255, 255, 255, 0.06);
+  font: inherit;
+  font-size: 0.43rem;
+  letter-spacing: 0.07em;
+  cursor: pointer;
+}
+
+.midi-inspector__ports button {
+  min-height: 24px;
+  margin-left: auto;
+}

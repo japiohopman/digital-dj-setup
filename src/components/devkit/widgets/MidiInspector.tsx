@@ -68,6 +68,20 @@ export function MidiInspector() {
 
       {snapshot.accessGranted && (
         <>
+          {snapshot.inputs.length === 0 && snapshot.outputs.length === 0 && (
+            <div className="midi-inspector__no-devices" role="status">
+              <strong>NO MIDI DEVICES VISIBLE TO THE BROWSER</strong>
+              <p>
+                Web MIDI permission is active, but Windows/Edge currently reports zero MIDI ports.
+                Check that the DDJ-REV1 appears in Windows Device Manager under
+                Sound, video and game controllers. If it is missing, reconnect it directly
+                to another USB port without a hub, then refresh this list.
+              </p>
+              <button type="button" onClick={() => service.refreshPorts()}>
+                REFRESH DEVICES
+              </button>
+            </div>
+          )}
           <label className="midi-inspector__select">
             <span>INPUT PORT</span>
             <select
@@ -88,6 +102,11 @@ export function MidiInspector() {
           <div className="midi-inspector__ports">
             <span>INPUTS {snapshot.inputs.length}</span>
             <span>OUTPUTS {snapshot.outputs.length}</span>
+            {(snapshot.inputs.length > 0 || snapshot.outputs.length > 0) && (
+              <button type="button" onClick={() => service.refreshPorts()}>
+                REFRESH
+              </button>
+            )}
           </div>
           {snapshot.outputs.length > 0 && (
             <ul className="midi-inspector__outputs" aria-label="Available MIDI outputs">
