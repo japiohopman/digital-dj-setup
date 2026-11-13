@@ -48,8 +48,9 @@ export function WorkspaceMenu({
 }: WorkspaceMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
-  const [targetDeck, setTargetDeck] = useState<WorkspaceDeckId>('a');
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [loadingTrackId, setLoadingTrackId] = useState<string | null>(null);
+  const [loadingDeckId, setLoadingDeckId] = useState<WorkspaceDeckId | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadMessage, setLoadMessage] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -125,22 +126,32 @@ export function WorkspaceMenu({
     if (event.target === event.currentTarget) setIsOpen(false);
   };
 
-  const handleLoadTrack = async (track: BattleAmmoTrack) => {
+  /** Expands the deck choice directly beneath the track the user selected. */
+  const handleSelectTrack = (track: BattleAmmoTrack) => {
+    setSelectedTrackId((current) => current === track.id ? null : track.id);
+    setLoadError(null);
+    setLoadMessage(null);
+  };
+
+  /** Loads the selected crate track into exactly one explicitly chosen deck. */
+  const handleLoadTrack = async (track: BattleAmmoTrack, deck: WorkspaceDeckId) => {
     if (!onLoadBundledTrack) {
       setLoadError('The deck loader is not connected yet. Close the library and try again.');
       return;
     }
 
     setLoadingTrackId(track.id);
+    setLoadingDeckId(deck);
     setLoadError(null);
     setLoadMessage(null);
     try {
-      await onLoadBundledTrack(targetDeck, track);
-      setLoadMessage(track.title + ' loaded to Deck ' + targetDeck.toUpperCase() + '. Ready at the start; playback has not started.');
+      await onLoadBundledTrack(deck, track);
+      setLoadMessage(track.title + ' loaded to Deck ' + deck.toUpperCase() + '. Ready at the start; playback has not started.');
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'The track could not be loaded.');
     } finally {
       setLoadingTrackId(null);
+      setLoadingDeckId(null);
     }
   };
 
@@ -205,51 +216,89 @@ export function WorkspaceMenu({
                 <span className="workspace-menu__track-count">{tracks.length.toString().padStart(2, '0')} CUTS</span>
               </div>
 
-              <div className="workspace-menu__target-row">
-                <span className="workspace-menu__section-label">LOAD TO DECK</span>
-                <div className="workspace-menu__deck-target" role="group" aria-label="Choose target deck">
-                  <button
-                    type="button"
-                    aria-pressed={targetDeck === 'a'}
-                    onClick={() => setTargetDeck('a')}
-                  >
-                    <span>01</span> DECK A
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={targetDeck === 'b'}
-                    onClick={() => setTargetDeck('b')}
-                  >
-                    <span>02</span> DECK B
-                  </button>
-                </div>
+              <div className="workspace-menu__track-instructions">
+                <span className="workspace-menu__section-label">TRACK SELECTION</span>
+                <span>Tap a track to choose where to load it.</span>
               </div>
 
               <div className="workspace-menu__track-list" role="list" aria-label="Battle Ammo tracks">
-                {tracks.map((track, index) => (
-                  <article className="workspace-menu__track-row" role="listitem" key={track.id}>
-                    <span className="workspace-menu__track-index">{String(index + 1).padStart(2, '0')}</span>
-                    <span className="workspace-menu__record-icon" aria-hidden="true">◉</span>
-                    <span className="workspace-menu__track-info">
-                      <strong>{track.title}</strong>
-                      <small>{track.filename} <span aria-hidden="true">·</span> MP3</small>
-                    </span>
-                    <button
-                      type="button"
-                      className="workspace-menu__load-button"
-                      onClick={() => void handleLoadTrack(track)}
-                      disabled={loadingTrackId !== null}
-                      aria-label={'Load ' + track.title + ' to Deck ' + targetDeck.toUpperCase()}
+                {tracks.map((track, index) => {
+                  const isSelected = selectedTrackId === track.id;
+                  const choiceId = 'workspace-track-target-' + track.id;
+
+                  return (
+                    <article
+                      className={'workspace-menu__track-card' + (isSelected ? ' is-selected' : '')}
+                      role="listitem"
+                      key={track.id}
                     >
-                      {loadingTrackId === track.id ? 'LOADING…' : 'LOAD TO ' + targetDeck.toUpperCase()}
-                    </button>
-                  </article>
-                ))}
+                      <button
+                        type="button"
+                        className="workspace-menu__track-row"
+                        onClick={() => handleSelectTrack(track)}
+                        aria-expanded={isSelected}
+                        aria-controls={choiceId}
+                        aria-label={isSelected
+                          ? 'Hide deck choices for ' + track.title
+                          : 'Choose a deck for ' + track.title}
+                        disabled={loadingTrackId !== null}
+                      >
+                        <span className="workspace-menu__track-index">{String(index + 1).padStart(2, '0')}</span>
+                        <span className="workspace-menu__record-icon" aria-hidden="true">◉</span>
+                        <span className="workspace-menu__track-info">
+                          <strong>{track.title}</strong>
+                          <small>{track.filename} <span aria-hidden="true">·</span> MP3</small>
+                        </span>
+                        <span className="workspace-menu__track-action">
+                          {isSelected ? 'CLOSE' : 'CHOOSE DECK'}
+                        </span>
+                      </button>
+
+                      {isSelected && (
+                        <div
+                          id={choiceId}
+                          className="workspace-menu__deck-choice"
+                          role="group"
+                          aria-label={'Load ' + track.title + ' to a deck'}
+                        >
+                          <span className="workspace-menu__deck-choice-prompt">LOAD THIS TRACK TO</span>
+                          <div className="workspace-menu__deck-choice-buttons">
+                            <button
+                              type="button"
+                              className="workspace-menu__deck-choice-button"
+                              onClick={() => void handleLoadTrack(track, 'a')}
+                              disabled={loadingTrackId !== null}
+                              aria-label={'Load ' + track.title + ' to Deck A'}
+                            >
+                              <span>01</span>
+                              {loadingTrackId === track.id && loadingDeckId === 'a' ? 'LOADING…' : 'DECK A'}
+                            </button>
+                            <button
+                              type="button"
+                              className="workspace-menu__deck-choice-button"
+                              onClick={() => void handleLoadTrack(track, 'b')}
+                              disabled={loadingTrackId !== null}
+                              aria-label={'Load ' + track.title + ' to Deck B'}
+                            >
+                              <span>02</span>
+                              {loadingTrackId === track.id && loadingDeckId === 'b' ? 'LOADING…' : 'DECK B'}
+                            </button>
+                          </div>
+                          {(loadError || loadMessage) && (
+                            <p className="workspace-menu__track-feedback" role="status" aria-live="polite">
+                              {loadError || loadMessage}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
               </div>
 
-              <div className="workspace-menu__load-feedback" role="status" aria-live="polite">
-                {loadError || loadMessage || 'Tracks are loaded stopped at the start. Nothing plays until you press start.'}
-              </div>
+              <p className="workspace-menu__load-feedback">
+                Tracks are loaded stopped at the start. Nothing plays until you press start.
+              </p>
 
               <section className="workspace-menu__local-section" aria-labelledby="workspace-local-title">
                 <div className="workspace-menu__local-heading">
