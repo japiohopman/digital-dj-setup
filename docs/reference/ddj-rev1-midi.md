@@ -48,7 +48,8 @@ Do not map a message to an app action until the physical capture is repeatable a
 
 | Physical control/action | Port name | Raw bytes (hex) | Message type | Channel | Repeatable / notes |
 |---|---|---|---|---|---|
-| _Awaiting physical capture_ | — | — | — | — | — |
+| Left deck PLAY/PAUSE — press | DDJ-REV1 input (exact displayed label not recorded) | `90 0B 7F` | Note On, note number 11, velocity 127 | 1 | Observed in five repeated press/release cycles |
+| Left deck PLAY/PAUSE — release | DDJ-REV1 input (exact displayed label not recorded) | `90 0B 00` | Note On with velocity 0 (release semantics) | 1 | Observed in five repeated press/release cycles |
 
 ## Architecture boundary
 
