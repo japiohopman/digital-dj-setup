@@ -1,6 +1,6 @@
 # Pioneer DDJ-REV1 — MIDI discovery
 
-**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Four physical button captures have been repeated and recorded below: PLAY/PAUSE and CUE on both decks. Remaining controls still need to be captured and identified; no control mapping is implemented or implied.
+**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Four physical button captures (PLAY/PAUSE and CUE on both decks) and the left channel fader have been captured. The official Pioneer MIDI message list identifies CC 19/51 as the 14-bit channel-fader MSB/LSB pair. Remaining controls still need to be captured and identified; no app control mapping is implemented or implied.
 
 ## Target and scope
 
@@ -33,7 +33,7 @@ Do not map a message to an app action until the physical capture is repeatable a
 
 ## Observed MIDI inventory
 
-**Connection smoke test (13 November 2026):** The DDJ-REV1 is detected by the local browser MIDI inspector and incoming messages appear after the controller is connected through a working USB port (the port previously used by the mouse). This confirms live USB-MIDI communication. The individual physical controls and their exact byte sequences have not yet been isolated and documented. Populate the table below only from deliberate captures made with one control/action at a time.
+**Connection smoke test (13 November 2026):** The DDJ-REV1 is detected by the local browser MIDI inspector and incoming messages appear after the controller is connected through a working USB port (the port previously used by the mouse). This confirms live USB-MIDI communication. The four transport buttons and left channel fader have now been isolated in physical captures. The fader capture is limited to the inspector's most recent 40 messages, so a complete end-to-end value curve has not yet been preserved.
 
 ### Capture discipline
 
@@ -56,6 +56,7 @@ Do not map a message to an app action until the physical capture is repeatable a
 | Right deck CUE — press | DDJ-REV1 input (exact displayed label not recorded) | `91 0C 7F` | Note On, note number 12, velocity 127 | 2 | Observed in five repeated press/release cycles |
 | Right deck CUE — release | DDJ-REV1 input (exact displayed label not recorded) | `91 0C 00` | Note On with velocity 0 (release semantics) | 2 | Observed in five repeated press/release cycles |
 | Left deck PLAY/PAUSE — release | DDJ-REV1 input (exact displayed label not recorded) | `90 0B 00` | Note On with velocity 0 (release semantics) | 1 | Observed in five repeated press/release cycles |
+| Left deck channel fader — slide | DDJ-REV1 input (exact displayed label not recorded) | `B0 13 xx` + `B0 33 xx` | Control Change; CC 19 MSB + CC 51 LSB (14-bit pair) | 1 | Physical capture emitted both CCs. Captured CC 19 MSB values ranged `78`–`7F`; CC 51 LSB values included `00`–`7F`. The 40-message view truncated the full sweep. Pioneer identifies this pair as CH FADER; bottom=min, top=max. |
 
 ## Architecture boundary
 
@@ -79,6 +80,7 @@ Do not map a message to an app action until the physical capture is repeatable a
 
 - [Pioneer DJ DDJ-REV1 product page](https://www.pioneerdj.com/en/product/dj-controllers/ddj-rev1/)
 - [Pioneer DJ DDJ-REV1 User Manual](https://www.pioneer-dj.de/wp-content/uploads/2024/02/Pioneer-DJ-DDJ-REV1-User-Manual.pdf)
+- [Pioneer DJ DDJ-REV1 MIDI Message List](https://www.pioneerdj.com/-/media/pioneerdj/software-info/controller/ddj-rev1/ddj-rev1_midi_message_list_e1.pdf) — identifies channel fader CC 19 (MSB) / CC 51 (LSB), with bottom=min and top=max.
 - [MDN: Web MIDI API](https://developer.mozilla.org/en-US/docs/Web/API/Web_MIDI_API)
 - [MDN: Navigator.requestMIDIAccess()](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/requestMIDIAccess)
 - [Mixxx DDJ-REV1 mapping proposal](https://github.com/mixxxdj/mixxx/pull/16722) — community research only; verify status, licence and provenance before relying on implementation details.
