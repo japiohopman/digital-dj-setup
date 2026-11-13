@@ -1,6 +1,6 @@
 # Pioneer DDJ-REV1 — MIDI discovery
 
-**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Individual control messages still need to be captured, identified and recorded; no control mapping is implemented or implied.
+**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Two left-deck buttons (PLAY/PAUSE and CUE) have repeatable physical captures recorded below. Remaining controls still need to be captured and identified; no control mapping is implemented or implied.
 
 ## Target and scope
 
@@ -49,6 +49,8 @@ Do not map a message to an app action until the physical capture is repeatable a
 | Physical control/action | Port name | Raw bytes (hex) | Message type | Channel | Repeatable / notes |
 |---|---|---|---|---|---|
 | Left deck PLAY/PAUSE — press | DDJ-REV1 input (exact displayed label not recorded) | `90 0B 7F` | Note On, note number 11, velocity 127 | 1 | Observed in five repeated press/release cycles |
+| Left deck CUE — press | DDJ-REV1 input (exact displayed label not recorded) | `90 0C 7F` | Note On, note number 12, velocity 127 | 1 | Observed in five repeated press/release cycles |
+| Left deck CUE — release | DDJ-REV1 input (exact displayed label not recorded) | `90 0C 00` | Note On with velocity 0 (release semantics) | 1 | Observed in five repeated press/release cycles |
 | Left deck PLAY/PAUSE — release | DDJ-REV1 input (exact displayed label not recorded) | `90 0B 00` | Note On with velocity 0 (release semantics) | 1 | Observed in five repeated press/release cycles |
 
 ## Architecture boundary
