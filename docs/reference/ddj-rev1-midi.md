@@ -19,6 +19,8 @@ The existing touch, pointer/mouse and keyboard workspace remains fully usable wh
 
 ## Capture procedure
 
+This procedure is actionable once the development-only MIDI Inspector has been installed with the Phase 0 implementation. It is not a pre-implementation setup checklist.
+
 1. Connect and power the physical DDJ-REV1.
 2. Open the development build in desktop Chrome or Edge over HTTPS/localhost.
 3. Open **TOOLS → DevKit → MIDI Inspector** and explicitly request MIDI access.
@@ -57,7 +59,7 @@ No physical MIDI messages have been verified yet. Populate this table only from 
 
 ## Sources
 
-- [Pioneer DJ DDJ-REV1 product page](https://www.pioneerdj.com/en/product/dj-controllers/ddj-rev1/black/overview/)
+- [Pioneer DJ DDJ-REV1 product page](https://www.pioneerdj.com/en/product/dj-controllers/ddj-rev1/)
 - [Pioneer DJ DDJ-REV1 User Manual](https://www.pioneer-dj.de/wp-content/uploads/2024/02/Pioneer-DJ-DDJ-REV1-User-Manual.pdf)
 - [MDN: Web MIDI API](https://developer.mozilla.org/en-US/docs/Web/API/Web_MIDI_API)
 - [MDN: Navigator.requestMIDIAccess()](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/requestMIDIAccess)
