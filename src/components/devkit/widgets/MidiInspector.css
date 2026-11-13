@@ -1,0 +1,166 @@
+.midi-inspector {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid rgba(197, 154, 88, 0.35);
+  border-radius: 5px;
+  color: #e5e7eb;
+  background: rgba(8, 10, 13, 0.72);
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+}
+
+.midi-inspector__header,
+.midi-inspector__header > div,
+.midi-inspector__capture-heading,
+.midi-inspector__ports {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.midi-inspector__header strong,
+.midi-inspector__capture-heading strong {
+  color: #d5ad70;
+  font-size: 0.53rem;
+  letter-spacing: 0.1em;
+}
+
+.midi-inspector__header > div {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.midi-inspector__header > div span,
+.midi-inspector__status,
+.midi-inspector__ports,
+.midi-inspector__capture-heading > span {
+  color: rgba(229, 231, 235, 0.58);
+  font-size: 0.43rem;
+  letter-spacing: 0.06em;
+}
+
+.midi-inspector__status.is-connected {
+  color: #9bd3a5;
+}
+
+.midi-inspector__status.is-denied,
+.midi-inspector__status.is-error,
+.midi-inspector__status.is-unsupported,
+.midi-inspector__status.is-disconnected {
+  color: #e6a09a;
+}
+
+.midi-inspector__permission p,
+.midi-inspector__error,
+.midi-inspector__empty,
+.midi-inspector__note {
+  margin: 0;
+  color: rgba(229, 231, 235, 0.7);
+  font-size: 0.49rem;
+  line-height: 1.5;
+}
+
+.midi-inspector__permission {
+  display: grid;
+  gap: 7px;
+}
+
+.midi-inspector__permission button {
+  min-height: 36px;
+  border: 1px solid rgba(213, 173, 112, 0.55);
+  border-radius: 4px;
+  color: #f0d6ad;
+  background: rgba(197, 154, 88, 0.12);
+  font: inherit;
+  font-size: 0.49rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.midi-inspector__permission button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.midi-inspector__select {
+  display: grid;
+  gap: 5px;
+  color: rgba(229, 231, 235, 0.65);
+  font-size: 0.45rem;
+  letter-spacing: 0.08em;
+}
+
+.midi-inspector__select select {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  color: #e5e7eb;
+  background: #171a1e;
+  font: inherit;
+  font-size: 0.5rem;
+}
+
+.midi-inspector__select option {
+  color: #e5e7eb;
+  background: #171a1e;
+}
+
+.midi-inspector__outputs {
+  display: grid;
+  gap: 3px;
+  margin: -3px 0 0;
+  padding-left: 14px;
+  color: rgba(229, 231, 235, 0.55);
+  font-size: 0.44rem;
+}
+
+.midi-inspector__messages {
+  display: grid;
+  max-height: 210px;
+  gap: 4px;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.midi-inspector__messages li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 8px;
+  padding: 5px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 0.45rem;
+}
+
+.midi-inspector__messages time {
+  color: rgba(229, 231, 235, 0.48);
+  font-size: 0.4rem;
+}
+
+.midi-inspector__messages code {
+  grid-column: 1 / -1;
+  color: #e6c38e;
+  font-size: 0.57rem;
+  letter-spacing: 0.09em;
+}
+
+.midi-inspector__messages li > span {
+  grid-column: 1 / -1;
+  color: rgba(229, 231, 235, 0.65);
+}
+
+.midi-inspector__error {
+  color: #e6a09a;
+}
+
+.midi-inspector__note {
+  color: rgba(229, 231, 235, 0.45);
+  font-size: 0.42rem;
+}

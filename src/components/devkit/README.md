@@ -9,6 +9,12 @@ This folder contains developer-only diagnostics. It is imported from `App.tsx` o
 - **Alt+D** toggles the popover where the browser allows the app to receive that shortcut.
 - Press **Escape** to close the popover.
 
+## Available diagnostics
+
+- **Arm angle meter** — live arm angle and local groove-range captures.
+- **Deck state trace** — read-only snapshot of the active deck and recent accepted/rejected transitions.
+- **MIDI inspector (DDJ-REV1)** — optional raw Web MIDI monitor. It asks for browser permission only after the user presses **REQUEST MIDI ACCESS**, requests standard MIDI access with SysEx disabled, and displays available input/output ports plus a bounded recent input-message list. It does not map MIDI messages to any app action.
+
 ## Adding a widget
 
 1. Add the widget component and its styles in this folder (put individual tools under `widgets/`).
@@ -20,5 +26,7 @@ This folder contains developer-only diagnostics. It is imported from `App.tsx` o
 The **Arm angle meter** receives only the active deck label and its live arm angle. Its groove-start/end captures are diagnostic measurements local to the widget. Hiding it preserves those measurements until the widget is unmounted.
 
 The **Deck state trace** receives a read-only snapshot of the active deck state and the most recent accepted/rejected transitions. It cannot dispatch events or change product state.
+
+The **MIDI inspector** lives under `src/components/devkit/widgets/` and uses the isolated service in `src/hardware/midi/`. It records raw messages only; no hardware control mappings are included in Phase 0.
 
 Do not place developer UI or widget styling inside `Turntable.tsx` or `Turntable.css`.
