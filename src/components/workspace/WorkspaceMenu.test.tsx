@@ -48,7 +48,7 @@ describe('WorkspaceMenu', () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it('loads a bundled track only into the selected deck', async () => {
+  it('shows deck choices under the selected track and loads it only into the chosen deck', async () => {
     const onLoadBundledTrack = vi.fn(async () => undefined);
     render(
       <WorkspaceMenu
@@ -58,14 +58,46 @@ describe('WorkspaceMenu', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Open workspace tools' }));
-    fireEvent.click(screen.getByRole('button', { name: '02 DECK B' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Load Super Duck Breaks to Deck B' }));
 
-    expect(onLoadBundledTrack).toHaveBeenCalledWith('b', expect.objectContaining({
+    expect(screen.queryByRole('group', { name: 'Choose target deck' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Load Super Duck Breaks to a deck' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose a deck for Super Duck Breaks' }));
+    expect(screen.getByRole('group', { name: 'Load Super Duck Breaks to a deck' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load Super Duck Breaks to Deck B' }));
+    expect(onLoadBundledTrack).toHaveBeenNthCalledWith(1, 'b', expect.objectContaining({
       id: 'super-duck-breaks',
       filename: 'super_duck_breaks.mp3',
     }));
     expect(await screen.findByText(/Super Duck Breaks loaded to Deck B/)).toBeTruthy();
+
+    // The same expanded track remains available for loading into the other deck.
+    fireEvent.click(screen.getByRole('button', { name: 'Load Super Duck Breaks to Deck A' }));
+    expect(onLoadBundledTrack).toHaveBeenNthCalledWith(2, 'a', expect.objectContaining({
+      id: 'super-duck-breaks',
+      filename: 'super_duck_breaks.mp3',
+    }));
+    expect(await screen.findByText(/Super Duck Breaks loaded to Deck A/)).toBeTruthy();
+  });
+
+  it('moves the inline deck choice to the track that was selected', () => {
+    render(
+      <WorkspaceMenu
+        onTrackControlsTargetChange={() => undefined}
+        onLoadBundledTrack={vi.fn(async () => undefined)}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open workspace tools' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose a deck for Scratch Making Me Itch' }));
+
+    expect(screen.getByRole('group', { name: 'Load Scratch Making Me Itch to a deck' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose a deck for Super Duck Breaks' }));
+
+    expect(screen.queryByRole('group', { name: 'Load Scratch Making Me Itch to a deck' })).toBeNull();
+    expect(screen.getByRole('group', { name: 'Load Super Duck Breaks to a deck' })).toBeTruthy();
   });
 
   it('keeps the Alt+D shortcut available for opening and closing the overlay', () => {
