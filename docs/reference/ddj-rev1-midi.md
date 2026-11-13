@@ -1,6 +1,6 @@
 # Pioneer DDJ-REV1 — MIDI discovery
 
-**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Four physical button captures (PLAY/PAUSE and CUE on both decks) and the left channel fader have been captured. The official Pioneer MIDI message list identifies CC 19/51 as the 14-bit channel-fader MSB/LSB pair. Remaining controls still need to be captured and identified; no app control mapping is implemented or implied.
+**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Four physical button captures (PLAY/PAUSE and CUE on both decks) and both channel faders have been captured. The official Pioneer MIDI message list identifies CC 19/51 as the 14-bit channel-fader MSB/LSB pair. Remaining controls still need to be captured and identified; no app control mapping is implemented or implied.
 
 ## Target and scope
 
@@ -57,6 +57,7 @@ Do not map a message to an app action until the physical capture is repeatable a
 | Right deck CUE — release | DDJ-REV1 input (exact displayed label not recorded) | `91 0C 00` | Note On with velocity 0 (release semantics) | 2 | Observed in five repeated press/release cycles |
 | Left deck PLAY/PAUSE — release | DDJ-REV1 input (exact displayed label not recorded) | `90 0B 00` | Note On with velocity 0 (release semantics) | 1 | Observed in five repeated press/release cycles |
 | Left deck channel fader — slide | DDJ-REV1 input (exact displayed label not recorded) | `B0 13 xx` + `B0 33 xx` | Control Change; CC 19 MSB + CC 51 LSB (14-bit pair) | 1 | Physical capture emitted both CCs. Captured CC 19 MSB values ranged `78`–`7F`; CC 51 LSB values included `00`–`7F`. The 40-message view truncated the full sweep. Pioneer identifies this pair as CH FADER; bottom=min, top=max. |
+| Right deck channel fader — slide | DDJ-REV1 input (exact displayed label not recorded) | `B1 13 xx` + `B1 33 xx` | Control Change; CC 19 MSB + CC 51 LSB (14-bit pair) | 2 | Physical capture emitted both CCs. Captured CC 19 MSB values ranged `78`–`7F`; CC 51 LSB values included `00`–`7F`. The 40-message view truncated the full sweep. Matches the left fader with channel 2. Pioneer identifies this pair as CH FADER; bottom=min, top=max. |
 
 ## Architecture boundary
 
