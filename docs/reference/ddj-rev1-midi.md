@@ -1,6 +1,6 @@
 # Pioneer DDJ-REV1 — MIDI discovery
 
-**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Four physical button captures (PLAY/PAUSE and CUE on both decks), both channel faders, the crossfader, both GAIN (TRIM) knobs, and left-deck EQ HI have been captured. The right-deck EQ HI byte pair is documented as an official-spec expectation, not a separate physical capture. Remaining controls still need to be captured and identified; no app control mapping is implemented or implied.
+**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Four physical button captures (PLAY/PAUSE and CUE on both decks), both channel faders, the crossfader, both GAIN (TRIM) knobs, and left-deck EQ HI and EQ MID have been captured. The right-deck EQ HI byte pair is documented as an official-spec expectation, not a separate physical capture. Remaining controls still need to be captured and identified; no app control mapping is implemented or implied.
 
 ## Target and scope
 
@@ -33,7 +33,7 @@ Do not map a message to an app action until the physical capture is repeatable a
 
 ## Observed MIDI inventory
 
-**Connection smoke test (13 November 2026):** The DDJ-REV1 is detected by the local browser MIDI inspector and incoming messages appear after the controller is connected through a working USB port (the port previously used by the mouse). This confirms live USB-MIDI communication. The four transport buttons, both channel faders, crossfader, both GAIN (TRIM) knobs, and left EQ HI have now been isolated in physical captures. The bounded 40-message inspector buffer does not preserve complete end-to-end value curves for continuous controls.
+**Connection smoke test (13 November 2026):** The DDJ-REV1 is detected by the local browser MIDI inspector and incoming messages appear after the controller is connected through a working USB port (the port previously used by the mouse). This confirms live USB-MIDI communication. The four transport buttons, both channel faders, crossfader, both GAIN (TRIM) knobs, left EQ HI and left EQ MID have now been isolated in physical captures. The bounded 40-message inspector buffer does not preserve complete end-to-end value curves for continuous controls.
 
 ### Capture discipline
 
