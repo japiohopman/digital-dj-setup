@@ -78,6 +78,7 @@ export function MidiInspector() {
               {snapshot.inputs.map((port) => (
                 <option value={port.id} key={port.id} disabled={port.state !== 'connected'}>
                   {[port.manufacturer, port.name].filter(Boolean).join(' — ')}
+                  {` · ID ${port.id}`}
                   {port.state === 'disconnected' ? ' (disconnected)' : ''}
                 </option>
               ))}
@@ -92,7 +93,7 @@ export function MidiInspector() {
             <ul className="midi-inspector__outputs" aria-label="Available MIDI outputs">
               {snapshot.outputs.map((port) => (
                 <li key={port.id}>
-                  {port.manufacturer ? `${port.manufacturer} — ` : ''}{port.name}
+                  {port.manufacturer ? `${port.manufacturer} — ` : ''}{port.name} · ID {port.id}
                 </li>
               ))}
             </ul>

@@ -12,7 +12,7 @@ const MAX_RECENT_MESSAGES = 40;
 function getBrowserRequester(): MidiAccessRequester | null {
   if (typeof navigator === 'undefined') return null;
 
-  const midiNavigator = navigator as Navigator & {
+  const midiNavigator = navigator as unknown as {
     requestMIDIAccess?: MidiAccessRequester;
   };
   const request = midiNavigator.requestMIDIAccess;
@@ -72,6 +72,7 @@ export class MidiConnectionService {
   private readonly listeners = new Set<() => void>();
   private messageSequence = 0;
   private connectionSequence = 0;
+  private accessRequestSequence = 0;
 
   private snapshot: MidiInspectorSnapshot = {
     status: 'idle',
@@ -110,14 +111,17 @@ export class MidiConnectionService {
       return;
     }
 
+    const requestSequence = ++this.accessRequestSequence;
     this.update({ status: 'requesting', error: null });
     try {
       const access = await this.requestMIDIAccess({ sysex: false });
+      if (requestSequence !== this.accessRequestSequence) return;
       this.access = access;
       this.access.addEventListener('statechange', this.onAccessStateChange);
       this.refreshPorts();
       this.update({ status: 'ready', accessGranted: true, error: null });
     } catch (error) {
+      if (requestSequence !== this.accessRequestSequence) return;
       this.update({
         status: isPermissionError(error) ? 'denied' : 'error',
         accessGranted: false,
@@ -199,6 +203,7 @@ export class MidiConnectionService {
   /** Remove all device listeners and close the selected port without affecting the app. */
   dispose = (): void => {
     this.connectionSequence += 1;
+    this.accessRequestSequence += 1;
     this.detachActiveInput();
     this.access?.removeEventListener('statechange', this.onAccessStateChange);
     this.access = null;
@@ -231,7 +236,11 @@ export class MidiConnectionService {
       return;
     }
 
-    if (this.activeInput?.id === selected.id) return;
+    if (
+      this.activeInput?.id === selected.id &&
+      selected.connection === 'open'
+    ) return;
+    if (this.snapshot.status === 'connecting') return;
     void this.selectInput(selected.id);
   }
 
