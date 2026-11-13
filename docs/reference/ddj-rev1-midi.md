@@ -1,6 +1,6 @@
 # Pioneer DDJ-REV1 — MIDI discovery
 
-**Status:** Phase 0 discovery in progress. No control mapping is implemented or implied by this document.
+**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Individual control messages still need to be captured, identified and recorded; no control mapping is implemented or implied.
 
 ## Target and scope
 
@@ -33,7 +33,18 @@ Do not map a message to an app action until the physical capture is repeatable a
 
 ## Observed MIDI inventory
 
-No physical MIDI messages have been verified yet. Populate this table only from captures made with the user's controller.
+**Connection smoke test (13 November 2026):** The DDJ-REV1 is detected by the local browser MIDI inspector and incoming messages appear after the controller is connected through a working USB port (the port previously used by the mouse). This confirms live USB-MIDI communication. The individual physical controls and their exact byte sequences have not yet been isolated and documented. Populate the table below only from deliberate captures made with one control/action at a time.
+
+### Capture discipline
+
+- Select the DDJ-REV1 input and leave it selected for the session.
+- Start with one physical control only. Do not touch another control during the capture.
+- For buttons, record press and release separately; repeat the same action three times to confirm stable bytes.
+- For knobs and faders, record minimum, midpoint and maximum, then a slow sweep. Note whether values increase or decrease.
+- For jogwheels, isolate touch, clockwise movement and counter-clockwise movement; do not combine touch and rotation in the first test.
+- Record the physical control name, action, exact byte sequence(s), message type, channel and whether the result repeated consistently.
+- The inspector shows the newest messages first and retains at most 40. To reset the visible capture before the next control, select the empty input option and then reselect the DDJ-REV1 input.
+- Do not infer a control meaning from a byte sequence alone. Confirm it by repeating the same physical action and comparing press/release or movement values.
 
 | Physical control/action | Port name | Raw bytes (hex) | Message type | Channel | Repeatable / notes |
 |---|---|---|---|---|---|
