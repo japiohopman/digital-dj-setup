@@ -1,6 +1,6 @@
 # Pioneer DDJ-REV1 — MIDI discovery
 
-**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Four physical button captures (PLAY/PAUSE and CUE on both decks), both channel faders, the crossfader, and both GAIN (TRIM) knobs have been captured. Pioneer’s official MIDI message list identifies these as 14-bit MSB/LSB pairs. Remaining controls still need to be captured and identified; no app control mapping is implemented or implied.
+**Status:** Physical USB-MIDI connection confirmed on the user's HP EliteBook 850 G2 after changing USB ports. The development MIDI Inspector receives incoming messages. Four physical button captures (PLAY/PAUSE and CUE on both decks), both channel faders, the crossfader, both GAIN (TRIM) knobs, and left-deck EQ HI have been captured. The right-deck EQ HI byte pair is documented as an official-spec expectation, not a separate physical capture. Remaining controls still need to be captured and identified; no app control mapping is implemented or implied.
 
 ## Target and scope
 
@@ -33,7 +33,7 @@ Do not map a message to an app action until the physical capture is repeatable a
 
 ## Observed MIDI inventory
 
-**Connection smoke test (13 November 2026):** The DDJ-REV1 is detected by the local browser MIDI inspector and incoming messages appear after the controller is connected through a working USB port (the port previously used by the mouse). This confirms live USB-MIDI communication. The four transport buttons, both channel faders, crossfader, and both GAIN (TRIM) knobs have now been isolated in physical captures. The bounded 40-message inspector buffer does not preserve complete end-to-end value curves for continuous controls.
+**Connection smoke test (13 November 2026):** The DDJ-REV1 is detected by the local browser MIDI inspector and incoming messages appear after the controller is connected through a working USB port (the port previously used by the mouse). This confirms live USB-MIDI communication. The four transport buttons, both channel faders, crossfader, both GAIN (TRIM) knobs, and left EQ HI have now been isolated in physical captures. The bounded 40-message inspector buffer does not preserve complete end-to-end value curves for continuous controls.
 
 ### Capture discipline
 
@@ -61,6 +61,8 @@ Do not map a message to an app action until the physical capture is repeatable a
 | Crossfader — slide left ↔ right | DDJ-REV1 input (exact displayed label not recorded) | `B6 1F xx` + `B6 3F xx` | Control Change; CC 31 MSB + CC 63 LSB (14-bit pair) | 7 | Physical capture emitted both CCs. The supplied 40-message window includes CC 31 values `00`–`07` and CC 63 values `00`–`7F`; it does not preserve a complete sweep. Pioneer identifies this as MIXER → CROSSFADER; left=min, right=max. |
 | Left deck GAIN (TRIM) — rotate counterclockwise ↔ clockwise | DDJ-REV1 input (exact displayed label not recorded) | `B0 04 xx` + `B0 24 xx` | Control Change; CC 4 MSB + CC 36 LSB (14-bit pair) | 1 | Physical capture emitted both CCs. The 40-message window includes CC 4 values `00`–`07` and CC 36 values `00`–`7D`; the complete sweep/endpoints are not preserved. Pioneer identifies this as GAIN (TRIM), fully counterclockwise=min and fully clockwise=max. |
 | Right deck GAIN (TRIM) — rotate counterclockwise ↔ clockwise | DDJ-REV1 input (exact displayed label not recorded) | `B1 04 xx` + `B1 24 xx` | Control Change; CC 4 MSB + CC 36 LSB (14-bit pair) | 2 | Physical capture emitted both CCs. The 40-message window includes CC 4 values `00`–`07` and CC 36 values `00`–`7A`; the complete sweep/endpoints are not preserved. Matches the left control on channel 2. Pioneer identifies this as GAIN (TRIM), fully counterclockwise=min and fully clockwise=max. |
+| Left deck EQ HI — rotate counterclockwise ↔ clockwise | DDJ-REV1 input (exact displayed label not recorded) | `B0 07 xx` + `B0 27 xx` | Control Change; CC 7 MSB + CC 39 LSB (14-bit pair) | 1 | Physically observed on the left deck. Supplied 40-message window shows CC 7 values `00`–`07` and CC 39 values `00`–`7D`; full sweep/endpoints are not preserved. Pioneer identifies this as EQ HI, fully counterclockwise=min and fully clockwise=max. |
+| Right deck EQ HI — expected, not separately captured | DDJ-REV1 input (expected from official spec) | `B1 07 xx` + `B1 27 xx` | Control Change; CC 7 MSB + CC 39 LSB (14-bit pair) | 2 | Manufacturer specification assigns EQ HI to channels 1/2/3/4. This channel-2 pair is therefore the documented expectation; physical right-deck verification remains open. |
 
 ## Architecture boundary
 
@@ -86,6 +88,7 @@ Do not map a message to an app action until the physical capture is repeatable a
 - [Pioneer DJ DDJ-REV1 User Manual](https://www.pioneer-dj.de/wp-content/uploads/2024/02/Pioneer-DJ-DDJ-REV1-User-Manual.pdf)
 - [Pioneer DJ DDJ-REV1 MIDI Message List](https://www.pioneerdj.com/-/media/pioneerdj/software-info/controller/ddj-rev1/ddj-rev1_midi_message_list_e1.pdf) — identifies channel fader CC 19 (MSB) / CC 51 (LSB), with bottom=min and top=max.
 - The same official MIDI Message List identifies GAIN (TRIM) as CC 4 (MSB) / CC 36 (LSB) on deck channels 1/2/3/4; fully counterclockwise=min and fully clockwise=max.
+- The same official MIDI Message List identifies EQ HI as CC 7 (MSB) / CC 39 (LSB), also on deck channels 1/2/3/4; fully counterclockwise=min and fully clockwise=max.
 - [MDN: Web MIDI API](https://developer.mozilla.org/en-US/docs/Web/API/Web_MIDI_API)
 - [MDN: Navigator.requestMIDIAccess()](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/requestMIDIAccess)
 - [Mixxx DDJ-REV1 mapping proposal](https://github.com/mixxxdj/mixxx/pull/16722) — community research only; verify status, licence and provenance before relying on implementation details.
